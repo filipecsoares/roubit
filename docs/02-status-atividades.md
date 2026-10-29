@@ -11,7 +11,7 @@
 
 | Feature | Total de Atividades | Concluídas | Em Progresso | Não Iniciadas | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **01. Workspace Setup & Tooling** | 4 | 2 | 0 | 2 | 🟡 Em Progresso |
+| **01. Workspace Setup & Tooling** | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
 | **02. Criptografia & Memory Safety** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **03. Gestão de Rotinas (Time Blocks)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
@@ -21,7 +21,7 @@
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **2** | **0** | **46** | **4.2%** |
+| **TOTAL** | **48** | **3** | **0** | **45** | **6.3%** |
 
 ---
 
@@ -32,7 +32,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **01.1** | Cargo Workspace & Project Layout | [activity-01-cargo-workspace-init.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/01-workspace-setup/activity-01-cargo-workspace-init.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **01.2** | Linting, Formatting & Quality Standards | [activity-02-linting-formatting-git-hooks.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/01-workspace-setup/activity-02-linting-formatting-git-hooks.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
-| **01.3** | GitHub Actions CI Pipeline | [activity-03-github-actions-ci-pipeline.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/01-workspace-setup/activity-03-github-actions-ci-pipeline.prompt) | ⚪ NÃO INICIADO | - |
+| **01.3** | GitHub Actions CI Pipeline | [activity-03-github-actions-ci-pipeline.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/01-workspace-setup/activity-03-github-actions-ci-pipeline.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **01.4** | Configuração de Ambiente & Tracing | [activity-04-environment-configuration-logging.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/01-workspace-setup/activity-04-environment-configuration-logging.prompt) | ⚪ NÃO INICIADO | - |
 
 ---

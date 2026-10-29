@@ -35,8 +35,8 @@ flowchart TD
 - [x] **0.2 Governança de Git & Políticas de Branching**
   - [x] Estabelecer fluxo de branches: `main` (produção/estável), `develop` (integração), `feature/*`.
   - [x] Definir padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
-- [ ] **0.3 Configuração Inicial de CI no GitHub Actions**
-  - [ ] Criar workflow `.github/workflows/rust-ci.yml` (`cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo audit`).
+- [x] **0.3 Configuração Inicial de CI no GitHub Actions**
+  - [x] Criar workflow `.github/workflows/rust-ci.yml` (`cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo audit`).
   - [ ] Criar workflow base `.github/workflows/vue-ci.yml` (lint e type check para o frontend).
 
 ---
