@@ -12,7 +12,7 @@
 | Feature | Total de Atividades | Concluídas | Em Progresso | Não Iniciadas | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **01. Workspace Setup & Tooling** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **02. Criptografia & Memory Safety** | 4 | 2 | 0 | 2 | 🟡 Em Progresso (50%) |
+| **02. Criptografia & Memory Safety** | 4 | 3 | 0 | 1 | 🟡 Em Progresso (75%) |
 | **03. Gestão de Rotinas (Time Blocks)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **05. Objetivos & OKRs** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
@@ -21,7 +21,7 @@
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **6** | **0** | **42** | **12.5%** |
+| **TOTAL** | **48** | **7** | **0** | **41** | **14.6%** |
 
 ---
 
@@ -42,7 +42,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **02.1** | Derivação de Chaves com Argon2id | [activity-01-argon2id-key-derivation.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/02-cryptography/activity-01-argon2id-key-derivation.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **02.2** | Cifra Autenticada AES-256-GCM | [activity-02-aes-256-gcm-cipher.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/02-cryptography/activity-02-aes-256-gcm-cipher.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
-| **02.3** | Sanitização de Memória com Zeroize | [activity-03-zeroize-memory-safety.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/02-cryptography/activity-03-zeroize-memory-safety.prompt) | ⚪ NÃO INICIADO | - |
+| **02.3** | Sanitização de Memória com Zeroize | [activity-03-zeroize-memory-safety.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/02-cryptography/activity-03-zeroize-memory-safety.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **02.4** | Vetores de Teste NIST e Benchmarks | [activity-04-cryptographic-test-vectors-benchmarks.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/02-cryptography/activity-04-cryptographic-test-vectors-benchmarks.prompt) | ⚪ NÃO INICIADO | - |
 
 ---

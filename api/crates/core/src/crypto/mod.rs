@@ -5,6 +5,8 @@
 
 pub mod cipher;
 pub mod kdf;
+pub mod memory;
 
 pub use cipher::{AesGcmCipher, CipherError, EncryptedEnvelope};
 pub use kdf::{DerivedKey, KdfError, KdfService};
+pub use memory::{SecretBytes, SecretString};

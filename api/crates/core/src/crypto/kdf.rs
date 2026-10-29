@@ -22,9 +22,29 @@ impl DerivedKey {
     }
 }
 
+impl std::ops::Deref for DerivedKey {
+    type Target = [u8; 32];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<[u8; 32]> for DerivedKey {
+    fn as_ref(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 impl std::fmt::Debug for DerivedKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("DerivedKey([REDACTED])")
+    }
+}
+
+impl std::fmt::Display for DerivedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("***REDACTED***")
     }
 }
 
