@@ -49,7 +49,7 @@ flowchart TD
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
   - [x] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
 
-  - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
+  - [x] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
   - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [x] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
   - [x] Implementar derivação de chave a partir de senha mestre usando Argon2id.
@@ -61,7 +61,7 @@ flowchart TD
   - [x] **Rastreamento de Hábitos (RF02):**
     - Lógica de registro para hábitos binários, contadores numéricos (ex: ml, páginas) e timer (minutos).
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
-  - [ ] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
+  - [x] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
   - [ ] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
 - [ ] **1.4 Interface de Linha de Comando (CLI com Clap)**
   - [ ] Implementar subcomando `roubit routine` (listar rotina de hoje, iniciar bloco, finalizar bloco).
