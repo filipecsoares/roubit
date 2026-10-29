@@ -6,7 +6,7 @@
 pub mod routine;
 
 pub use routine::{
-    create_sqlite_pool, BlockStatus, DailyRoutineLog, Routine, RoutineRepository,
-    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock, TimeBlockValidationError,
-    TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
+    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Routine,
+    RoutineProgressTracker, RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository,
+    TimeBlock, TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
