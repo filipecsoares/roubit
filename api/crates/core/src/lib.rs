@@ -13,8 +13,10 @@ pub use crypto::{
 };
 pub use domain::{
     create_sqlite_pool, BlockStatus, DailyRoutineLog, Routine, RoutineRepository,
-    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock,
+    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock, TimeBlockValidationError,
+    TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
+
 pub use telemetry::init_telemetry;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

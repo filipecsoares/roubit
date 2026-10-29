@@ -4,8 +4,12 @@
 
 pub mod models;
 pub mod repository;
+pub mod validation;
 
 pub use models::{BlockStatus, DailyRoutineLog, Routine, TimeBlock};
 pub use repository::{
     create_sqlite_pool, RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository,
+};
+pub use validation::{
+    TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
