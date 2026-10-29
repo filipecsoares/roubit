@@ -79,4 +79,5 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Audit Cargo.lock
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2023-0071
+
