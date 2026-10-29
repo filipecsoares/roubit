@@ -14,14 +14,14 @@
 | **01. Workspace Setup & Tooling** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **02. Criptografia & Memory Safety** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **03. Gestão de Rotinas (Time Blocks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
-| **04. Rastreamento de Hábitos (Streaks)** | 5 | 4 | 0 | 1 | 🟡 Em Progresso (80%) |
+| **04. Rastreamento de Hábitos (Streaks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **05. Objetivos & OKRs** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **06. Journaling Criptografado** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **07. Aplicação CLI (Terminal)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **17** | **0** | **31** | **35.4%** |
+| **TOTAL** | **48** | **18** | **0** | **30** | **37.5%** |
 
 ---
 
@@ -65,7 +65,7 @@
 | **04.2** | Repositório de Hábitos & Check-in Atômico | [activity-02-habit-repository-sqlx.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/04-habits/activity-02-habit-repository-sqlx.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **04.3** | Motor Resiliente de Cálculo de Streaks | [activity-03-streak-calculation-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/04-habits/activity-03-streak-calculation-engine.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **04.4** | Análise de Aderência & Heatmap Anual | [activity-04-adherence-metrics-analytics.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/04-habits/activity-04-adherence-metrics-analytics.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
-| **04.5** | Suíte de Testes de Integração de Hábitos | [activity-05-habit-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/04-habits/activity-05-habit-unit-integration-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **04.5** | Suíte de Testes de Integração de Hábitos | [activity-05-habit-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/04-habits/activity-05-habit-unit-integration-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 
 ---
 
