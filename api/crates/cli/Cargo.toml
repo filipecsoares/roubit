@@ -1,0 +1,18 @@
+[package]
+name = "roubit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "roubit"
+path = "src/main.rs"
+
+[dependencies]
+roubit-core.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true

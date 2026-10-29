@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/cli",
+    "crates/server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Roubit Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/filipecsoares/roubit"
+
+[workspace.dependencies]
+# Serialization & Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "~1.11", features = ["v4", "serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Async & Runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Internal workspace crates
+roubit-core = { path = "crates/core" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

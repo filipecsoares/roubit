@@ -27,11 +27,11 @@ flowchart TD
 ### Fase 0: Inicialização do Repositório, Estrutura de Diretórios e Governança
 *Objetivo: Estabelecer as bases do repositório, convenções de código, pipelines iniciais e estrutura modular.*
 
-- [ ] **0.1 Estrutura do Monorepo / Diretórios Base**
-  - [ ] Estabelecer os 3 diretórios raiz do projeto: `docs/`, `frontend/` e `api/`.
-  - [ ] Configurar Cargo Workspace para o ecossistema Rust dentro de `api/` (`api/Cargo.toml`, `api/crates/core`, `api/crates/cli`, `api/crates/server`).
-  - [ ] Estruturar diretório do frontend SPA (`frontend/` para Vue 3).
-  - [ ] Definir `.gitignore`, `.editorconfig` e variáveis de ambiente exemplo (`.env.example`).
+- [x] **0.1 Estrutura do Monorepo / Diretórios Base**
+  - [x] Estabelecer os 3 diretórios raiz do projeto: `docs/`, `frontend/` e `api/`.
+  - [x] Configurar Cargo Workspace para o ecossistema Rust dentro de `api/` (`api/Cargo.toml`, `api/crates/core`, `api/crates/cli`, `api/crates/server`).
+  - [x] Estruturar diretório do frontend SPA (`frontend/` para Vue 3).
+  - [x] Definir `.gitignore`, `.editorconfig` e variáveis de ambiente exemplo (`.env.example`).
 - [ ] **0.2 Governança de Git & Políticas de Branching**
   - [ ] Estabelecer fluxo de branches: `main` (produção/estável), `develop` (integração), `feature/*`.
   - [ ] Definir padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
