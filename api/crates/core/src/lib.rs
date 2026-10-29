@@ -13,9 +13,9 @@ pub use crypto::{
 };
 pub use domain::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit, HabitLog,
-    HabitType, Routine, RoutineProgressTracker, RoutineRepository, RoutineRepositoryError,
-    SqliteRoutineRepository, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
-    MINIMUM_BLOCK_DURATION_MINUTES,
+    HabitRepository, HabitRepositoryError, HabitType, Routine, RoutineProgressTracker,
+    RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteRoutineRepository,
+    TimeBlock, TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
 
 pub use telemetry::init_telemetry;

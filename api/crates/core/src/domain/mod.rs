@@ -6,7 +6,10 @@
 pub mod habit;
 pub mod routine;
 
-pub use habit::{Habit, HabitLog, HabitType};
+pub use habit::{
+    Habit, HabitLog, HabitRepository, HabitRepositoryError, HabitType, SqliteHabitRepository,
+};
+
 pub use routine::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Routine,
     RoutineProgressTracker, RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository,
