@@ -47,7 +47,8 @@ flowchart TD
 - [ ] **1.1 Modelagem do Banco de Dados e Migrations (SQLx + SQLite WAL)**
   - [x] Configurar conexão SQLite com modo WAL (`PRAGMA journal_mode=WAL`) e `PRAGMA foreign_keys = ON`.
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
-  - [ ] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
+  - [x] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
+
   - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
   - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [x] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
@@ -57,7 +58,7 @@ flowchart TD
 - [ ] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
   - [x] **Gestão de Rotinas (RF01):** Criação, edição e acompanhamento de blocos de tempo; cálculo de aderência do dia.
 
-  - [ ] **Rastreamento de Hábitos (RF02):**
+  - [x] **Rastreamento de Hábitos (RF02):**
     - Lógica de registro para hábitos binários, contadores numéricos (ex: ml, páginas) e timer (minutos).
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
   - [ ] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
