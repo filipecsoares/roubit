@@ -4,6 +4,7 @@
 //! - [`routine`]: Routine management and time-blocking (RF01)
 
 pub mod habit;
+pub mod okr;
 pub mod routine;
 
 pub use habit::{
@@ -11,6 +12,8 @@ pub use habit::{
     HabitRepositoryError, HabitType, HeatmapCell, SqliteHabitRepository, StreakCalculator,
     StreakMetrics,
 };
+
+pub use okr::{KeyResult, Objective};
 
 pub use routine::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Routine,

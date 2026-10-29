@@ -49,7 +49,7 @@ flowchart TD
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
   - [x] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
 
-  - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
+  - [x] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
   - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [x] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
   - [x] Implementar derivação de chave a partir de senha mestre usando Argon2id.
