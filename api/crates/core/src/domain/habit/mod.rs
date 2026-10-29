@@ -4,6 +4,8 @@
 
 pub mod models;
 pub mod repository;
+pub mod streak;
 
 pub use models::{Habit, HabitLog, HabitType};
 pub use repository::{HabitRepository, HabitRepositoryError, SqliteHabitRepository};
+pub use streak::{StreakCalculator, StreakMetrics};

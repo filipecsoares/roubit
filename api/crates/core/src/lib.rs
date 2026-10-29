@@ -15,7 +15,8 @@ pub use domain::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit, HabitLog,
     HabitRepository, HabitRepositoryError, HabitType, Routine, RoutineProgressTracker,
     RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteRoutineRepository,
-    TimeBlock, TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
+    StreakCalculator, StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
+    MINIMUM_BLOCK_DURATION_MINUTES,
 };
 
 pub use telemetry::init_telemetry;
