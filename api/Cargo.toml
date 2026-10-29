@@ -25,6 +25,7 @@ dotenvy = "0.15"
 envy = "0.4"
 
 # Cryptography & Memory Security
+aes-gcm = "0.10"
 argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 zeroize = { version = "1.8", features = ["derive"] }

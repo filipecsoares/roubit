@@ -6,7 +6,7 @@ pub mod crypto;
 pub mod telemetry;
 
 pub use config::AppConfig;
-pub use crypto::{DerivedKey, KdfError, KdfService};
+pub use crypto::{AesGcmCipher, CipherError, DerivedKey, EncryptedEnvelope, KdfError, KdfService};
 pub use telemetry::init_telemetry;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
