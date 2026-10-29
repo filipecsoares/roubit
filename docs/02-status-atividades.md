@@ -16,12 +16,12 @@
 | **03. Gestão de Rotinas (Time Blocks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **05. Objetivos & OKRs** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **06. Journaling Criptografado** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **06. Journaling Criptografado** | 4 | 1 | 0 | 3 | 🟡 Em Progresso (25%) |
 | **07. Aplicação CLI (Terminal)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **22** | **0** | **26** | **45.8%** |
+| **TOTAL** | **48** | **23** | **0** | **25** | **47.9%** |
 
 ---
 
@@ -82,7 +82,7 @@
 ### Feature 06: Journaling Criptografado (Dual-Storage)
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **06.1** | Arquitetura Dual-Storage & Schema | [activity-01-journal-domain-models-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/06-journaling/activity-01-journal-domain-models-schema.prompt) | ⚪ NÃO INICIADO | - |
+| **06.1** | Arquitetura Dual-Storage & Schema | [activity-01-journal-domain-models-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/06-journaling/activity-01-journal-domain-models-schema.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **06.2** | Repositório SQLite com Busca por Metadados | [activity-02-journal-repository-sqlx.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/06-journaling/activity-02-journal-repository-sqlx.prompt) | ⚪ NÃO INICIADO | - |
 | **06.3** | Serviço Criptográfico do Diário | [activity-03-journal-service-crypto-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/06-journaling/activity-03-journal-service-crypto-integration.prompt) | ⚪ NÃO INICIADO | - |
 | **06.4** | Testes de Zero-Knowledge & Tampering | [activity-04-journal-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/06-journaling/activity-04-journal-unit-integration-tests.prompt) | ⚪ NÃO INICIADO | - |
