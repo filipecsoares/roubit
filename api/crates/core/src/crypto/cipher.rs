@@ -52,16 +52,18 @@ impl AesGcmCipher {
     ///
     /// # Errors
     /// Returns [`CipherError::EncryptionFailed`] if encryption fails.
-    pub fn encrypt(
+    /// Encrypts `plaintext` using AES-256-GCM with a specified 96-bit `nonce`, 32-byte `key`, and optional `associated_data`.
+    ///
+    /// # Errors
+    /// Returns [`CipherError::EncryptionFailed`] if encryption fails.
+    pub fn encrypt_with_nonce(
         key: &[u8; KEY_LENGTH],
+        nonce_bytes: &[u8; NONCE_LENGTH],
         plaintext: &[u8],
         associated_data: Option<&[u8]>,
     ) -> Result<EncryptedEnvelope, CipherError> {
-        let mut nonce_bytes = [0u8; NONCE_LENGTH];
-        rand_core::OsRng.fill_bytes(&mut nonce_bytes);
-
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from_slice(nonce_bytes);
 
         let payload = Payload {
             msg: plaintext,
@@ -73,9 +75,25 @@ impl AesGcmCipher {
             .map_err(|e| CipherError::EncryptionFailed(e.to_string()))?;
 
         Ok(EncryptedEnvelope {
-            nonce: nonce_bytes,
+            nonce: *nonce_bytes,
             ciphertext,
         })
+    }
+
+    /// Encrypts `plaintext` using AES-256-GCM with the provided 32-byte `key` and optional `associated_data`.
+    ///
+    /// Generates a fresh 96-bit random nonce using [`rand_core::OsRng`] for every invocation.
+    ///
+    /// # Errors
+    /// Returns [`CipherError::EncryptionFailed`] if encryption fails.
+    pub fn encrypt(
+        key: &[u8; KEY_LENGTH],
+        plaintext: &[u8],
+        associated_data: Option<&[u8]>,
+    ) -> Result<EncryptedEnvelope, CipherError> {
+        let mut nonce_bytes = [0u8; NONCE_LENGTH];
+        rand_core::OsRng.fill_bytes(&mut nonce_bytes);
+        Self::encrypt_with_nonce(key, &nonce_bytes, plaintext, associated_data)
     }
 
     /// Decrypts an [`EncryptedEnvelope`] using AES-256-GCM with the provided 32-byte `key` and optional `associated_data`.

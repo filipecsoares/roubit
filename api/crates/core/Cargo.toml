@@ -28,3 +28,9 @@ zeroize.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+hex-literal.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "crypto_bench"
+harness = false
