@@ -21,6 +21,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "~1.11", features = ["v4", "serde"] }
 thiserror = "2.0"
 anyhow = "1.0"
+async-trait = "0.1"
 dotenvy = "0.15"
 envy = "0.4"
 
@@ -33,6 +34,9 @@ hex-literal = "0.4"
 
 # Benchmarking & Testing
 criterion = { version = "0.5", features = ["html_reports"] }
+
+# Database & Persistence
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate", "macros"] }
 
 # Async & Runtime
 tokio = { version = "1.43", features = ["full"] }
