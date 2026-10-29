@@ -61,7 +61,7 @@ flowchart TD
   - [x] **Rastreamento de Hábitos (RF02):**
     - Lógica de registro para hábitos binários, contadores numéricos (ex: ml, páginas) e timer (minutos).
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
-  - [ ] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
+  - [x] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
   - [ ] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
 - [ ] **1.4 Interface de Linha de Comando (CLI com Clap)**
   - [ ] Implementar subcomando `roubit routine` (listar rotina de hoje, iniciar bloco, finalizar bloco).
