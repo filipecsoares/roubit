@@ -32,6 +32,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 # Internal workspace crates
 roubit-core = { path = "crates/core" }
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+
 [profile.release]
 opt-level = 3
 lto = "thin"

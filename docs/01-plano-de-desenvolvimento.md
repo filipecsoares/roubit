@@ -32,9 +32,9 @@ flowchart TD
   - [x] Configurar Cargo Workspace para o ecossistema Rust dentro de `api/` (`api/Cargo.toml`, `api/crates/core`, `api/crates/cli`, `api/crates/server`).
   - [x] Estruturar diretório do frontend SPA (`frontend/` para Vue 3).
   - [x] Definir `.gitignore`, `.editorconfig` e variáveis de ambiente exemplo (`.env.example`).
-- [ ] **0.2 Governança de Git & Políticas de Branching**
-  - [ ] Estabelecer fluxo de branches: `main` (produção/estável), `develop` (integração), `feature/*`.
-  - [ ] Definir padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
+- [x] **0.2 Governança de Git & Políticas de Branching**
+  - [x] Estabelecer fluxo de branches: `main` (produção/estável), `develop` (integração), `feature/*`.
+  - [x] Definir padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
 - [ ] **0.3 Configuração Inicial de CI no GitHub Actions**
   - [ ] Criar workflow `.github/workflows/rust-ci.yml` (`cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo audit`).
   - [ ] Criar workflow base `.github/workflows/vue-ci.yml` (lint e type check para o frontend).
