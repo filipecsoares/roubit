@@ -13,7 +13,7 @@
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **01. Workspace Setup & Tooling** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **02. Criptografia & Memory Safety** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **03. Gestão de Rotinas (Time Blocks)** | 5 | 4 | 0 | 1 | 🟡 Em Progresso (80%) |
+| **03. Gestão de Rotinas (Time Blocks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **05. Objetivos & OKRs** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **06. Journaling Criptografado** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
@@ -21,7 +21,7 @@
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **12** | **0** | **36** | **25.0%** |
+| **TOTAL** | **48** | **13** | **0** | **35** | **27.1%** |
 
 ---
 
@@ -54,7 +54,7 @@
 | **03.2** | Repositório SQLite em Modo WAL | [activity-02-sqlite-repository-wal.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/03-routines/activity-02-sqlite-repository-wal.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **03.3** | Motor de Validação & Detecção de Overlap | [activity-03-time-block-validation-overlap-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/03-routines/activity-03-time-block-validation-overlap-engine.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **03.4** | Tracker de Execução e Aderência Diária | [activity-04-daily-routine-progress-tracker.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/03-routines/activity-04-daily-routine-progress-tracker.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
-| **03.5** | Testes de Integração de Rotinas | [activity-05-routine-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/03-routines/activity-05-routine-unit-integration-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **03.5** | Testes de Integração de Rotinas | [activity-05-routine-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/03-routines/activity-05-routine-unit-integration-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 
 ---
 
