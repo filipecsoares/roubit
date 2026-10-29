@@ -1,7 +1,17 @@
 //! Roubit REST API Server
 
+use roubit_core::{init_telemetry, AppConfig};
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let config = AppConfig::from_env().unwrap_or_default();
+    init_telemetry(&config.log_level);
+    tracing::info!(
+        host = %config.server_host,
+        port = config.server_port,
+        "Starting Roubit REST API Server v{}",
+        roubit_core::VERSION
+    );
     println!("Roubit REST API Server v{}", roubit_core::VERSION);
     Ok(())
 }
