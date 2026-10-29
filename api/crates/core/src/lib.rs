@@ -12,9 +12,10 @@ pub use crypto::{
     SecretString,
 };
 pub use domain::{
-    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Routine,
-    RoutineProgressTracker, RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository,
-    TimeBlock, TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
+    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit, HabitLog,
+    HabitType, Routine, RoutineProgressTracker, RoutineRepository, RoutineRepositoryError,
+    SqliteRoutineRepository, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
+    MINIMUM_BLOCK_DURATION_MINUTES,
 };
 
 pub use telemetry::init_telemetry;

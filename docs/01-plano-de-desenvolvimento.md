@@ -47,7 +47,8 @@ flowchart TD
 - [ ] **1.1 Modelagem do Banco de Dados e Migrations (SQLx + SQLite WAL)**
   - [x] Configurar conexão SQLite com modo WAL (`PRAGMA journal_mode=WAL`) e `PRAGMA foreign_keys = ON`.
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
-  - [ ] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
+  - [x] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
+
   - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
   - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [x] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
