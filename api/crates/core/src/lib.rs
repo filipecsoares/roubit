@@ -12,10 +12,11 @@ pub use crypto::{
     SecretString,
 };
 pub use domain::{
-    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit, HabitLog,
-    HabitRepository, HabitRepositoryError, HabitType, Routine, RoutineProgressTracker,
-    RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteRoutineRepository,
-    StreakCalculator, StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
+    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit,
+    HabitAnalyticsService, HabitAnalyticsSummary, HabitLog, HabitRepository, HabitRepositoryError,
+    HabitType, HeatmapCell, Routine, RoutineProgressTracker, RoutineRepository,
+    RoutineRepositoryError, SqliteHabitRepository, SqliteRoutineRepository, StreakCalculator,
+    StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
     MINIMUM_BLOCK_DURATION_MINUTES,
 };
 

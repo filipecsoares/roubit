@@ -7,8 +7,9 @@ pub mod habit;
 pub mod routine;
 
 pub use habit::{
-    Habit, HabitLog, HabitRepository, HabitRepositoryError, HabitType, SqliteHabitRepository,
-    StreakCalculator, StreakMetrics,
+    Habit, HabitAnalyticsService, HabitAnalyticsSummary, HabitLog, HabitRepository,
+    HabitRepositoryError, HabitType, HeatmapCell, SqliteHabitRepository, StreakCalculator,
+    StreakMetrics,
 };
 
 pub use routine::{
