@@ -1,0 +1,88 @@
+# Activity: OKR SQLite Repository with SQLx
+
+## 1. Objective & Context
+Implement an asynchronous, transaction-safe repository for Objectives and Key Results. Allow querying objectives with their associated key results in an efficient, joined structure.
+
+- **Prerequisites:** Activity 01 (OKR Domain Models).
+- **Target Location:** `crates/core/src/domain/okr/repository.rs`.
+
+## 2. Technical Scope & Specifications
+- **Driver:** `sqlx::SqlitePool`.
+- **Query Patterns:**
+  - Transactional creation of an Objective with multiple initial Key Results.
+  - Efficient batch retrieval of Objectives with Key Results using SQLite JSON aggregation or dual-query hydration.
+  - Key Result progress update and automatic recalculation of parent Objective progress.
+
+## 3. Data Structures & Signatures
+
+```rust
+use async_trait::async_trait;
+use uuid::Uuid;
+use super::models::{Objective, KeyResult};
+
+#[derive(Debug, thiserror::Error)]
+pub enum OkrRepositoryError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Objective not found: {0}")]
+    ObjectiveNotFound(Uuid),
+    #[error("Key Result not found: {0}")]
+    KeyResultNotFound(Uuid),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ObjectiveWithKeyResults {
+    pub objective: Objective,
+    pub key_results: Vec<KeyResult>,
+}
+
+#[async_trait]
+pub trait OkrRepository: Send + Sync {
+    async fn create_objective(&self, objective: &Objective) -> Result<(), OkrRepositoryError>;
+    async fn create_key_result(&self, kr: &KeyResult) -> Result<(), OkrRepositoryError>;
+    async fn get_objective_with_krs(&self, id: Uuid) -> Result<Option<ObjectiveWithKeyResults>, OkrRepositoryError>;
+    async fn list_objectives_by_quarter(&self, quarter: &str) -> Result<Vec<ObjectiveWithKeyResults>, OkrRepositoryError>;
+    async fn update_key_result_value(&self, kr_id: Uuid, new_value: f64) -> Result<KeyResult, OkrRepositoryError>;
+    async fn update_objective_progress(&self, objective_id: Uuid, progress: f32) -> Result<(), OkrRepositoryError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `SqliteOkrRepository` struct.
+2. Implement `create_objective` and `create_key_result` using SQLx query bindings.
+3. Implement `get_objective_with_krs`:
+   - Fetch parent objective.
+   - Fetch child key results `WHERE objective_id = ? ORDER BY created_at ASC`.
+   - Return combined `ObjectiveWithKeyResults`.
+4. Implement `update_key_result_value`:
+   - Calculate new `progress_percentage`.
+   - Update KR in database.
+   - Recalculate parent objective weighted progress and persist.
+
+## 5. Security, Error Handling & Edge Cases
+- **Atomic Recalculation:** Use a transaction when updating a KR value so the parent objective's progress is updated synchronously, eliminating inconsistent intermediate states.
+
+## 6. Verification & Automated Tests
+```rust
+#[tokio::test]
+async fn test_okr_creation_and_kr_association() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteOkrRepository::new(pool);
+
+    let obj = mock_objective("Achieve Peak Fitness", "2026-Q4");
+    repo.create_objective(&obj).await.unwrap();
+
+    let kr = mock_kr(obj.id, "Run 150 km", 0.0, 150.0, "km");
+    repo.create_key_result(&kr).await.unwrap();
+
+    let loaded = repo.get_objective_with_krs(obj.id).await.unwrap().unwrap();
+    assert_eq!(loaded.key_results.len(), 1);
+    assert_eq!(loaded.key_results[0].title, "Run 150 km");
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `SqliteOkrRepository` implemented with parameterized SQL.
+- [ ] Parent-child hydration verified in integration tests.
+- [ ] Transactional atomic updates cover KR and parent Objective progress.

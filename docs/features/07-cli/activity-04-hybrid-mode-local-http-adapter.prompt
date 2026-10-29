@@ -1,0 +1,73 @@
+# Activity: Hybrid Mode Adapter (Local SQLite & Remote HTTP API)
+
+## 1. Objective & Context
+Allow the Roubit CLI to seamlessly switch between two operation modes without altering the user-facing command syntax:
+1. **Local Mode (Default in Phase 1):** Directly talks to the embedded SQLite database via `roubit-core`. Zero server required.
+2. **Remote Mode (Phase 2):** Connects to the Roubit REST API service over HTTP (`https://api.roubit.local`), transmitting JWT credentials and `Idempotency-Key` headers.
+
+- **Prerequisites:** Activity 01 (Clap Tree) and domain repositories.
+- **Target Location:** `crates/cli/src/client/`.
+
+## 2. Technical Scope & Specifications
+- **Client Trait:** `RoubitClient` abstracting operations (`check_in_habit`, `list_routines`, etc.).
+- **Adapters:**
+  - `LocalClient`: Directly delegates to `crates/core` domain services and repositories.
+  - `HttpClient`: Uses `reqwest` (`0.12.x` with `json`) to perform REST requests against an Axum server.
+- **Configuration Switch:** Controlled via `--remote <URL>` CLI flag or `ROUBIT_REMOTE_URL` environment variable.
+
+## 3. Data Structures & Signatures
+
+```rust
+use async_trait::async_trait;
+use uuid::Uuid;
+use chrono::NaiveDate;
+use roubit_core::domain::habit::models::{Habit, HabitLog};
+
+#[derive(Debug, thiserror::Error)]
+pub enum ClientError {
+    #[error("Local engine error: {0}")]
+    Local(String),
+    #[error("HTTP network error: {0}")]
+    Http(#[from] reqwest::Error),
+    #[error("API returned error ({status}): {message}")]
+    Api { status: u16, message: String },
+}
+
+#[async_trait]
+pub trait RoubitClient: Send + Sync {
+    async fn list_habits(&self) -> Result<Vec<Habit>, ClientError>;
+    async fn habit_checkin(&self, habit_id: Uuid, date: NaiveDate, value: f64) -> Result<HabitLog, ClientError>;
+    // Other domain use cases...
+}
+
+pub struct LocalClient {
+    core_ctx: roubit_core::AppContext,
+}
+
+pub struct HttpClient {
+    base_url: String,
+    auth_token: Option<String>,
+    client: reqwest::Client,
+}
+```
+
+## 4. Implementation Steps
+1. Define `RoubitClient` trait in `crates/cli/src/client/mod.rs`.
+2. Implement `LocalClient` in `crates/cli/src/client/local.rs` using `crates/core`.
+3. Implement `HttpClient` in `crates/cli/src/client/remote.rs`:
+   - Inject `Idempotency-Key: <UUIDv4>` on mutation POST requests.
+   - Attach `Authorization: Bearer <token>`.
+4. Implement client factory in `crates/cli/src/client/factory.rs` that inspects CLI flags and environment variables to choose the active client.
+
+## 5. Security, Error Handling & Edge Cases
+- **Idempotency on Retries:** When operating in HTTP mode, transient network errors (e.g. timeout) can safely be retried with the same `Idempotency-Key` without causing double check-ins.
+- **Token Storage:** In HTTP mode, store user session tokens securely in `~/.config/roubit/credentials.json` with user-only file permissions (`0600`).
+
+## 6. Verification & Automated Tests
+- Test factory creates `LocalClient` when no remote flag is set.
+- Test factory creates `HttpClient` when `--remote http://localhost:8080` is provided.
+
+## 7. Definition of Done (DoD)
+- [ ] `RoubitClient` trait defines high-level application operations.
+- [ ] `LocalClient` and `HttpClient` implement the trait identically.
+- [ ] Factory selects appropriate backend based on flags and config.

@@ -1,0 +1,84 @@
+# Activity: Daily Routine Execution & Progress Tracker
+
+## 1. Objective & Context
+Calculate the user's real-time position within their daily routine, determine the currently active time block, and compute daily adherence metrics (percentage of blocks completed, on-time rate, and pending time).
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 03.
+- **Target Location:** `crates/core/src/domain/routine/tracker.rs`.
+
+## 2. Technical Scope & Specifications
+- **Real-Time Evaluation:** Compares the system's current time against scheduled blocks.
+- **Adherence Computation:**
+  $$\text{Adherence Rate} = \frac{\text{Completed Blocks}}{\text{Total Scheduled Blocks}} \times 100$$
+- **Current Block Detection:** Identifies which block corresponds to $start \le now < end$. If within a gap, calculates time remaining until the next upcoming block.
+
+## 3. Data Structures & Signatures
+
+```rust
+use chrono::{NaiveDate, NaiveTime};
+use serde::{Deserialize, Serialize};
+use super::models::{TimeBlock, BlockStatus};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentRoutineProgress {
+    pub total_blocks: usize,
+    pub completed_blocks: usize,
+    pub skipped_blocks: usize,
+    pub pending_blocks: usize,
+    pub adherence_percentage: f32,
+    pub active_block: Option<TimeBlock>,
+    pub next_block: Option<TimeBlock>,
+    pub minutes_until_next: Option<i64>,
+}
+
+pub struct RoutineProgressTracker;
+
+impl RoutineProgressTracker {
+    pub fn compute_progress(
+        blocks: &[TimeBlock],
+        block_statuses: &[(TimeBlock, BlockStatus)],
+        current_time: NaiveTime,
+    ) -> CurrentRoutineProgress;
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/routine/tracker.rs`.
+2. Implement logic to match current block:
+   ```rust
+   let active = blocks.iter().find(|b| b.start_time <= current_time && current_time < b.end_time);
+   ```
+3. Implement upcoming block detection:
+   ```rust
+   let next = blocks.iter().filter(|b| b.start_time > current_time).min_by_key(|b| b.start_time);
+   ```
+4. Calculate adherence percentage safely handling division by zero when a routine has 0 blocks.
+5. Export tracker in `crates/core/src/domain/routine/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Zero Blocks:** When `total_blocks == 0`, `adherence_percentage` must return `0.0` without NaN or panic.
+- **Past Midnight:** Handle end-of-day situations where all blocks are in the past.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_routine_progress_calculation() {
+    let b1 = mock_block("Morning", "07:00:00", "09:00:00");
+    let b2 = mock_block("Focus", "09:30:00", "12:00:00");
+
+    let progress = RoutineProgressTracker::compute_progress(
+        &[b1.clone(), b2.clone()],
+        &[(b1.clone(), BlockStatus::Completed), (b2.clone(), BlockStatus::Pending)],
+        NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+    );
+
+    assert_eq!(progress.completed_blocks, 1);
+    assert_eq!(progress.adherence_percentage, 50.0);
+    assert_eq!(progress.active_block.unwrap().name, "Focus");
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `RoutineProgressTracker` computes completed, pending, and skipped counts.
+- [ ] Identifies the active block and next upcoming block accurately.
+- [ ] Unit tests pass covering all times of day (before start, inside block, inside gap, after end).

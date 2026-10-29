@@ -1,0 +1,133 @@
+# Activity: Cargo Workspace Initialization & Project Directory Layout
+
+## 1. Objective & Context
+Set up the clean root structure for the Roubit platform, strictly adhering to the 3-folder architecture (`docs`, `frontend`, and `api`), and initialize a high-performance Rust multi-crate workspace inside `api/`. This isolates the Rust backend and CLI inside `api/`, the Vue.js 3 SPA inside `frontend/`, and centralized engineering documentation inside `docs/`.
+
+- **Prerequisites:** Rust stable toolchain (`1.85+` or latest stable).
+- **Target Location:** Project root and `api/`.
+
+## 2. Technical Scope & Specifications
+- **Root Directories:**
+  - `docs/`: Centralized documentation, specifications, and activity guides.
+  - `frontend/`: Vue.js 3 single-page application (Vite, Pinia, TailwindCSS).
+  - `api/`: Complete Rust project and Cargo Workspace.
+- **Crate Division inside `api/`:**
+  - `api/crates/core`: Pure domain models, database abstractions (SQLite/PostgreSQL), business rules, and cryptographic services. Zero HTTP framework dependencies.
+  - `api/crates/cli`: Command-line interface built on top of `core` and optional HTTP client (`roubit` binary).
+  - `api/crates/server`: HTTP REST API service using Axum, exposing `core` use cases to web clients.
+- **Cargo Profiles:**
+  - `dev`: Fast compilation iterations (`opt-level = 0`, debug assertions enabled).
+  - `release`: Maximum runtime performance and minimum binary size (`opt-level = 3`, `lto = "thin"`, `codegen-units = 1`, `panic = "abort"`, `strip = true`).
+
+## 3. Data Structures & File Layout
+
+```
+roubit/
+├── docs/                       # Project documentation & features
+├── frontend/                   # Vue.js 3 SPA
+├── api/                        # Rust project workspace
+│   ├── Cargo.toml              # Workspace virtual manifest
+│   ├── Cargo.lock
+│   ├── .rustfmt.toml
+│   ├── clippy.toml
+│   ├── crates/
+│   │   ├── core/               # roubit-core (domain, db, crypto)
+│   │   │   ├── Cargo.toml
+│   │   │   └── src/
+│   │   │       └── lib.rs
+│   │   ├── cli/                # roubit-cli (CLI executable)
+│   │   │   ├── Cargo.toml
+│   │   │   └── src/
+│   │   │       └── main.rs
+│   │   └── server/             # roubit-server (Axum REST API)
+│   │       ├── Cargo.toml
+│   │       └── src/
+│   │           └── main.rs
+│   └── Dockerfile
+├── .gitignore
+├── .editorconfig
+└── docker-compose.yml
+```
+
+### Virtual Manifest (`api/Cargo.toml`)
+```toml
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/cli",
+    "crates/server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Roubit Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/user/roubit"
+
+[workspace.dependencies]
+# Serialization & Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Async & Runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Internal workspace crates
+roubit-core = { path = "crates/core" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+```
+
+## 4. Implementation Steps
+1. Create the 3 root directories if they do not exist:
+   ```bash
+   mkdir -p docs frontend api/crates
+   ```
+2. Create `api/Cargo.toml` with the virtual manifest and shared dependencies defined above.
+3. Initialize `api/crates/core`:
+   - Run: `cargo new --lib api/crates/core`
+   - Configure `api/crates/core/Cargo.toml` to inherit workspace package metadata and define required core dependencies.
+4. Initialize `api/crates/cli`:
+   - Run: `cargo new --bin api/crates/cli`
+   - Add `roubit-core` as a workspace dependency.
+5. Initialize `api/crates/server`:
+   - Run: `cargo new --bin api/crates/server`
+   - Add `roubit-core` as a workspace dependency.
+6. Create root `.gitignore` ignoring target directories (`target/`, `api/target/`), `.env`, SQLite local files (`*.db`, `*.db-wal`, `*.db-shm`), and frontend build outputs (`frontend/dist/`, `frontend/node_modules/`).
+7. Validate workspace build:
+   - Run: `cargo check --manifest-path api/Cargo.toml` (or `cd api && cargo check`).
+
+## 5. Security, Error Handling & Edge Cases
+- **No Circular Dependencies:** `api/crates/core` must never depend on `cli` or `server`.
+- **Target Directory Isolation:** Ensure `api/target` is excluded in root `.gitignore`.
+- **Release Profile Safety:** `panic = "abort"` in release profile prevents unwinding code bloat, ensuring minimal footprint (<25MB target).
+
+## 6. Verification & Automated Tests
+- Command verification:
+  ```bash
+  cd api
+  cargo build
+  cargo test
+  ```
+- Output check: All crates inside `api/` must compile cleanly with 0 warnings.
+
+## 7. Definition of Done (DoD)
+- [ ] Project root contains exactly `docs/`, `frontend/`, and `api/`.
+- [ ] `api/Cargo.toml` configures `crates/core`, `crates/cli`, and `crates/server`.
+- [ ] `cargo check --manifest-path api/Cargo.toml` runs with status 0.
+- [ ] `.gitignore` and `.editorconfig` configured at the repository root.

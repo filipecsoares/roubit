@@ -1,0 +1,53 @@
+# Activity: Habit Analytics, Heatmap & OKR Alignment Views
+
+## 1. Objective & Context
+Develop dedicated views for in-depth analytics: `HabitsView.vue` (streak records and year-long contribution heatmap) and `OkrsView.vue` (interactive tree of quarterly objectives, Key Results, and their connected habits).
+
+- **Prerequisites:** Activities 01 and 02 of Feature 09, and domain analytics features.
+- **Target Location:** `frontend/src/views/HabitsView.vue` and `frontend/src/views/OkrsView.vue`.
+
+## 2. Technical Scope & Specifications
+- **Contribution Heatmap:** An interactive SVG/CSS grid rendering the last 365 days of activity with 5 intensity levels (0 to 4), tooltips displaying date and count, and streak highlights.
+- **OKR Progress Tree:** Expandable/collapsible cards for Objectives, progress bars for Key Results, and badges indicating linked daily habits.
+
+## 3. Component Architecture
+
+```
+frontend/src/components/
+├── habits/
+│   ├── HeatmapCalendar.vue
+│   ├── StreakBadge.vue
+│   └── HabitManageModal.vue
+└── okrs/
+    ├── ObjectiveCard.vue
+    ├── KeyResultProgressBar.vue
+    └── LinkHabitModal.vue
+```
+
+## 4. Implementation Steps
+1. Implement `HeatmapCalendar.vue`:
+   - Group days by weeks (columns of 7 rows: Mon-Sun).
+   - Render cells colored according to intensity:
+     - Level 0: `#1e293b` (slate-800)
+     - Level 1: `#064e3b` (emerald-900)
+     - Level 2: `#047857` (emerald-700)
+     - Level 3: `#10b981` (emerald-500)
+     - Level 4: `#34d399` (emerald-400)
+   - Add hover tooltip with formatted date and value.
+2. Implement `HabitsView.vue` listing all active habits, their longest streaks, and their heatmaps.
+3. Implement `OkrsView.vue`:
+   - Group objectives by quarter (`2026-Q4`).
+   - Show weighted progress bar and list of child Key Results.
+   - Display a clickable badge linking directly to the corresponding daily habit.
+
+## 5. Security, Error Handling & Edge Cases
+- **Responsive Layout for Heatmap:** On mobile devices, allow horizontal scrolling with sticky month headers so the heatmap grid remains accessible.
+
+## 6. Verification & Automated Tests
+- Test that heatmap grid calculates exactly 52 or 53 weeks.
+- Test that OKR card renders correct weighted progress percentage.
+
+## 7. Definition of Done (DoD)
+- [ ] 365-day contribution heatmap renders with tooltips and 5 color levels.
+- [ ] OKR view visualizes Objectives and linked Key Results.
+- [ ] Views are fully responsive across mobile and desktop breakpoints.

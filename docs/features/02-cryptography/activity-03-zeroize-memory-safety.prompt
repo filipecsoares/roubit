@@ -1,0 +1,79 @@
+# Activity: Memory Sanitization with Zeroize
+
+## 1. Objective & Context
+Ensure that plaintexts, derived encryption keys, and raw passphrases in memory are automatically and irreversibly wiped (zeroized) upon completion or drop. This prevents sensitive data retention in RAM, core dumps, or operating system swap space.
+
+- **Prerequisites:** Activity 01 (Argon2id), Activity 02 (AES-GCM).
+- **Target Location:** `crates/core/src/crypto/memory.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `zeroize` (`1.8.x` with `derive` and `zeroize_derive` features).
+- **Technique:** Volatile memory zeroing that cannot be removed by compiler dead-code elimination optimizations (`core::sync::atomic::compiler_fence`).
+- **Key Wrappers:**
+  - `SecretString`: Secure heap-allocated string wrapper zeroized on drop.
+  - `SecretBytes`: Secure heap-allocated byte vector zeroized on drop.
+  - `DerivedKey`: 32-byte fixed array zeroized on drop.
+
+## 3. Data Structures & Signatures
+
+```rust
+use std::ops::Deref;
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+/// Secure wrapper for plaintext sensitive strings
+#[derive(Clone, Default, Zeroize, ZeroizeOnDrop)]
+pub struct SecretString(String);
+
+impl SecretString {
+    pub fn new(val: String) -> Self { Self(val) }
+    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_bytes(&self) -> &[u8] { self.0.as_bytes() }
+}
+
+impl Deref for SecretString {
+    type Target = str;
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+// Ensure Debug never prints actual secret
+impl std::fmt::Debug for SecretString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecretString(***REDACTED***)")
+    }
+}
+```
+
+## 4. Implementation Steps
+1. Add `zeroize = { version = "1.8", features = ["derive", "zeroize_derive"] }` to `crates/core/Cargo.toml`.
+2. Implement `SecretString` and `SecretBytes` with `Zeroize` and `ZeroizeOnDrop` traits.
+3. Override `std::fmt::Debug` and `std::fmt::Display` to redact sensitive contents (`***REDACTED***`), preventing accidental log leaks.
+4. Integrate `SecretString` into passphrase inputs in `crates/cli` and `crates/core`.
+5. Integrate `DerivedKey` in `KdfService` and `AesGcmCipher`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Compiler Optimization Prevention:** Normal `memset` calls can be stripped by aggressive LLVM optimizations if the memory is not read afterwards. `zeroize` uses inline volatile writes to guarantee memory scrubbing.
+- **Panic Resilience:** Because `ZeroizeOnDrop` hooks into Rust's destructor (`Drop`), the memory is securely cleared even if unwinding or panic occurs.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_debug_redaction() {
+    let secret = SecretString::new("my-master-password".to_string());
+    let formatted = format!("{:?}", secret);
+    assert!(!formatted.contains("my-master-password"));
+    assert!(formatted.contains("***REDACTED***"));
+}
+
+#[test]
+fn test_zeroize_on_drop_behavior() {
+    let mut buffer = [0xAAu8; 32];
+    buffer.zeroize();
+    assert_eq!(buffer, [0u8; 32]);
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `SecretString` and `SecretBytes` wrappers implemented.
+- [ ] `Debug` implementation rigorously redacts secrets.
+- [ ] `ZeroizeOnDrop` applied to all cryptographic key objects.
+- [ ] Unit tests pass confirming zeroization and log redaction.

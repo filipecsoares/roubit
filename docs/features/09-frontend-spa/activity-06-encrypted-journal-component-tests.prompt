@@ -1,0 +1,91 @@
+# Activity: Encrypted Journaling UI & Vitest Component Tests
+
+## 1. Objective & Context
+Implement the client-side UI for **RF04 — Encrypted Journaling** (`JournalView.vue`). Provide an uncluttered, distraction-free Markdown editor for personal reflections, a secure passphrase unlock modal, a mood selector, and write automated component tests using Vitest and Vue Test Utils.
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 09.
+- **Target Location:** `frontend/src/views/JournalView.vue`, `frontend/src/components/journal/`, and `frontend/tests/`.
+
+## 2. Technical Scope & Specifications
+- **Editor:** Clean textarea or minimal Markdown editor with auto-save indicator.
+- **Security Indicator:** Lock icon badge showing whether the client vault is `Locked` (red/gray) or `Decrypted & In-Memory` (green).
+- **Testing Framework:** `vitest` (`2.x`) and `@vue/test-utils` (`2.4.x`).
+
+## 3. Component Architecture
+
+```
+frontend/src/components/journal/
+├── VaultUnlockModal.vue
+├── JournalEditor.vue
+├── MoodSelector.vue
+├── TagInput.vue
+└── LockStatusBadge.vue
+```
+
+### Vault Unlock Modal (`VaultUnlockModal.vue`)
+```vue
+<template>
+  <div v-if="!isUnlocked" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-surface-card border border-surface-border rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center gap-3 text-white">
+        <LockIcon class="w-6 h-6 text-brand-500" />
+        <h3 class="text-xl font-bold">Unlock Personal Journal</h3>
+      </div>
+      <p class="text-sm text-slate-400">
+        Enter your master passphrase to decrypt your personal reflections locally. Your passphrase is never sent to the server.
+      </p>
+      <input
+        v-model="passphrase"
+        type="password"
+        placeholder="Master Passphrase"
+        class="w-full px-4 py-2 bg-surface-dark border border-surface-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+        @keyup.enter="handleUnlock"
+      />
+      <button
+        class="w-full py-2 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-lg transition"
+        :disabled="isLoading"
+        @click="handleUnlock"
+      >
+        {{ isLoading ? 'Deriving Keys...' : 'Unlock Journal' }}
+      </button>
+    </div>
+  </div>
+</template>
+```
+
+## 4. Implementation Steps
+1. Create `frontend/src/components/journal/` components.
+2. Wire `WebCryptoService` into `handleUnlock` in `VaultUnlockModal.vue`:
+   - Derive key in-memory via WASM Argon2id.
+   - Set key in `useVaultStore`.
+3. Implement `JournalEditor.vue`:
+   - When user clicks "Save Reflection", call `WebCryptoService.encrypt()`.
+   - Send pre-encrypted Base64 payload to `POST /api/v1/journal`.
+4. Configure Vitest in `frontend/vite.config.ts`:
+   ```typescript
+   /// <reference types="vitest" />
+   export default defineConfig({
+     // ...
+     test: {
+       environment: 'jsdom',
+       globals: true,
+     },
+   });
+   ```
+5. Write unit and component tests in `frontend/tests/journal.spec.ts`.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Plaintext Network Traffic:** Verify in tests that the network request payload contains zero occurrences of the plaintext words entered in the textarea.
+- **Auto-Wipe on Lock:** Clicking the "Lock Vault" button immediately resets the `CryptoKey` reference to `null` and clears the textarea.
+
+## 6. Verification & Automated Tests
+- Run Vitest:
+  ```bash
+  cd frontend && npm run test
+  ```
+- All test suites must pass.
+
+## 7. Definition of Done (DoD)
+- [ ] Journal UI components implemented with lock/unlock status indicators.
+- [ ] Text is encrypted locally prior to dispatching HTTP mutation requests.
+- [ ] Vitest component tests pass verifying encryption and vault locking.

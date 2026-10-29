@@ -1,0 +1,82 @@
+# Activity: Journal SQLite Repository with Metadata Indexing
+
+## 1. Objective & Context
+Implement the asynchronous repository for Journal entries. Provide fast metadata filtering (by date range, tags, or mood) without decrypting records or loading heavy ciphertext payloads into memory when only headers are requested.
+
+- **Prerequisites:** Activity 01 (Journal Models).
+- **Target Location:** `crates/core/src/domain/journal/repository.rs`.
+
+## 2. Technical Scope & Specifications
+- **Driver:** `sqlx::SqlitePool`.
+- **Selective Queries:**
+  - `list_metadata`: Excludes `encrypted_payload` BLOB from the SELECT statement for fast overview lists and calendar views.
+  - `get_full_entry`: Fetches complete encrypted envelope for decryption.
+- **CRUD Operations:** Insert, fetch, update metadata, update encrypted payload, delete.
+
+## 3. Data Structures & Signatures
+
+```rust
+use async_trait::async_trait;
+use chrono::NaiveDate;
+use uuid::Uuid;
+use super::models::{EncryptedJournalEntry, JournalMetadata};
+
+#[derive(Debug, thiserror::Error)]
+pub enum JournalRepositoryError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Journal entry not found: {0}")]
+    NotFound(Uuid),
+}
+
+#[async_trait]
+pub trait JournalRepository: Send + Sync {
+    async fn save_entry(&self, entry: &EncryptedJournalEntry) -> Result<(), JournalRepositoryError>;
+    async fn get_entry_by_id(&self, id: Uuid) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError>;
+    async fn get_entry_by_date(&self, date: NaiveDate) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError>;
+    async fn list_metadata_in_range(
+        &self,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<JournalMetadata>, JournalRepositoryError>;
+    async fn delete_entry(&self, id: Uuid) -> Result<(), JournalRepositoryError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `SqliteJournalRepository` struct.
+2. Implement `save_entry`:
+   - Bind UUID, date, mood, JSON tags, BLOB salt, BLOB nonce, and BLOB ciphertext.
+   - Use UPSERT on conflict with `id` to allow editing reflections.
+3. Implement `list_metadata_in_range`:
+   - Execute `SELECT id, entry_date, mood_score, tags, LENGTH(encrypted_payload) as ciphertext_bytes_len, created_at, updated_at FROM journal_entries WHERE entry_date BETWEEN ? AND ? ORDER BY entry_date DESC`.
+4. Wrap in tests with in-memory SQLite.
+
+## 5. Security, Error Handling & Edge Cases
+- **Memory Footprint Optimization:** By omitting the `encrypted_payload` BLOB during list queries, listing thousands of journal metadata entries consumes minimal RAM (< 1 MB).
+
+## 6. Verification & Automated Tests
+```rust
+#[tokio::test]
+async fn test_journal_repository_metadata_listing() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteJournalRepository::new(pool);
+
+    let entry = mock_encrypted_entry(NaiveDate::from_ymd_opt(2026, 10, 29).unwrap(), 5);
+    repo.save_entry(&entry).await.unwrap();
+
+    let list = repo.list_metadata_in_range(
+        NaiveDate::from_ymd_opt(2026, 10, 1).unwrap(),
+        NaiveDate::from_ymd_opt(2026, 10, 31).unwrap(),
+    ).await.unwrap();
+
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].mood_score, Some(5));
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `SqliteJournalRepository` implemented with SQLx queries.
+- [ ] Fast metadata listing omits BLOB payloads.
+- [ ] CRUD operations validated with integration tests.

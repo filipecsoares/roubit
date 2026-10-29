@@ -1,0 +1,92 @@
+# Activity: Habit SQLite Repository with Atomic Check-Ins
+
+## 1. Objective & Context
+Implement the asynchronous repository for Habits and HabitLogs. Provide atomic check-ins, allowing incrementing numeric values (e.g., adding 250ml to a daily water tracker) or toggling completion status in a single database transaction.
+
+- **Prerequisites:** Activity 01 (Habit Domain Models).
+- **Target Location:** `crates/core/src/domain/habit/repository.rs`.
+
+## 2. Technical Scope & Specifications
+- **Driver:** `sqlx::SqlitePool`.
+- **Atomic Operations:**
+  - `UPSERT` syntax (`INSERT INTO habit_logs ... ON CONFLICT(habit_id, log_date) DO UPDATE SET actual_value = actual_value + excluded.actual_value, is_completed = (actual_value >= target_value)`).
+- **Query Optimization:** Prepared statements with bounded date range retrieval for streak and chart rendering.
+
+## 3. Data Structures & Signatures
+
+```rust
+use async_trait::async_trait;
+use chrono::NaiveDate;
+use uuid::Uuid;
+use super::models::{Habit, HabitLog};
+
+#[derive(Debug, thiserror::Error)]
+pub enum HabitRepositoryError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Habit not found: {0}")]
+    NotFound(Uuid),
+}
+
+#[async_trait]
+pub trait HabitRepository: Send + Sync {
+    async fn create_habit(&self, habit: &Habit) -> Result<(), HabitRepositoryError>;
+    async fn get_habit_by_id(&self, id: Uuid) -> Result<Option<Habit>, HabitRepositoryError>;
+    async fn list_active_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError>;
+    async fn record_check_in(
+        &self,
+        habit_id: Uuid,
+        date: NaiveDate,
+        value: f64,
+        is_increment: bool,
+    ) -> Result<HabitLog, HabitRepositoryError>;
+    async fn get_logs_for_habit(
+        &self,
+        habit_id: Uuid,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<HabitLog>, HabitRepositoryError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `SqliteHabitRepository` wrapping `sqlx::SqlitePool`.
+2. Implement `record_check_in`:
+   - Fetch habit target value.
+   - Use SQLite UPSERT query to either insert a new log for `(habit_id, date)` or update the existing log.
+   - Evaluate `is_completed = (new_value >= habit.target_value)`.
+3. Implement `get_logs_for_habit` using `ORDER BY log_date ASC` between `start_date` and `end_date`.
+4. Wrap in integration tests with in-memory SQLite.
+
+## 5. Security, Error Handling & Edge Cases
+- **Concurrent Check-ins:** SQLite UPSERT inside a transaction handles concurrent check-in attempts atomically without race conditions.
+- **Archive Isolation:** Archived habits (`is_archived = 1`) should be excluded from `list_active_habits` but historical logs must remain accessible.
+
+## 6. Verification & Automated Tests
+```rust
+#[tokio::test]
+async fn test_habit_checkin_upsert_and_increment() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteHabitRepository::new(pool);
+
+    let habit = mock_numeric_habit("Drink Water", 2000.0, "ml");
+    repo.create_habit(&habit).await.unwrap();
+
+    let today = chrono::Utc::now().date_naive();
+    // First drink: 500ml
+    let log1 = repo.record_check_in(habit.id, today, 500.0, true).await.unwrap();
+    assert_eq!(log1.actual_value, 500.0);
+    assert!(!log1.is_completed);
+
+    // Second drink: 1600ml (total 2100ml >= 2000.0)
+    let log2 = repo.record_check_in(habit.id, today, 1600.0, true).await.unwrap();
+    assert_eq!(log2.actual_value, 2100.0);
+    assert!(log2.is_completed);
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `SqliteHabitRepository` implemented with SQLx queries.
+- [ ] Atomic UPSERT handles both incremental additions and direct value overwrites.
+- [ ] Integration tests verify automated calculation of `is_completed` based on targets.

@@ -1,0 +1,99 @@
+# Activity: Argon2id Master Key Derivation
+
+## 1. Objective & Context
+Implement a hardened Key Derivation Function (KDF) to convert user-supplied passphrases into 256-bit cryptographic master keys. This ensures resistance against GPU, ASIC, and side-channel brute-force attacks according to modern OWASP recommendations.
+
+- **Prerequisites:** Feature 01 (`crates/core` workspace setup).
+- **Target Location:** `crates/core/src/crypto/kdf.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `argon2` (`0.5.x` with `alloc` and `password-hash` features), `rand_core` (`0.6.x` or `0.9` with `OsRng`).
+- **Algorithm:** Argon2id (hybrid version combining Argon2d and Argon2i).
+- **OWASP Recommended Parameters:**
+  - Memory size ($m$): 64 MiB (`65536` KiB).
+  - Iterations / Time cost ($t$): 3 passes.
+  - Parallelism ($p$): 4 lanes/threads.
+  - Output Key Length: 32 bytes (256 bits).
+  - Salt Length: 16 bytes (128 bits) cryptographically secure random bytes generated via `OsRng`.
+
+## 3. Data Structures & Signatures
+
+```rust
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+/// Secure wrapper for derived 256-bit master key
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+pub struct DerivedKey(pub [u8; 32]);
+
+#[derive(Debug, thiserror::Error)]
+pub enum KdfError {
+    #[error("Argon2 derivation error: {0}")]
+    DerivationFailed(String),
+    #[error("Invalid salt length, expected at least 16 bytes")]
+    InvalidSalt,
+}
+
+pub struct KdfService {
+    memory_cost: u32,
+    time_cost: u32,
+    parallelism: u32,
+}
+
+impl KdfService {
+    pub fn default_recommended() -> Self;
+    pub fn generate_salt() -> [u8; 16];
+    pub fn derive_key(&self, passphrase: &[u8], salt: &[u8]) -> Result<DerivedKey, KdfError>;
+}
+```
+
+## 4. Implementation Steps
+1. Add dependencies to `crates/core/Cargo.toml`:
+   ```toml
+   argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
+   rand_core = { version = "0.6", features = ["getrandom"] }
+   zeroize = { version = "1.8", features = ["derive", "zeroize_derive"] }
+   ```
+2. Implement `generate_salt()` utilizing `rand_core::OsRng` to extract 16 random bytes.
+3. Configure `argon2::Params::new(memory_cost, time_cost, parallelism, Some(32))`.
+4. Implement `derive_key(passphrase, salt)`:
+   - Instantiate `Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params)`.
+   - Compute output key buffer into `[u8; 32]`.
+   - Wrap output inside `DerivedKey` struct implementing `ZeroizeOnDrop`.
+5. Expose public API in `crates/core/src/crypto/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Salt Uniqueness:** Never hardcode salts or reuse a static salt across different cryptographic contexts. Every new user/vault initialization must generate a fresh salt.
+- **Passphrase Wiping:** Any intermediate vector or slice holding the passphrase must be wrapped with `Zeroize` or wiped immediately upon key derivation.
+- **Side-Channel Mitigation:** Argon2id combines data-dependent memory access (protecting against GPU brute-force) with data-independent access (protecting against cache timing attacks).
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_argon2id_derivation_deterministic() {
+    let kdf = KdfService::default_recommended();
+    let salt = [42u8; 16];
+    let pass = b"correct-horse-battery-staple";
+
+    let key1 = kdf.derive_key(pass, &salt).unwrap();
+    let key2 = kdf.derive_key(pass, &salt).unwrap();
+
+    assert_eq!(key1.0, key2.0);
+}
+
+#[test]
+fn test_argon2id_different_salts_produce_different_keys() {
+    let kdf = KdfService::default_recommended();
+    let pass = b"secure-passphrase";
+
+    let key1 = kdf.derive_key(pass, &[1u8; 16]).unwrap();
+    let key2 = kdf.derive_key(pass, &[2u8; 16]).unwrap();
+
+    assert_ne!(key1.0, key2.0);
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `KdfService` compiles and adheres to OWASP Argon2id parameters.
+- [ ] Cryptographically secure 16-byte random salt generation via `OsRng`.
+- [ ] `DerivedKey` implements `ZeroizeOnDrop`.
+- [ ] Unit tests pass confirming deterministic derivation and salt uniqueness.

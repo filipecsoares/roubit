@@ -1,0 +1,100 @@
+# Activity: Axum HTTP Server Architecture, Tracing & Error Handling
+
+## 1. Objective & Context
+Establish the foundation for the HTTP REST API in `api/crates/server` using `axum` on top of the `tokio` asynchronous runtime. Configure graceful shutdown, correlation request ID injection, structured request/response tracing via `tower-http`, and centralized RFC 7807 (Problem Details for HTTP APIs) error formatting.
+
+- **Prerequisites:** Feature 01 (Workspace Setup) and `api/crates/core`.
+- **Target Location:** `api/crates/server/src/server.rs` and `api/crates/server/src/errors.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `axum` (`0.8.x` or `0.7.x`), `tower-http` (`0.6.x` with `trace`, `request-id`, `cors`, `timeout`), `tokio` (`1.43.x`).
+- **Standardized Error Responses:** RFC 7807 JSON structure (`type`, `title`, `status`, `detail`, `instance`).
+- **Telemetry:** Correlated logs with unique `x-request-id` header on every incoming request.
+
+## 3. Data Structures & Signatures
+
+```rust
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct ProblemDetails {
+    pub r#type: String,
+    pub title: String,
+    pub status: u16,
+    pub detail: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+    #[error("Validation failed: {0}")]
+    BadRequest(String),
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
+    #[error("Internal server error")]
+    Internal(#[from] anyhow::Error),
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, title, detail) = match &self {
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, "Not Found", msg.clone()),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "Bad Request", msg.clone()),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "Unauthorized", msg.clone()),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, "Conflict", msg.clone()),
+            ApiError::Internal(err) => {
+                tracing::error!(error = ?err, "Internal unhandled error");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred".into())
+            }
+        };
+
+        let problem = ProblemDetails {
+            r#type: format!("https://roubit.app/errors/{}", status.as_u16()),
+            title: title.to_string(),
+            status: status.as_u16(),
+            detail,
+            instance: None,
+        };
+
+        (status, Json(problem)).into_response()
+    }
+}
+```
+
+## 4. Implementation Steps
+1. Add dependencies to `api/crates/server/Cargo.toml`:
+   ```toml
+   axum = "0.8"
+   tower = "0.5"
+   tower-http = { version = "0.6", features = ["trace", "request-id", "cors", "timeout"] }
+   tokio = { version = "1.43", features = ["full"] }
+   ```
+2. Implement centralized error responder `api/crates/server/src/errors.rs`.
+3. Configure `axum::Router` in `api/crates/server/src/server.rs`:
+   - Attach `SetRequestIdLayer` and `PropagateRequestIdLayer`.
+   - Attach `TraceLayer::new_for_http()`.
+   - Attach `TimeoutLayer::new(Duration::from_secs(30))`.
+4. Implement graceful shutdown listening for `SIGINT` / `SIGTERM`.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Stack Trace Leaks:** `ApiError::Internal` must log the full internal error to `tracing::error!` for developers while returning a sanitized generic message to the client.
+- **Request ID Propagation:** Return `x-request-id` header in the HTTP response so clients can correlate frontend errors with backend server logs.
+
+## 6. Verification & Automated Tests
+- Test that unhandled errors return status 500 with RFC 7807 JSON.
+- Test that graceful shutdown cleanly drains active connections.
+
+## 7. Definition of Done (DoD)
+- [ ] Axum server starts and shuts down cleanly on SIGTERM/Ctrl+C.
+- [ ] `TraceLayer` logs requests with correlated request IDs.
+- [ ] Error responses strictly conform to RFC 7807 Problem Details.

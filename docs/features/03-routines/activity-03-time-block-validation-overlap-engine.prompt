@@ -1,0 +1,87 @@
+# Activity: Time Block Validation & Overlap Engine
+
+## 1. Objective & Context
+Ensure that time blocks within a routine are mathematically coherent, chronologically ordered, and optionally non-overlapping (or with detected conflicts). Provide clean domain validation before persisting schedules.
+
+- **Prerequisites:** Activity 01 (Routine Domain Models).
+- **Target Location:** `crates/core/src/domain/routine/validation.rs`.
+
+## 2. Technical Scope & Specifications
+- **Pure Domain Logic:** No I/O or database dependencies.
+- **Rules:**
+  - `start_time` must precede `end_time` (or properly handle overnight blocks crossing midnight).
+  - Minimum block duration: 5 minutes.
+  - Maximum block duration: 24 hours.
+  - Overlap Detection: Flag or block overlapping intervals within the same routine template.
+- **Return Type:** Rich domain error enum indicating the exact colliding blocks.
+
+## 3. Data Structures & Signatures
+
+```rust
+use super::models::TimeBlock;
+use chrono::NaiveTime;
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum TimeBlockValidationError {
+    #[error("Start time ({start}) must be before end time ({end})")]
+    InvalidInterval { start: NaiveTime, end: NaiveTime },
+
+    #[error("Block duration ({minutes} mins) is below minimum of 5 minutes")]
+    DurationTooShort { minutes: i64 },
+
+    #[error("Overlap detected between '{block_a}' ({start_a}-{end_a}) and '{block_b}' ({start_b}-{end_b})")]
+    OverlapDetected {
+        block_a: String,
+        start_a: NaiveTime,
+        end_a: NaiveTime,
+        block_b: String,
+        start_b: NaiveTime,
+        end_b: NaiveTime,
+    },
+}
+
+pub struct TimeBlockValidator;
+
+impl TimeBlockValidator {
+    pub fn validate_single(block: &TimeBlock) -> Result<(), TimeBlockValidationError>;
+    pub fn validate_schedule(blocks: &[TimeBlock]) -> Result<(), TimeBlockValidationError>;
+    pub fn sort_chronologically(blocks: &mut [TimeBlock]);
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/routine/validation.rs`.
+2. Implement interval validation: `block.end_time - block.start_time >= chrono::Duration::minutes(5)`.
+3. Implement schedule overlap algorithm:
+   - Sort blocks by `start_time`.
+   - Iterate adjacent blocks: if `current.start_time < previous.end_time`, trigger `TimeBlockValidationError::OverlapDetected`.
+4. Integrate validation into the creation and update use cases before calling the repository.
+
+## 5. Security, Error Handling & Edge Cases
+- **Overnight Blocks:** For blocks crossing midnight (e.g. 23:00 to 02:00), either split into two contiguous blocks or flag with explicit overnight metadata.
+- **Identical Start Times:** Instantly rejected as conflicting.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_detects_overlapping_blocks() {
+    let mut b1 = mock_block("Morning Prep", "07:00:00", "08:30:00");
+    let mut b2 = mock_block("Deep Work", "08:00:00", "10:00:00");
+
+    let result = TimeBlockValidator::validate_schedule(&[b1, b2]);
+    assert!(matches!(result, Err(TimeBlockValidationError::OverlapDetected { .. })));
+}
+
+#[test]
+fn test_valid_consecutive_schedule() {
+    let b1 = mock_block("Morning Prep", "07:00:00", "08:00:00");
+    let b2 = mock_block("Deep Work", "08:00:00", "10:00:00");
+
+    assert!(TimeBlockValidator::validate_schedule(&[b1, b2]).is_ok());
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `TimeBlockValidator` validates minimum durations and chronological boundaries.
+- [ ] Overlap detection correctly flags conflicting schedules with descriptive error details.
+- [ ] 100% test coverage for edge cases (adjacent boundaries, subsets, supersets).

@@ -1,0 +1,125 @@
+# Activity: Routine Domain Models & SQLite Schema
+
+## 1. Objective & Context
+Define the core domain models and database tables for **RF01 — Routine Management (Time Blocks)**. Routines represent structured blocks of the day (e.g., Morning Kickoff, Deep Work, Evening Decompression), enabling time-blocking and real-time execution tracking.
+
+- **Prerequisites:** Feature 01 (Workspace Setup).
+- **Target Location:** `crates/core/src/domain/routine/` and `crates/core/migrations/0001_create_routines.sql`.
+
+## 2. Technical Scope & Specifications
+- **Database:** SQLite with WAL mode (`PRAGMA journal_mode = WAL`), foreign keys enabled.
+- **ORM / Driver:** `sqlx` (`0.8.x` with `sqlite`, `runtime-tokio`, `chrono`, `uuid`).
+- **Entity Concepts:**
+  - `Routine`: High-level grouping or template (e.g., "Weekday Routine", "Weekend Flow").
+  - `TimeBlock`: Scheduled interval within a routine with start time, end time, label, color, and optional category.
+  - `RoutineDayLog`: Actual daily execution record storing completion timestamps and adherence state.
+
+## 3. Data Structures & Schema
+
+### Domain Entities (`crates/core/src/domain/routine/models.rs`)
+```rust
+use chrono::{NaiveTime, Utc, DateTime};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Routine {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TimeBlock {
+    pub id: Uuid,
+    pub routine_id: Uuid,
+    pub name: String,
+    pub start_time: NaiveTime, // e.g. 08:00:00
+    pub end_time: NaiveTime,   // e.g. 10:30:00
+    pub category: String,      // e.g. "Focus", "Health", "Leisure"
+    pub color_hex: String,     // e.g. "#4F46E5"
+    pub order_index: i32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum BlockStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Skipped,
+}
+```
+
+### Database Migration (`migrations/0001_create_routines.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS routines (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS time_blocks (
+    id TEXT PRIMARY KEY NOT NULL,
+    routine_id TEXT NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    start_time TEXT NOT NULL, -- HH:MM:SS format
+    end_time TEXT NOT NULL,   -- HH:MM:SS format
+    category TEXT NOT NULL DEFAULT 'General',
+    color_hex TEXT NOT NULL DEFAULT '#6366F1',
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_time_blocks_routine_id ON time_blocks(routine_id);
+CREATE INDEX IF NOT EXISTS idx_time_blocks_start_time ON time_blocks(start_time);
+
+CREATE TABLE IF NOT EXISTS daily_routine_logs (
+    id TEXT PRIMARY KEY NOT NULL,
+    time_block_id TEXT NOT NULL REFERENCES time_blocks(id) ON DELETE CASCADE,
+    date TEXT NOT NULL, -- YYYY-MM-DD
+    status TEXT NOT NULL CHECK(status IN ('pending', 'in_progress', 'completed', 'skipped')),
+    started_at TEXT,
+    completed_at TEXT,
+    notes TEXT,
+    UNIQUE(time_block_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_routine_logs_date ON daily_routine_logs(date);
+```
+
+## 4. Implementation Steps
+1. Add `sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate"] }` to `crates/core/Cargo.toml`.
+2. Create migration file `crates/core/migrations/0001_create_routines.sql`.
+3. Implement Rust domain structs in `crates/core/src/domain/routine/models.rs`.
+4. Derive `sqlx::FromRow` and Serde traits on domain structs.
+5. Export module in `crates/core/src/domain/routine/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Foreign Key Cascading:** `ON DELETE CASCADE` guarantees removing a Routine deletes all associated TimeBlocks and historical logs without orphan records.
+- **Unique Daily Log:** `UNIQUE(time_block_id, date)` prevents duplicate check-in records for the same block on the same calendar day.
+- **Time Format Integrity:** Use ISO-8601 string storage (`HH:MM:SS` and `YYYY-MM-DD`) ensuring deterministic sorting in SQLite.
+
+## 6. Verification & Automated Tests
+- Test compile-time or migration execution:
+  ```rust
+  #[tokio::test]
+  async fn test_routine_migration_runs() {
+      let pool = sqlx::sqlite::SqlitePoolOptions::new()
+          .connect("sqlite::memory:")
+          .await
+          .unwrap();
+      sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Domain structs (`Routine`, `TimeBlock`, `BlockStatus`) defined with Serde and SQLx traits.
+- [ ] Migration SQL created with indexes and foreign key constraints.
+- [ ] In-memory SQLite migration executes cleanly in test.

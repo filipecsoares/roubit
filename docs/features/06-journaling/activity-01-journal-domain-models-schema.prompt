@@ -1,0 +1,91 @@
+# Activity: Journal Domain Models & Dual-Storage Schema
+
+## 1. Objective & Context
+Define domain models and SQLite migrations for **RF04 — Encrypted Journaling (Field-Level Encryption)**. Journaling uses a **dual-storage architecture**:
+1. **Public/Open Metadata:** Tags, date, mood index, entry length, and timestamps stored in plaintext for fast querying, filtering, and indexing.
+2. **Encrypted Envelope:** Sensitive personal reflections and notes encrypted via AES-256-GCM. The database never stores plaintext content.
+
+- **Prerequisites:** Feature 01 (Workspace Setup) and Feature 02 (Cryptography).
+- **Target Location:** `crates/core/src/domain/journal/` and `crates/core/migrations/0004_create_journal.sql`.
+
+## 2. Technical Scope & Specifications
+- **Envelope Storage:** 12-byte nonce, variable-length ciphertext (with appended 16-byte auth tag), and salt used for KDF.
+- **Metadata Fields:** `entry_date`, `mood_score` (1 to 5), `tags` (comma-separated or JSON array), `title_hint` (optional open short summary).
+- **Relational Constraints:** Unique per-entry ID, indexed by `entry_date` and `mood_score`.
+
+## 3. Data Structures & Schema
+
+### Domain Entities (`crates/core/src/domain/journal/models.rs`)
+```rust
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct JournalMetadata {
+    pub id: Uuid,
+    pub entry_date: NaiveDate,
+    pub mood_score: Option<u8>,     // 1 (very bad) to 5 (excellent)
+    pub tags: Vec<String>,
+    pub ciphertext_bytes_len: usize,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EncryptedJournalEntry {
+    pub metadata: JournalMetadata,
+    pub salt: [u8; 16],
+    pub nonce: [u8; 12],
+    pub encrypted_payload: Vec<u8>, // Ciphertext + Auth Tag
+}
+
+/// Decrypted in-memory representation (never persisted to DB)
+pub struct DecryptedJournalEntry {
+    pub metadata: JournalMetadata,
+    pub plaintext_content: String,
+}
+```
+
+### Database Migration (`migrations/0004_create_journal.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id TEXT PRIMARY KEY NOT NULL,
+    entry_date TEXT NOT NULL, -- YYYY-MM-DD
+    mood_score INTEGER CHECK(mood_score IS NULL OR (mood_score >= 1 AND mood_score <= 5)),
+    tags TEXT NOT NULL DEFAULT '[]', -- JSON array of tags
+    salt BLOB NOT NULL,             -- 16 bytes KDF salt
+    nonce BLOB NOT NULL,            -- 12 bytes AES-GCM nonce
+    encrypted_payload BLOB NOT NULL,-- Ciphertext + Auth Tag
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_mood ON journal_entries(mood_score);
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/migrations/0004_create_journal.sql`.
+2. Implement structs in `crates/core/src/domain/journal/models.rs`.
+3. Implement JSON serialization/deserialization for tags (`Vec<String>` <-> JSON string).
+4. Export models from `crates/core/src/domain/journal/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Plaintext Leakage:** Plaintext content must never have a corresponding column in SQLite.
+- **Salt Preservation:** Each entry stores its unique 16-byte salt to allow independent derivation or password rotation.
+
+## 6. Verification & Automated Tests
+- Test migration execution and BLOB insertion:
+  ```rust
+  #[tokio::test]
+  async fn test_journal_migration() {
+      let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+      sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Dual-storage domain models implemented (`JournalMetadata`, `EncryptedJournalEntry`).
+- [ ] SQLite migration created with BLOB storage for cryptographic artifacts.
+- [ ] Migration passes without errors.

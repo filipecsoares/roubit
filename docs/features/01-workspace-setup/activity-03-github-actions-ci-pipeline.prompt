@@ -1,0 +1,127 @@
+# Activity: GitHub Actions Continuous Integration (CI) Pipeline
+
+## 1. Objective & Context
+Automate code quality, security audits, and automated tests on every push and pull request via GitHub Actions. Ensures that breaking changes, formatting regressions, and known vulnerabilities in dependencies are blocked before merging into `develop` or `main`.
+
+- **Prerequisites:** Activity 01 (Workspace Init), Activity 02 (Linting & Standards).
+- **Target Location:** `.github/workflows/rust-ci.yml`.
+
+## 2. Technical Scope & Specifications
+- **Runner:** `ubuntu-latest`.
+- **Toolchain:** Stable Rust with `rustfmt` and `clippy` components installed.
+- **Caching:** `Swatinem/rust-cache` to accelerate build times and dependency compilation.
+- **Security Audit:** `cargo-audit` to detect published vulnerabilities in dependencies (`RUSTSEC` database).
+- **Triggers:** Push to `main`, `develop`, and all Pull Requests targeting `main` or `develop`.
+
+## 3. Workflow Specification (`.github/workflows/rust-ci.yml`)
+
+```yaml
+name: Rust CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+defaults:
+  run:
+    working-directory: api
+
+jobs:
+  fmt:
+    name: Code Formatting Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Setup Cargo Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Automated Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Cargo Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+
+      - name: Run Workspace Tests
+        run: cargo test --workspace --verbose
+
+  audit:
+    name: Security Vulnerability Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit Cargo.lock
+        run: cargo audit
+```
+
+## 4. Implementation Steps
+1. Create directory `.github/workflows/` at repository root.
+2. Create `.github/workflows/rust-ci.yml` with the specification above.
+3. Commit and push once GitHub remote is configured.
+4. Verify that the GitHub Actions tab triggers all 4 parallel jobs (`fmt`, `clippy`, `test`, `audit`).
+
+## 5. Security, Error Handling & Edge Cases
+- **Cache Invalidation:** `Swatinem/rust-cache` automatically hashes `Cargo.lock` to prevent stale caches.
+- **Fail-Fast Policy:** Set `fail-fast: false` on test matrices if multiple architectures are added later.
+- **Dependency Advisory:** If a zero-day advisory is filed, `cargo-audit` blocks the pipeline until the dependency is patched.
+
+## 6. Verification & Automated Tests
+- Locally emulate the CI execution steps sequentially:
+  ```bash
+  cargo fmt --all -- --check
+  cargo clippy --workspace --all-targets -- -D warnings
+  cargo test --workspace
+  cargo audit
+  ```
+- All local commands must complete with status `0`.
+
+## 7. Definition of Done (DoD)
+- [ ] `.github/workflows/rust-ci.yml` is committed.
+- [ ] Workflow contains jobs for `fmt`, `clippy`, `test`, and `audit`.
+- [ ] Pipeline runs and succeeds cleanly on GitHub Actions upon PR creation.

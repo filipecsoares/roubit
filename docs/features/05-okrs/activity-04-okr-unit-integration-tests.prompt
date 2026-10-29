@@ -1,0 +1,66 @@
+# Activity: OKR Integration Tests & Cascade Validation
+
+## 1. Objective & Context
+Ensure full data integrity, cascading deletions, and mathematical consistency across the OKR domain using end-to-end integration tests.
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 05.
+- **Target Location:** `crates/core/tests/okr_integration.rs`.
+
+## 2. Technical Scope & Specifications
+- **Framework:** `tokio::test` with SQLite in-memory test database.
+- **Scenarios Covered:**
+  - Cascading deletes: Deleting an Objective removes all associated Key Results.
+  - Habit decoupling: Deleting a Habit sets `linked_habit_id` on the KR to `NULL` without deleting the KR.
+  - Live progress update: Simulating habit check-ins and observing automatic OKR progress advancement.
+
+## 3. Test Cases Implementation
+
+```rust
+#[tokio::test]
+async fn test_cascade_delete_objective_removes_krs() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteOkrRepository::new(pool.clone());
+
+    let obj = mock_objective("Learn Rust Internals", "2026-Q4");
+    repo.create_objective(&obj).await.unwrap();
+
+    let kr = mock_kr(obj.id, "Read The Rustonomicon", 0.0, 1.0, "book");
+    repo.create_key_result(&kr).await.unwrap();
+
+    // Delete objective
+    sqlx::query("DELETE FROM objectives WHERE id = ?")
+        .bind(obj.id.to_string())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Verify KR was cascade deleted
+    let remaining_krs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM key_results WHERE objective_id = ?")
+        .bind(obj.id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(remaining_krs, 0);
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/tests/okr_integration.rs`.
+2. Add test cases for progress calculations, habit linkage updates, and foreign key cascade rules.
+3. Validate that all assertions pass cleanly.
+
+## 5. Security, Error Handling & Edge Cases
+- Ensure database foreign keys are strictly enforced during tests by verifying `PRAGMA foreign_keys = ON`.
+
+## 6. Verification & Automated Tests
+- Run tests:
+  ```bash
+  cargo test --test okr_integration
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Integration tests verify OKR creation, query hydration, and cascading deletes.
+- [ ] Habit check-in progress propagation validated.
+- [ ] All tests run and pass in CI.

@@ -1,0 +1,97 @@
+# Activity: Habit Adherence Analytics & Contribution Heatmap
+
+## 1. Objective & Context
+Calculate aggregated consistency statistics (weekly, monthly, and quarterly adherence percentages) and generate GitHub-style contribution heatmap matrices (level 0 to 4 based on completion percentage/intensity) for visual representation in the CLI and Web SPA.
+
+- **Prerequisites:** Activity 01 (Habit Models) and Activity 02 (Repository).
+- **Target Location:** `crates/core/src/domain/habit/analytics.rs`.
+
+## 2. Technical Scope & Specifications
+- **Adherence Rate Formula:**
+  $$\text{Consistency} = \frac{\sum \text{Completed Qualifying Days}}{\sum \text{Total Scheduled Days in Window}} \times 100$$
+- **Heatmap Buckets (Intensity 0-4):**
+  - Level 0: 0% completion (or missed scheduled day).
+  - Level 1: 1% - 39% completion.
+  - Level 2: 40% - 79% completion.
+  - Level 3: 80% - 99% completion.
+  - Level 4: 100%+ completion (target fully achieved or exceeded).
+
+## 3. Data Structures & Signatures
+
+```rust
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeatmapCell {
+    pub date: NaiveDate,
+    pub count: f64,
+    pub target: f64,
+    pub intensity: u8, // 0 to 4
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HabitAnalyticsSummary {
+    pub total_logs_count: usize,
+    pub completion_rate_30d: f32,
+    pub completion_rate_90d: f32,
+    pub all_time_completion_rate: f32,
+    pub heatmap_cells: Vec<HeatmapCell>,
+}
+
+pub struct HabitAnalyticsService;
+
+impl HabitAnalyticsService {
+    pub fn generate_heatmap(
+        logs: &[(NaiveDate, f64)],
+        target_value: f64,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Vec<HeatmapCell>;
+
+    pub fn calculate_window_adherence(
+        completed_days: usize,
+        required_days: usize,
+    ) -> f32;
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/habit/analytics.rs`.
+2. Implement date-range iteration filling missing dates with Level 0 intensity so the resulting heatmap vector contains a continuous grid without missing days.
+3. Calculate intensity levels $0..=4$ based on ratio `actual / target`.
+4. Implement window adherence calculation with division-by-zero guards.
+5. Export analytics service in `crates/core/src/domain/habit/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Overachievement (>100%):** Cap intensity at `4` even if a user drinks 4000ml when target is 2000ml.
+- **Large Time Windows:** Bounded queries ensure we do not load years of logs into memory without chunking or date constraints.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_heatmap_intensity_levels() {
+    let target = 100.0;
+    let logs = vec![
+        (NaiveDate::from_ymd_opt(2026, 10, 27).unwrap(), 0.0),   // Level 0
+        (NaiveDate::from_ymd_opt(2026, 10, 28).unwrap(), 50.0),  // Level 2
+        (NaiveDate::from_ymd_opt(2026, 10, 29).unwrap(), 100.0), // Level 4
+    ];
+
+    let cells = HabitAnalyticsService::generate_heatmap(
+        &logs,
+        target,
+        NaiveDate::from_ymd_opt(2026, 10, 27).unwrap(),
+        NaiveDate::from_ymd_opt(2026, 10, 29).unwrap(),
+    );
+
+    assert_eq!(cells[0].intensity, 0);
+    assert_eq!(cells[1].intensity, 2);
+    assert_eq!(cells[2].intensity, 4);
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] Heatmap cell generation returns uninterrupted calendar ranges.
+- [ ] Intensity mapped accurately between 0 and 4.
+- [ ] Adherence percentages tested for 30-day and 90-day windows.

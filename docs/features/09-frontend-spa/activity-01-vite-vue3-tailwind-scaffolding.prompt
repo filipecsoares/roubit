@@ -1,0 +1,111 @@
+# Activity: Vue 3 SPA Scaffolding, TypeScript & TailwindCSS
+
+## 1. Objective & Context
+Initialize the single-page application (SPA) in `frontend/` using Vue.js 3 with Composition API (`<script setup>`), TypeScript, Vite, Vue Router, Pinia, and TailwindCSS. Establish a sleek, minimalist design system with tailored dark mode and crisp typography.
+
+- **Prerequisites:** Node.js 20+ LTS, npm or pnpm.
+- **Target Location:** `frontend/`.
+
+## 2. Technical Scope & Specifications
+- **Framework:** Vue 3.5+ (Composition API).
+- **Build Tool:** Vite 6+.
+- **Language:** TypeScript 5.x with strict mode enabled.
+- **Styling:** TailwindCSS 3.4+ / 4.x with `@tailwindcss/typography`, `@tailwindcss/forms`.
+- **State Management:** Pinia 2.3+.
+- **Routing:** Vue Router 4.x.
+- **Aesthetic Pillars:** Minimalist, glassmorphism accents, curated dark mode (`slate-950` / `zinc-900`), Inter / Outfit typography.
+
+## 3. Project Configuration & Layout
+
+```
+frontend/
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.js
+├── postcss.config.js
+└── src/
+    ├── main.ts
+    ├── App.vue
+    ├── assets/
+    │   └── main.css
+    ├── router/
+    │   └── index.ts
+    ├── stores/
+    ├── services/
+    ├── components/
+    │   └── common/
+    └── views/
+        ├── DashboardView.vue
+        ├── HabitsView.vue
+        ├── OkrsView.vue
+        ├── JournalView.vue
+        └── LoginView.vue
+```
+
+### `tailwind.config.js` Theme Palette
+```javascript
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          50: '#eef2ff',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+        },
+        surface: {
+          dark: '#0B0F19',
+          card: '#111827',
+          border: '#1F2937',
+        }
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      }
+    },
+  },
+  plugins: [],
+}
+```
+
+## 4. Implementation Steps
+1. Initialize Vite Vue TypeScript project in `frontend/`:
+   ```bash
+   npm create vite@latest frontend -- --template vue-ts
+   ```
+2. Install core dependencies:
+   ```bash
+   cd frontend
+   npm install vue-router@4 pinia@2 axios lucide-vue-next
+   npm install -D tailwindcss postcss autoprefixer @types/node
+   npx tailwindcss init -p
+   ```
+3. Configure `tsconfig.json` with strict type checking and `@/*` path alias mapping to `./src/*`.
+4. Configure Vue Router with view routes: `/` (Dashboard), `/habits`, `/okrs`, `/journal`, `/login`.
+5. Set up global dark mode provider in `App.vue`.
+
+## 5. Security, Error Handling & Edge Cases
+- **XSS Prevention:** Vue automatically escapes interpolated strings (`{{ }}`); never use `v-html` on unvetted inputs.
+- **Routing Guards:** Protect authenticated routes (`/`, `/journal`, `/habits`) using Vue Router navigation guards, redirecting unauthenticated users to `/login`.
+
+## 6. Verification & Automated Tests
+- Run dev server:
+  ```bash
+  npm run dev
+  ```
+- Run type check & production build:
+  ```bash
+  npm run build
+  ```
+- Both commands must succeed with exit code `0`.
+
+## 7. Definition of Done (DoD)
+- [ ] Vue 3 SPA builds cleanly with Vite and TypeScript.
+- [ ] TailwindCSS configured with dark mode and typography palette.
+- [ ] Router routes configured with navigation guard stubs.

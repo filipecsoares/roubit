@@ -1,0 +1,77 @@
+# Activity: Habit Unit & Integration Test Suite
+
+## 1. Objective & Context
+Provide an end-to-end integration and unit test suite verifying the complete lifecycle of habits: definition creation, atomic multi-value check-ins, streak progression across calendar changes, and adherence calculations.
+
+- **Prerequisites:** Activities 01 to 04 of Feature 04.
+- **Target Location:** `crates/core/tests/habit_integration.rs`.
+
+## 2. Technical Scope & Specifications
+- **Framework:** `tokio::test` with SQLite in-memory engine.
+- **Scenarios Covered:**
+  - Binary habit toggle (complete/incomplete).
+  - Numeric incremental check-ins accumulating to target.
+  - Multi-week streaks across weekend boundaries.
+  - Cascade deletion (deleting habit drops all historical logs).
+
+## 3. Test Cases Implementation
+
+```rust
+#[tokio::test]
+async fn test_full_habit_lifecycle_and_streak() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteHabitRepository::new(pool);
+
+    // 1. Create Daily Binary Habit
+    let habit = Habit {
+        id: Uuid::new_v4(),
+        name: "Morning Meditation".into(),
+        description: None,
+        habit_type: HabitType::Binary,
+        target_value: 1.0,
+        unit: None,
+        frequency_days: 127, // All 7 days
+        color_hex: "#10B981".into(),
+        is_archived: false,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    repo.create_habit(&habit).await.unwrap();
+
+    // 2. Perform 5 consecutive check-ins
+    let today = Utc::now().date_naive();
+    for i in 0..5 {
+        let date = today - chrono::Duration::days(i);
+        repo.record_check_in(habit.id, date, 1.0, false).await.unwrap();
+    }
+
+    // 3. Fetch logs and verify streak
+    let logs = repo.get_logs_for_habit(habit.id, today - chrono::Duration::days(10), today).await.unwrap();
+    let completed_dates: Vec<_> = logs.iter().filter(|l| l.is_completed).map(|l| l.log_date).collect();
+    let streak = StreakCalculator::calculate(&completed_dates, habit.frequency_days, today);
+
+    assert_eq!(streak.current_streak, 5);
+    assert_eq!(streak.longest_streak, 5);
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/tests/habit_integration.rs`.
+2. Add test cases for numeric aggregation, timer habits, and streak calculations.
+3. Validate error branches (updating non-existent habit returns `HabitRepositoryError::NotFound`).
+
+## 5. Security, Error Handling & Edge Cases
+- **Leap Years & DST:** `chrono::NaiveDate` handles leap years and timezone-free date arithmetic natively, avoiding off-by-one errors on daylight saving changes.
+
+## 6. Verification & Automated Tests
+- Run tests:
+  ```bash
+  cargo test --test habit_integration
+  ```
+- All assertions must pass with 0 errors.
+
+## 7. Definition of Done (DoD)
+- [ ] Integration tests cover Binary, Numeric, and Timer habits.
+- [ ] Streak calculation verified through actual database queries.
+- [ ] All tests execute cleanly in CI environment.

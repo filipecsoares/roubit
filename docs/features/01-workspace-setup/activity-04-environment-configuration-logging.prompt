@@ -1,0 +1,106 @@
+# Activity: Environment Configuration & Structured Tracing Foundation
+
+## 1. Objective & Context
+Provide a unified, type-safe configuration loader and an asynchronous, structured tracing/logging foundation across all Roubit binaries (`crates/cli` and `crates/api`). This ensures 12-factor application compliance, configurable log levels (`INFO`, `DEBUG`, `TRACE`), and context-rich log formatting.
+
+- **Prerequisites:** Activity 01 (Workspace Init).
+- **Target Location:** `crates/core/src/config/` and `crates/core/src/telemetry/`.
+
+## 2. Technical Scope & Specifications
+- **Config Management:** Typed environment parsing using `serde`, `dotenvy` (`0.15`), and fallback defaults.
+- **Logging / Tracing:** `tracing` (`0.1`) and `tracing-subscriber` (`0.3`) with `EnvFilter`.
+- **Output Formats:**
+  - CLI: Compact, human-readable terminal output.
+  - API: JSON-formatted or compact structured spans for cloud and local debugging.
+- **Log Levels:** Configured via `RUST_LOG` environment variable (defaults to `roubit=info,tower_http=info`).
+
+## 3. Data Structures & Signatures
+
+### Configuration Struct (`crates/core/src/config.rs`)
+```rust
+use serde::Deserialize;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppConfig {
+    #[serde(default = "default_database_url")]
+    pub database_url: String,
+
+    #[serde(default = "default_server_port")]
+    pub server_port: u16,
+
+    #[serde(default = "default_server_host")]
+    pub server_host: String,
+
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
+}
+
+fn default_database_url() -> String {
+    "sqlite://roubit.db?mode=rwc".to_string()
+}
+fn default_server_port() -> u16 { 8080 }
+fn default_server_host() -> String { "127.0.0.1".to_string() }
+fn default_log_level() -> String { "roubit=info,tower_http=info".to_string() }
+
+impl AppConfig {
+    pub fn from_env() -> Result<Self, envy::Error> {
+        let _ = dotenvy::dotenv(); // Load optional .env file
+        envy::from_env::<AppConfig>()
+    }
+}
+```
+
+### Telemetry Initialization (`crates/core/src/telemetry.rs`)
+```rust
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
+
+pub fn init_telemetry(default_filter: &str) {
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(default_filter));
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_target(true)
+        .with_thread_ids(false)
+        .compact();
+
+    Registry::default()
+        .with(env_filter)
+        .with(fmt_layer)
+        .init();
+}
+```
+
+## 4. Implementation Steps
+1. Add dependencies `dotenvy`, `envy`, `tracing`, `tracing-subscriber` in `crates/core/Cargo.toml`.
+2. Implement `crates/core/src/config.rs` with `AppConfig` and validation.
+3. Implement `crates/core/src/telemetry.rs` with `init_telemetry`.
+4. Export modules in `crates/core/src/lib.rs`.
+5. Create `.env.example` at project root with:
+   ```env
+   DATABASE_URL=sqlite://roubit.db?mode=rwc
+   SERVER_HOST=127.0.0.1
+   SERVER_PORT=8080
+   RUST_LOG=roubit=debug,tower_http=debug
+   ```
+
+## 5. Security, Error Handling & Edge Cases
+- **Secret Sanitization:** Sensitive values (e.g. JWT secret, encryption passphrases) must never be logged via `tracing::info!` or printed in debug logs.
+- **Missing File Grace:** `dotenvy::dotenv()` must gracefully handle a missing `.env` file without returning an error (e.g., in Docker/production container environments).
+
+## 6. Verification & Automated Tests
+- Unit test verifying default config values when environment is empty.
+- Unit test verifying environment variable overrides.
+  ```rust
+  #[test]
+  fn test_default_config() {
+      let config = AppConfig::from_env().expect("Should load config defaults");
+      assert_eq!(config.server_port, 8080);
+      assert!(config.database_url.contains("roubit.db"));
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] `AppConfig` parses environment variables with secure fallbacks.
+- [ ] `init_telemetry` sets up the global tracing subscriber cleanly.
+- [ ] `.env.example` documented at the project root.
+- [ ] Unit tests pass for configuration loading.

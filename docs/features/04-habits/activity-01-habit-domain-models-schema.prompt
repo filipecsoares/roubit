@@ -1,0 +1,114 @@
+# Activity: Habit Domain Models & SQLite Schema
+
+## 1. Objective & Context
+Define domain models and SQLite migrations for **RF02 — Habit Tracker**. Habits support three distinct measurement modalities:
+1. **Binary:** Simple completion (yes/no, e.g., "Floss teeth").
+2. **Numeric:** Quantitative targets with units (e.g., "Drink 2500 ml water", "Read 20 pages").
+3. **Timer / Duration:** Time-tracked goals (e.g., "Meditate for 15 minutes").
+
+- **Prerequisites:** Feature 01 (Workspace Setup).
+- **Target Location:** `crates/core/src/domain/habit/` and `crates/core/migrations/0002_create_habits.sql`.
+
+## 2. Technical Scope & Specifications
+- **Frequency Options:** Daily, specific weekdays (e.g., Mon, Wed, Fri), or target times per week (e.g., 3x/week).
+- **Measurement Types:** `Binary`, `Numeric`, `Timer`.
+- **Relational Integrity:** Foreign keys to habit definitions, indexing on log dates for instant streak and heatmap calculations.
+
+## 3. Data Structures & Schema
+
+### Domain Entities (`crates/core/src/domain/habit/models.rs`)
+```rust
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HabitType {
+    Binary,
+    Numeric,
+    Timer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Habit {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub habit_type: HabitType,
+    pub target_value: f64,          // 1.0 for binary, e.g. 2000.0 for ml, 15.0 for mins
+    pub unit: Option<String>,        // e.g. "ml", "pages", "min"
+    pub frequency_days: u8,         // Bitmask (1=Mon, 2=Tue, 4=Wed, etc.) or 127 for daily
+    pub color_hex: String,
+    pub is_archived: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HabitLog {
+    pub id: Uuid,
+    pub habit_id: Uuid,
+    pub log_date: NaiveDate,
+    pub actual_value: f64,
+    pub is_completed: bool,
+    pub notes: Option<String>,
+    pub logged_at: DateTime<Utc>,
+}
+```
+
+### Database Migration (`migrations/0002_create_habits.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS habits (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    habit_type TEXT NOT NULL CHECK(habit_type IN ('binary', 'numeric', 'timer')),
+    target_value REAL NOT NULL DEFAULT 1.0,
+    unit TEXT,
+    frequency_days INTEGER NOT NULL DEFAULT 127, -- bitmask for 7 days
+    color_hex TEXT NOT NULL DEFAULT '#10B981',
+    is_archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS habit_logs (
+    id TEXT PRIMARY KEY NOT NULL,
+    habit_id TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+    log_date TEXT NOT NULL, -- YYYY-MM-DD
+    actual_value REAL NOT NULL DEFAULT 0.0,
+    is_completed INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    logged_at TEXT NOT NULL,
+    UNIQUE(habit_id, log_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_date ON habit_logs(habit_id, log_date DESC);
+CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(log_date);
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/migrations/0002_create_habits.sql`.
+2. Define `HabitType`, `Habit`, and `HabitLog` structs in `crates/core/src/domain/habit/models.rs`.
+3. Implement SQLx `FromRow` and custom serialization for `HabitType` string conversion.
+4. Export models from `crates/core/src/domain/habit/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Unique Per-Day Constraint:** `UNIQUE(habit_id, log_date)` guarantees that check-ins on the same day can be updated or incremented without creating duplicate rows.
+- **Negative Value Prevention:** Enforce `actual_value >= 0.0` to avoid corrupted progress calculations.
+
+## 6. Verification & Automated Tests
+- Test schema creation and constraints:
+  ```rust
+  #[tokio::test]
+  async fn test_habit_schema_migration() {
+      let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+      sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Domain structs model Binary, Numeric, and Timer habits.
+- [ ] SQLite migration applied with appropriate composite indexes.
+- [ ] Bitmask frequency representation documented and tested.

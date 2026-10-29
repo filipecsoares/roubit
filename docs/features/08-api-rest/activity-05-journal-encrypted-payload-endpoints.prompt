@@ -1,0 +1,69 @@
+# Activity: Zero-Knowledge Journal REST Controllers
+
+## 1. Objective & Context
+Implement API endpoints for **RF04 — Encrypted Journaling**. Enforce strict zero-knowledge architecture on the server: the backend receives and stores *only* pre-encrypted envelopes (ciphertext, nonce, salt) alongside open metadata (entry date, mood score, tags). The server never possesses the master key or decrypted content.
+
+- **Prerequisites:** Activities 01 and 02 of Feature 08, and Feature 06 (Journaling).
+- **Target Location:** `crates/api/src/controllers/journal_controller.rs`.
+
+## 2. Technical Scope & Specifications
+- **Endpoints:**
+  - `GET /api/v1/journal/metadata`: List entries in a date range (returns dates, tags, mood, but omits ciphertext).
+  - `GET /api/v1/journal/:id`: Fetch complete encrypted envelope (salt, nonce, ciphertext) for client-side decryption.
+  - `POST /api/v1/journal`: Save or update encrypted journal entry.
+  - `DELETE /api/v1/journal/:id`: Delete entry.
+- **Payload Guarantee:** The server explicitly rejects any request body containing a plaintext `content` field.
+
+## 3. Data Transfer Objects (DTOs)
+
+```rust
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use validator::Validate;
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct SaveEncryptedJournalRequest {
+    pub entry_date: NaiveDate,
+    #[validate(range(min = 1, max = 5))]
+    pub mood_score: Option<u8>,
+    pub tags: Vec<String>,
+    pub salt_base64: String,      // 16 bytes encoded as Base64
+    pub nonce_base64: String,     // 12 bytes encoded as Base64
+    pub ciphertext_base64: String,// Ciphertext + Tag encoded as Base64
+}
+
+#[derive(Debug, Serialize)]
+pub struct EncryptedJournalResponse {
+    pub id: Uuid,
+    pub entry_date: NaiveDate,
+    pub mood_score: Option<u8>,
+    pub tags: Vec<String>,
+    pub salt_base64: String,
+    pub nonce_base64: String,
+    pub ciphertext_base64: String,
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/api/src/controllers/journal_controller.rs`.
+2. Implement `save_journal_entry`:
+   - Decode Base64 cryptographic artifacts (`salt`, `nonce`, `ciphertext`).
+   - Validate buffer lengths (salt == 16 bytes, nonce == 12 bytes, ciphertext >= 16 bytes for auth tag).
+   - Persist to `SqliteJournalRepository`.
+3. Implement `get_journal_entry` and `list_journal_metadata`.
+4. Register routes in API router under `/api/v1/journal`.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Decryption at Server:** Ensure there are no code paths or cryptographic dependencies in `crates/api` attempting to decrypt journal text.
+- **Base64 Decoding Safety:** Use `base64::prelude::BASE64_STANDARD` and reject invalid strings with `400 Bad Request`.
+
+## 6. Verification & Automated Tests
+- Test saving an encrypted entry returns `201 Created`.
+- Test that listing metadata does not transfer large ciphertext payloads.
+- Test that malformed Base64 is rejected.
+
+## 7. Definition of Done (DoD)
+- [ ] Journal REST endpoints implemented and guarded by authentication.
+- [ ] Server enforces zero-knowledge storage; only Base64-encoded encrypted envelopes accepted.
+- [ ] Integration tests verify storage and retrieval of cryptographic envelopes.

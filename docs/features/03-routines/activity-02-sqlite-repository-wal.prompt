@@ -1,0 +1,104 @@
+# Activity: Routine SQLite Repository with WAL Mode
+
+## 1. Objective & Context
+Implement a high-performance, asynchronous data access repository for Routines and TimeBlocks using `sqlx`. Ensure SQLite is configured in WAL (Write-Ahead Logging) mode with optimal concurrency and memory usage settings.
+
+- **Prerequisites:** Activity 01 (Routine Domain Models & Schema).
+- **Target Location:** `crates/core/src/domain/routine/repository.rs`.
+
+## 2. Technical Scope & Specifications
+- **Driver:** `sqlx::SqlitePool`.
+- **SQLite Pragmas for Concurrency & Memory Safety:**
+  - `PRAGMA journal_mode = WAL;` (Allows concurrent readers while writing).
+  - `PRAGMA synchronous = NORMAL;` (High durability with minimal disk sync overhead).
+  - `PRAGMA foreign_keys = ON;` (Strict constraint verification).
+  - `PRAGMA busy_timeout = 5000;` (Prevents immediate `database is locked` errors during burst writes).
+- **Repository Pattern:** Trait-based contract (`RoutineRepository`) to decouple domain logic from SQL persistence.
+
+## 3. Data Structures & Signatures
+
+```rust
+use async_trait::async_trait;
+use uuid::Uuid;
+use super::models::{Routine, TimeBlock, BlockStatus};
+use chrono::NaiveDate;
+
+#[derive(Debug, thiserror::Error)]
+pub enum RoutineRepositoryError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Routine not found: {0}")]
+    NotFound(Uuid),
+}
+
+#[async_trait]
+pub trait RoutineRepository: Send + Sync {
+    async fn create_routine(&self, routine: &Routine) -> Result<(), RoutineRepositoryError>;
+    async fn get_routine_by_id(&self, id: Uuid) -> Result<Option<Routine>, RoutineRepositoryError>;
+    async fn get_active_routine(&self) -> Result<Option<Routine>, RoutineRepositoryError>;
+    async fn add_time_block(&self, block: &TimeBlock) -> Result<(), RoutineRepositoryError>;
+    async fn list_blocks_for_routine(&self, routine_id: Uuid) -> Result<Vec<TimeBlock>, RoutineRepositoryError>;
+    async fn log_block_status(
+        &self,
+        block_id: Uuid,
+        date: NaiveDate,
+        status: BlockStatus,
+        notes: Option<String>,
+    ) -> Result<(), RoutineRepositoryError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `SqliteRoutineRepository` struct holding `sqlx::SqlitePool`.
+2. Implement pool initialization helper:
+   ```rust
+   use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+   use std::str::FromStr;
+
+   pub async fn create_sqlite_pool(database_url: &str) -> Result<sqlx::SqlitePool, sqlx::Error> {
+       let options = SqliteConnectOptions::from_str(database_url)?
+           .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+           .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+           .foreign_keys(true)
+           .busy_timeout(std::time::Duration::from_secs(5));
+
+       SqlitePoolOptions::new()
+           .max_connections(5)
+           .connect_with(options)
+           .await
+   }
+   ```
+3. Implement `RoutineRepository` trait methods with parameterized SQL queries.
+4. Use transactions (`pool.begin().await?`) when mutating routines alongside multiple time blocks.
+
+## 5. Security, Error Handling & Edge Cases
+- **SQL Injection Prevention:** All queries use parameterized binds (`?` in SQLite) via SQLx queries, eliminating SQL injection vectors.
+- **Connection Limits:** SQLite is a single-writer database; limit pool write connections appropriately to avoid thread lock starvation.
+
+## 6. Verification & Automated Tests
+```rust
+#[tokio::test]
+async fn test_sqlite_routine_crud() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+
+    let repo = SqliteRoutineRepository::new(pool);
+    let routine = Routine {
+        id: Uuid::new_v4(),
+        name: "Morning Flow".into(),
+        description: None,
+        is_active: true,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    repo.create_routine(&routine).await.unwrap();
+    let fetched = repo.get_routine_by_id(routine.id).await.unwrap();
+    assert_eq!(fetched.unwrap().name, "Morning Flow");
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] SQLite connection helper configures WAL mode, normal sync, and busy timeout.
+- [ ] `RoutineRepository` trait and `SqliteRoutineRepository` implementation complete.
+- [ ] CRUD operations and transaction rollbacks covered by automated tests.

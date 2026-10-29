@@ -1,0 +1,101 @@
+# Activity: Resilient Streak Calculation Engine
+
+## 1. Objective & Context
+Implement a high-performance, deterministic algorithm to calculate habit streaks: **Current Streak** (unbroken consecutive qualifying days ending today or yesterday) and **Longest Streak** (all-time personal record). The algorithm must accurately account for custom habit frequencies (e.g. weekdays-only habits).
+
+- **Prerequisites:** Activity 01 (Habit Models).
+- **Target Location:** `crates/core/src/domain/habit/streak.rs`.
+
+## 2. Technical Scope & Specifications
+- **Frequency Awareness:**
+  - Daily habits: Missed days break the streak.
+  - Weekday-only habits (Mon-Fri): Saturday and Sunday must NOT break the streak.
+- **Grace Period Policy:**
+  - If today's check-in is not yet done, yesterday's streak is still considered "alive" (Current Streak = previous count).
+  - If yesterday was also missed (on a required day), Current Streak resets to `0`.
+- **Complexity:** $O(N)$ single-pass reverse chronological scan over log history.
+
+## 3. Data Structures & Signatures
+
+```rust
+use chrono::{Datelike, NaiveDate, Weekday};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreakMetrics {
+    pub current_streak: u32,
+    pub longest_streak: u32,
+    pub is_active_today: bool,
+}
+
+pub struct StreakCalculator;
+
+impl StreakCalculator {
+    /// Computes current and longest streak given completed dates and frequency bitmask
+    pub fn calculate(
+        completed_dates: &[NaiveDate],
+        frequency_bitmask: u8,
+        reference_date: NaiveDate,
+    ) -> StreakMetrics;
+
+    pub fn is_required_day(date: NaiveDate, frequency_bitmask: u8) -> bool;
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/habit/streak.rs`.
+2. Implement `is_required_day`:
+   - Map `date.weekday()` to bit (Monday = 1 << 0, Tuesday = 1 << 1, ..., Sunday = 1 << 6).
+   - Check `(frequency_bitmask & bit) != 0`.
+3. Implement `calculate`:
+   - Sort completed dates descending (most recent first).
+   - Determine if `reference_date` (today) is completed.
+   - Iterate backwards day by day from `reference_date - 1 day`:
+     - If the day was a required day and was completed, increment current streak.
+     - If the day was a required day and was NOT completed, break current streak accumulation.
+     - If the day was not a required day (e.g. weekend), skip without breaking streak.
+   - Scan entire history to compute the all-time maximum unbroken consecutive run (`longest_streak`).
+
+## 5. Security, Error Handling & Edge Cases
+- **Empty Log History:** When 0 logs exist, return `current_streak: 0, longest_streak: 0, is_active_today: false`.
+- **Duplicate Dates:** Handle deduplication of log dates before scanning.
+- **Future Dates:** Filter out any anomalous logs with dates in the future.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_daily_streak_unbroken() {
+    let today = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
+    let dates = vec![
+        today,
+        today - chrono::Duration::days(1),
+        today - chrono::Duration::days(2),
+        today - chrono::Duration::days(3),
+    ];
+
+    let metrics = StreakCalculator::calculate(&dates, 127, today);
+    assert_eq!(metrics.current_streak, 4);
+    assert_eq!(metrics.longest_streak, 4);
+    assert!(metrics.is_active_today);
+}
+
+#[test]
+fn test_weekday_streak_skips_weekends() {
+    // Mon Oct 26 to Fri Oct 30
+    let friday = NaiveDate::from_ymd_opt(2026, 10, 30).unwrap();
+    let thursday = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
+    let wednesday = NaiveDate::from_ymd_opt(2026, 10, 28).unwrap();
+
+    let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap(); // Following Monday
+    let dates = vec![monday, friday, thursday, wednesday];
+
+    // Bitmask for Mon-Fri: 1+2+4+8+16 = 31
+    let metrics = StreakCalculator::calculate(&dates, 31, monday);
+    assert_eq!(metrics.current_streak, 4); // Sat & Sun did not reset streak!
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] Streak calculation handles daily and weekday-specific frequency bitmasks.
+- [ ] Grace period correctly preserves streak if check-in is pending for today.
+- [ ] Unit tests cover weekend jumps, broken streaks, and longest streak retention.

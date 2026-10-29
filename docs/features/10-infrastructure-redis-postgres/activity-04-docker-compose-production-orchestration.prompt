@@ -1,0 +1,127 @@
+# Activity: Multi-Stage Dockerfiles & Docker Compose Orchestration
+
+## 1. Objective & Context
+Enable 1-command deployment of the entire Roubit ecosystem (`docker compose up -d`). Create multi-stage, hardened Dockerfiles for the Rust backend API and the Vue 3 frontend, orchestrating them alongside PostgreSQL and Redis with automated healthchecks and persistent volumes.
+
+- **Prerequisites:** Features 08, 09, and Activities 01-03 of Feature 10.
+- **Target Location:** Repository root `docker-compose.yml`, `crates/api/Dockerfile`, and `frontend/Dockerfile`.
+
+## 2. Technical Scope & Specifications
+- **Backend Image:** Multi-stage build using `rust:1.85-alpine` or `debian-bookworm-slim` builder, producing a static scratch or distroless runtime image (<30MB image size, non-root user).
+- **Frontend Image:** Multi-stage build using `node:20-alpine` builder and `nginx:alpine` runtime (<25MB image size).
+- **Orchestration:** `docker-compose.yml` with:
+  - `postgres`: Version 16+ Alpine with healthcheck.
+  - `redis`: Version 7+ Alpine with `--notify-keyspace-events Ex` and healthcheck.
+  - `api`: Depends on `postgres` and `redis` being healthy.
+  - `frontend`: Depends on `api`.
+
+## 3. Configuration Files
+
+### Backend `api/Dockerfile`
+```dockerfile
+# Stage 1: Build binary
+FROM rust:1.85-slim as builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo build --release --bin roubit-server
+
+# Stage 2: Minimal Runtime
+FROM debian:bookworm-slim
+RUN useradd -m -u 1000 appuser && \
+    apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+USER appuser
+WORKDIR /app
+COPY --from=builder /app/target/release/roubit-server /app/roubit-server
+EXPOSE 8080
+ENV RUST_LOG=roubit=info,tower_http=info
+CMD ["/app/roubit-server"]
+```
+
+### `docker-compose.yml`
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: roubit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: roubit
+      POSTGRES_USER: roubit_user
+      POSTGRES_PASSWORD: roubit_secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roubit_user -d roubit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: roubit-redis
+    restart: unless-stopped
+    command: ["redis-server", "--notify-keyspace-events", "Ex"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: roubit-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://roubit_user:roubit_secure_password@postgres:5432/roubit
+      REDIS_URL: redis://redis:6379
+      SERVER_PORT: 8080
+      SERVER_HOST: 0.0.0.0
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: roubit-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## 4. Implementation Steps
+1. Create `crates/api/Dockerfile` using multi-stage build.
+2. Create `frontend/Dockerfile` building static Vue files and copying into Nginx.
+3. Create root `docker-compose.yml`.
+4. Create `.dockerignore` files excluding local `target/`, `node_modules/`, and `.git/`.
+5. Verify stack startup: `docker compose up -d`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Non-Root Execution:** The Rust binary runs as unprivileged `appuser` (UID 1000) inside the container.
+- **Persistent Storage:** Named volumes (`postgres_data`, `redis_data`) guarantee zero data loss across container restarts.
+
+## 6. Verification & Automated Tests
+- Test that `docker compose ps` shows all 4 containers in `healthy` or `running` state.
+- Test making HTTP GET request to `http://localhost/` loads the Vue SPA.
+
+## 7. Definition of Done (DoD)
+- [ ] Multi-stage Dockerfiles build minimal, secure images.
+- [ ] `docker-compose.yml` orchestrates API, SPA, PostgreSQL, and Redis.
+- [ ] Healthchecks ensure backend waits for databases before booting.

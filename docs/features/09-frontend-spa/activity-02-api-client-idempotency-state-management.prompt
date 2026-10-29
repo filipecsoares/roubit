@@ -1,0 +1,84 @@
+# Activity: HTTP Client, Idempotency-Key Interceptor & Pinia Stores
+
+## 1. Objective & Context
+Configure an HTTP client service using `axios` that integrates transparently with the backend API. The client automatically injects JWT authorization headers, gracefully handles 401 session expirations, and generates unique `Idempotency-Key` (UUIDv4) headers for all state-mutating requests (`POST`, `PUT`). Set up central reactive state stores with Pinia.
+
+- **Prerequisites:** Activity 01 (Vite & Scaffolding) and Feature 08 (API REST).
+- **Target Location:** `frontend/src/services/api.ts` and `frontend/src/stores/`.
+
+## 2. Technical Scope & Specifications
+- **Client:** `axios` (`1.7.x`).
+- **Idempotency Header:** Automatically generated via `crypto.randomUUID()` on mutation requests.
+- **Pinia Stores:**
+  - `useAuthStore`: User profile, JWT token, login/logout actions.
+  - `useRoutineStore`: Active routine, time blocks, block completion actions.
+  - `useHabitStore`: List of habits, streak counters, check-in mutation.
+  - `useOkrStore`: Objectives and child Key Results.
+  - `useJournalStore`: Metadata list, current entry, and encryption status.
+
+## 3. Implementation Code
+
+### `frontend/src/services/api.ts`
+```typescript
+import axios from 'axios';
+import { useAuthStore } from '@/stores/auth';
+
+export const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+apiClient.interceptors.request.use((config) => {
+  const authStore = useAuthStore();
+  if (authStore.token) {
+    config.headers.Authorization = `Bearer ${authStore.token}`;
+  }
+
+  // Inject Idempotency-Key on mutation methods
+  if (['post', 'put', 'patch'].includes(config.method?.toLowerCase() || '')) {
+    if (!config.headers['Idempotency-Key']) {
+      config.headers['Idempotency-Key'] = crypto.randomUUID();
+    }
+  }
+
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const authStore = useAuthStore();
+      authStore.logout();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+## 4. Implementation Steps
+1. Create `frontend/src/services/api.ts` with the interceptor configuration above.
+2. Implement Pinia stores in `frontend/src/stores/`:
+   - `auth.ts`
+   - `routine.ts`
+   - `habit.ts`
+   - `okr.ts`
+   - `journal.ts`
+3. Define TypeScript interfaces for backend responses mirroring the Rust DTOs.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Token in URL:** Never pass access tokens as query parameters.
+- **Automatic Retries:** If a network timeout occurs, retrying the mutation with the same `Idempotency-Key` avoids creating duplicate records on the server.
+
+## 6. Verification & Automated Tests
+- Test request interceptor attaches `Authorization` header when token exists.
+- Test request interceptor generates UUIDv4 `Idempotency-Key` on POST requests.
+
+## 7. Definition of Done (DoD)
+- [ ] `apiClient` configured with auth and idempotency interceptors.
+- [ ] Pinia stores implemented for all 4 core modules.
+- [ ] 401 handling redirects user to login cleanly.

@@ -1,0 +1,67 @@
+# Activity: Scheduled Reminders via Redis Keyspace Notifications & TTL
+
+## 1. Objective & Context
+Implement a zero-cost, lightweight scheduling mechanism for routine and habit reminders. Instead of heavy background polling loops running every second in SQL, schedule future alert timestamps by setting expiring Redis keys with exact TTLs. When the key expires, Redis triggers a Keyspace Notification consumed by a Tokio background worker to fire notifications.
+
+- **Prerequisites:** Activity 01 (Redis Connection).
+- **Target Location:** `crates/api/src/workers/reminder_worker.rs`.
+
+## 2. Technical Scope & Specifications
+- **Redis Configuration:** Enable keyspace events in Redis config: `notify-keyspace-events Ex` (fires on expired key events).
+- **Key Format:** `reminder:<user_id>:<entity_type>:<entity_id>` (e.g. `reminder:usr_123:time_block:blk_456`).
+- **Worker Runtime:** Background `tokio::spawn` task subscribing to the Pub/Sub channel `__keyevent@0__:expired`.
+- **Delivery Mechanisms:** Server-Sent Events (SSE) `/api/v1/notifications/stream` for connected browser clients and desktop alerts.
+
+## 3. Data Structures & Signatures
+
+```rust
+use redis::aio::PubSub;
+use tokio::sync::broadcast;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReminderNotification {
+    pub user_id: String,
+    pub entity_type: String, // "time_block", "habit"
+    pub entity_id: String,
+    pub title: String,
+    pub message: String,
+    pub scheduled_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub struct ReminderScheduler {
+    redis_service: std::sync::Arc<crate::redis::RedisService>,
+}
+
+impl ReminderScheduler {
+    pub async fn schedule_reminder(
+        &self,
+        user_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+        fire_in_seconds: usize,
+    ) -> Result<(), crate::redis::RedisError>;
+}
+```
+
+## 4. Implementation Steps
+1. Configure Redis container with `--notify-keyspace-events Ex`.
+2. Implement `ReminderScheduler::schedule_reminder`:
+   - Execute `SET reminder:<user_id>:<entity_type>:<entity_id> "active" EX <seconds>`.
+3. Implement `start_reminder_worker(pool, tx_notification)`:
+   - Connect async Pub/Sub channel to `__keyevent@0__:expired`.
+   - On expiration event, parse key string tokens `(user_id, entity_type, entity_id)`.
+   - Hydrate entity details from database.
+   - Broadcast reminder event to active SSE connections.
+4. Expose SSE route in Axum: `GET /api/v1/notifications/stream`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Missed Expirations on Downtime:** Redis Pub/Sub events are fire-and-forget; on startup, run a fast catch-up check in SQLite/Postgres for any blocks whose start times passed during maintenance.
+- **Connection Drops:** Worker Pub/Sub stream must auto-reconnect with exponential backoff if Redis is restarted.
+
+## 6. Verification & Automated Tests
+- Test setting key with 1-second TTL triggers worker callback and broadcasts notification within ~1050ms.
+
+## 7. Definition of Done (DoD)
+- [ ] Redis Keyspace Notification listener implemented on Tokio runtime.
+- [ ] Schedule method sets expiring keys with exact TTLs.
+- [ ] SSE endpoint broadcasts real-time reminders to web clients.

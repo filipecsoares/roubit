@@ -1,0 +1,91 @@
+# Activity: Journal Integration Tests & Zero-Knowledge Validation
+
+## 1. Objective & Context
+Validate zero-knowledge characteristics of the Journaling subsystem: ensure that the database layer never stores readable text, that corrupted ciphertexts are strictly rejected, and that wrong passphrases produce safe, uninformative decryption failures.
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 06.
+- **Target Location:** `crates/core/tests/journal_integration.rs`.
+
+## 2. Technical Scope & Specifications
+- **Framework:** `tokio::test` with SQLite in-memory test database.
+- **Scenarios Tested:**
+  - Raw database inspection asserting 0 occurrences of plaintext keywords.
+  - Wrong passphrase decryption returns `DecryptionFailed`.
+  - Bit-flip tampering in SQLite database detected and rejected.
+  - Deletion removes both metadata and ciphertext records completely.
+
+## 3. Test Cases Implementation
+
+```rust
+#[tokio::test]
+async fn test_database_contains_no_plaintext() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteJournalRepository::new(pool.clone());
+    let service = JournalService::new(repo, KdfService::default_recommended());
+
+    let pass = SecretString::new("super-secret-vault-key".into());
+    let secret_phrase = "TOP_SECRET_REFLECTION_PHRASE";
+    let entry_text = SecretString::new(format!("My personal thoughts: {}", secret_phrase));
+
+    service.create_or_update_entry(
+        NaiveDate::from_ymd_opt(2026, 10, 29).unwrap(),
+        Some(4),
+        vec!["private".into()],
+        entry_text,
+        &pass,
+    ).await.unwrap();
+
+    // Query SQLite raw text representations across all columns
+    let raw_payloads: Vec<Vec<u8>> = sqlx::query_scalar("SELECT encrypted_payload FROM journal_entries")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+    for payload in raw_payloads {
+        let stringified = String::from_utf8_lossy(&payload);
+        assert!(!stringified.contains(secret_phrase), "Plaintext leaked in raw BLOB!");
+    }
+}
+
+#[tokio::test]
+async fn test_wrong_passphrase_fails_cleanly() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteJournalRepository::new(pool);
+    let service = JournalService::new(repo, KdfService::default_recommended());
+
+    let correct_pass = SecretString::new("correct-password".into());
+    let wrong_pass = SecretString::new("wrong-password".into());
+
+    let meta = service.create_or_update_entry(
+        NaiveDate::from_ymd_opt(2026, 10, 29).unwrap(),
+        None,
+        vec![],
+        SecretString::new("Hello world".into()),
+        &correct_pass,
+    ).await.unwrap();
+
+    let result = service.read_and_decrypt_entry(meta.id, &wrong_pass).await;
+    assert!(result.is_err());
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/tests/journal_integration.rs`.
+2. Implement test fixtures and assertions shown above.
+3. Verify test runs without leaks or panics.
+
+## 5. Security, Error Handling & Edge Cases
+- Test that SQL errors and cipher failures do not return partially decrypted strings.
+
+## 6. Verification & Automated Tests
+- Run tests:
+  ```bash
+  cargo test --test journal_integration
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Database inspect test confirms zero plaintext leakage.
+- [ ] Wrong passphrase returns proper error without crashing.
+- [ ] Ciphertext tampering detected and blocked.

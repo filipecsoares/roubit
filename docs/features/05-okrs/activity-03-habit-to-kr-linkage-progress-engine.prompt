@@ -1,0 +1,73 @@
+# Activity: Habit-to-KR Linkage & Progress Computation Engine
+
+## 1. Objective & Context
+Implement the business engine that connects daily habits directly to long-term Key Results. When a user checks in to a habit linked to an active KR (e.g. daily running habit linked to "Run 150 km in Q4"), the Key Result and Objective progress are recalculated automatically.
+
+- **Prerequisites:** Activities 01 and 02 of Feature 05, and Feature 04 (Habits).
+- **Target Location:** `crates/core/src/domain/okr/progress.rs`.
+
+## 2. Technical Scope & Specifications
+- **Progress Formulas:**
+  - Key Result Progress:
+    $$\text{KR Progress} = \min\left(100.0, \max\left(0.0, \frac{\text{Current} - \text{Initial}}{\text{Target} - \text{Initial}} \times 100\right)\right)$$
+  - Objective Weighted Progress:
+    $$\text{Objective Progress} = \frac{\sum (\text{KR Progress}_i \times \text{Weight}_i)}{\sum \text{Weight}_i}$$
+- **Synchronization Trigger:** Hook into `HabitRepository::record_check_in` or call `OkrProgressService::sync_from_habit`.
+
+## 3. Data Structures & Signatures
+
+```rust
+use super::models::{KeyResult, Objective};
+
+pub struct OkrProgressEngine;
+
+impl OkrProgressEngine {
+    pub fn calculate_kr_progress(initial: f64, target: f64, current: f64) -> f32;
+
+    pub fn calculate_objective_progress(key_results: &[KeyResult]) -> f32;
+}
+
+pub struct OkrSyncService<O: super::repository::OkrRepository, H: crate::domain::habit::repository::HabitRepository> {
+    okr_repo: O,
+    habit_repo: H,
+}
+
+impl<O, H> OkrSyncService<O, H>
+where
+    O: super::repository::OkrRepository,
+    H: crate::domain::habit::repository::HabitRepository,
+{
+    pub async fn sync_linked_krs_for_habit(&self, habit_id: uuid::Uuid) -> Result<(), super::repository::OkrRepositoryError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/okr/progress.rs`.
+2. Implement `calculate_kr_progress` handling edge cases (target equals initial, over-achievement).
+3. Implement `calculate_objective_progress` using weighted average of all KRs.
+4. Implement `OkrSyncService::sync_linked_krs_for_habit`:
+   - Query all KRs where `linked_habit_id == habit_id`.
+   - Aggregate sum or count of completed habit logs within the KR date range.
+   - Update KR `current_value` and update parent Objective `progress_percentage`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Zero Weight KRs:** If all KRs have weight `0.0`, default objective progress to `0.0`.
+- **Target Inversion:** Support negative targets (e.g. reduce body fat from 25% down to 18%).
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_weighted_objective_progress() {
+    let kr1 = mock_kr_with_progress(50.0, 1.0); // 50% progress, weight 1.0
+    let kr2 = mock_kr_with_progress(100.0, 3.0); // 100% progress, weight 3.0
+
+    // Weighted average: (50*1 + 100*3) / (1 + 3) = 350 / 4 = 87.5%
+    let progress = OkrProgressEngine::calculate_objective_progress(&[kr1, kr2]);
+    assert_eq!(progress, 87.5);
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] Mathematical calculations for KR and weighted Objective progress implemented.
+- [ ] Handles boundary limits (0% to 100%) and edge cases.
+- [ ] Habit check-in sync logic implemented and tested.

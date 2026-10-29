@@ -1,0 +1,77 @@
+# Activity: REST Controllers for Routines, Habits & OKRs
+
+## 1. Objective & Context
+Expose typed, validated REST API endpoints for Routines, Habits, and OKRs. Connect Axum handlers directly to the underlying `crates/core` use cases and repositories, applying request validation and returning standardized JSON payloads.
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 08, and core domain features.
+- **Target Location:** `crates/api/src/controllers/`.
+
+## 2. Technical Scope & Specifications
+- **Validation:** `validator` (`0.19.x` or `0.20.x`) derive macros for length, range, and format checks.
+- **Endpoints:**
+  - `GET /api/v1/routines`: Fetch active routine and current day's progress.
+  - `POST /api/v1/routines`: Create new routine template.
+  - `POST /api/v1/routines/blocks/:id/complete`: Log completion of a time block.
+  - `GET /api/v1/habits`: List active habits with streak metrics.
+  - `POST /api/v1/habits`: Create new habit definition.
+  - `POST /api/v1/habits/:id/checkin`: Record habit check-in (protected by idempotency).
+  - `GET /api/v1/okrs`: List objectives for current quarter with child Key Results.
+  - `POST /api/v1/okrs`: Create objective.
+
+## 3. Data Transfer Objects (DTOs)
+
+```rust
+use serde::{Deserialize, Serialize};
+use validator::Validate;
+use uuid::Uuid;
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateHabitRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub name: String,
+    pub description: Option<String>,
+    pub habit_type: String, // "binary", "numeric", "timer"
+    #[validate(range(min = 0.01))]
+    pub target_value: f64,
+    pub unit: Option<String>,
+    pub frequency_days: Option<u8>,
+    pub color_hex: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct HabitCheckinRequest {
+    pub date: chrono::NaiveDate,
+    #[validate(range(min = 0.0))]
+    pub value: f64,
+    pub is_increment: Option<bool>,
+}
+```
+
+## 4. Implementation Steps
+1. Add `validator = { version = "0.19", features = ["derive"] }` to `crates/api/Cargo.toml`.
+2. Implement route controllers in:
+   - `crates/api/src/controllers/routine_controller.rs`
+   - `crates/api/src/controllers/habit_controller.rs`
+   - `crates/api/src/controllers/okr_controller.rs`
+3. Wire controllers into main API router with auth middleware guards:
+   ```rust
+   let api_routes = Router::new()
+       .nest("/routines", routine_routes())
+       .nest("/habits", habit_routes())
+       .nest("/okrs", okr_routes())
+       .route_layer(middleware::from_extractor::<AuthenticatedUser>());
+   ```
+
+## 5. Security, Error Handling & Edge Cases
+- **Strict Payload Validation:** Reject malformed inputs with `400 Bad Request` and detailed field-level validation error messages.
+- **Tenant Isolation:** Every query must enforce `user_id = current_user.id` to prevent cross-account data access.
+
+## 6. Verification & Automated Tests
+- Integration tests using `axum::serve` or `tower::ServiceExt::oneshot`:
+  - Test `POST /api/v1/habits` creates habit and returns `201 Created`.
+  - Test `POST /api/v1/habits/:id/checkin` records check-in and updates streaks.
+
+## 7. Definition of Done (DoD)
+- [ ] Endpoints for Routines, Habits, and OKRs implemented and registered.
+- [ ] Request payloads validated using `validator`.
+- [ ] Tenant data isolation strictly enforced via `AuthenticatedUser`.

@@ -1,0 +1,107 @@
+# Activity: Authenticated AES-256-GCM Encryption & Decryption
+
+## 1. Objective & Context
+Implement high-throughput, memory-safe symmetric encryption and decryption for sensitive user payloads (specifically personal journal entries and confidential reflection notes). AES-256-GCM provides both confidentiality and tamper-proof cryptographic authenticity.
+
+- **Prerequisites:** Activity 01 (Argon2id Key Derivation).
+- **Target Location:** `crates/core/src/crypto/cipher.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `aes-gcm` (`0.10.x` with `aes` hardware acceleration features where available).
+- **Cipher:** AES-256-GCM (Galois/Counter Mode).
+- **Key Size:** 256 bits (32 bytes).
+- **Nonce (IV) Size:** 96 bits (12 bytes) uniquely generated per encryption operation via `OsRng`.
+- **Authentication Tag:** 128 bits (16 bytes) appended to ciphertext or stored as part of the payload envelope.
+- **Envelope Format:** Binary or Base64-encoded structured representation: `[12-byte Nonce] + [Variable-length Ciphertext with Tag]`.
+
+## 3. Data Structures & Signatures
+
+```rust
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EncryptedEnvelope {
+    pub nonce: [u8; 12],
+    pub ciphertext: Vec<u8>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CipherError {
+    #[error("Encryption failure: {0}")]
+    EncryptionFailed(String),
+    #[error("Decryption failed: invalid key or tampered ciphertext")]
+    DecryptionFailed,
+}
+
+pub struct AesGcmCipher;
+
+impl AesGcmCipher {
+    /// Encrypts plaintext with key and returns nonce + ciphertext with auth tag
+    pub fn encrypt(
+        key: &[u8; 32],
+        plaintext: &[u8],
+        associated_data: Option<&[u8]>,
+    ) -> Result<EncryptedEnvelope, CipherError>;
+
+    /// Decrypts ciphertext envelope and verifies cryptographic authenticity tag
+    pub fn decrypt(
+        key: &[u8; 32],
+        envelope: &EncryptedEnvelope,
+        associated_data: Option<&[u8]>,
+    ) -> Result<Vec<u8>, CipherError>;
+}
+```
+
+## 4. Implementation Steps
+1. Add `aes-gcm = "0.10"` to `crates/core/Cargo.toml`.
+2. Implement `AesGcmCipher::encrypt`:
+   - Initialize 96-bit nonce using `rand_core::OsRng`.
+   - Instantiate `Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key))`.
+   - Build `Payload` with optional associated data (AAD).
+   - Encrypt in-place or into buffer, producing ciphertext + 16-byte authentication tag.
+   - Return `EncryptedEnvelope { nonce, ciphertext }`.
+3. Implement `AesGcmCipher::decrypt`:
+   - Reconstruct nonce `GenericArray::from_slice(&envelope.nonce)`.
+   - Call cipher `decrypt`.
+   - If the authentication tag doesn't match or ciphertext was tampered with, return `CipherError::DecryptionFailed` without leaking error details.
+4. Export cipher module in `crates/core/src/crypto/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Nonce Reuse Catastrophe:** A nonce must NEVER be reused with the same key in GCM mode; doing so reveals the XOR of plaintexts and destroys authenticity. Every encryption call MUST generate a new 12-byte random nonce via `OsRng`.
+- **Constant-Time Verification:** The authentication tag is verified in constant time by the `aes-gcm` crate to avoid timing side channels.
+- **Opaque Decryption Errors:** Do not distinguish between padding errors or tag mismatches. Return a single generic error: `DecryptionFailed`.
+
+## 6. Verification & Automated Tests
+```rust
+#[test]
+fn test_encryption_roundtrip() {
+    let key = [7u8; 32];
+    let plaintext = b"Personal journal reflection entry.";
+
+    let envelope = AesGcmCipher::encrypt(&key, plaintext, None).unwrap();
+    let decrypted = AesGcmCipher::decrypt(&key, &envelope, None).unwrap();
+
+    assert_eq!(decrypted, plaintext);
+}
+
+#[test]
+fn test_tampered_ciphertext_fails() {
+    let key = [7u8; 32];
+    let plaintext = b"Confidential entry.";
+
+    let mut envelope = AesGcmCipher::encrypt(&key, plaintext, None).unwrap();
+    // Tamper with ciphertext byte
+    if let Some(byte) = envelope.ciphertext.first_mut() {
+        *byte ^= 0xFF;
+    }
+
+    let result = AesGcmCipher::decrypt(&key, &envelope, None);
+    assert!(result.is_err());
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] AES-256-GCM cipher implemented with 96-bit random nonce generation.
+- [ ] Roundtrip encryption and decryption verified.
+- [ ] Tampered ciphertext immediately rejected by authentication tag validation.
+- [ ] Nonce and ciphertext encapsulated cleanly in `EncryptedEnvelope`.

@@ -1,0 +1,61 @@
+# Activity: Cryptographic Test Vectors & Benchmarks
+
+## 1. Objective & Context
+Validate the correctness of the Roubit cryptographic subsystem against published NIST and RFC test vectors. Run benchmarks to ensure encryption and key derivation meet performance budgets without degrading user experience or CLI response times.
+
+- **Prerequisites:** Activities 01, 02, and 03 of Feature 02.
+- **Target Location:** `crates/core/tests/crypto_vectors.rs` and `crates/core/benches/crypto_bench.rs`.
+
+## 2. Technical Scope & Specifications
+- **Test Vectors:**
+  - NIST Special Publication 800-38D (AES-GCM Known Answer Tests).
+  - RFC 9106 (Argon2id test vectors).
+- **Benchmark Tool:** `criterion` (`0.5.x`) with HTML reporting.
+- **Performance Budgets:**
+  - AES-256-GCM encryption/decryption: < 50 microseconds for typical journal entry (1-10 KB).
+  - Argon2id key derivation: 200ms - 500ms (balanced for desktop/server security vs. perceived delay).
+
+## 3. Test Vectors & Structure
+
+```rust
+// NIST SP 800-38D Test Case
+const NIST_KEY: [u8; 32] = hex_literal::hex!("feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308");
+const NIST_NONCE: [u8; 12] = hex_literal::hex!("cafebabefacedbaddecaf888");
+const NIST_PLAINTEXT: &[u8] = &hex_literal::hex!(
+    "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255"
+);
+```
+
+## 4. Implementation Steps
+1. Add `hex-literal = "0.4"` and `criterion = { version = "0.5", features = ["html_reports"] }` to `crates/core/Cargo.toml` under `[dev-dependencies]`.
+2. Implement test suite in `crates/core/tests/crypto_vectors.rs`:
+   - Validate NIST AES-256-GCM test vector output (ciphertext + tag).
+   - Validate Argon2id key derivation against RFC 9106 vector.
+3. Create `crates/core/benches/crypto_bench.rs`:
+   - Benchmark AES-256-GCM encryption for 1KB, 10KB, and 100KB payloads.
+   - Benchmark Argon2id derivation with default parameters.
+4. Add benchmark definition in `crates/core/Cargo.toml`:
+   ```toml
+   [[bench]]
+   name = "crypto_bench"
+   harness = false
+   ```
+
+## 5. Security, Error Handling & Edge Cases
+- **Non-standard Nonce Lengths:** Ensure the cipher rejects nonces shorter or longer than 12 bytes.
+- **Empty Plaintext:** Verify that encrypting an empty plaintext string produces a valid 16-byte authentication tag without panic.
+
+## 6. Verification & Automated Tests
+- Run integration test vectors:
+  ```bash
+  cargo test --test crypto_vectors
+  ```
+- Run criterion benchmark:
+  ```bash
+  cargo bench --bench crypto_bench
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] NIST SP 800-38D test vectors pass for AES-256-GCM.
+- [ ] RFC 9106 test vectors pass for Argon2id.
+- [ ] Criterion benchmark executes and reports throughput within target performance budgets.

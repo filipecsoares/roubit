@@ -1,0 +1,109 @@
+# Activity: Modular CLI Command Tree with Clap
+
+## 1. Objective & Context
+Implement a modular, ergonomic Command-Line Interface (CLI) in `crates/cli` using `clap` in derive mode. The CLI provides immediate local productivity for Routines, Habits, OKRs, and Journaling with global flags for formatting (`--json`, `--quiet`, `--verbose`) and configuration overrides.
+
+- **Prerequisites:** Feature 01 (Workspace Setup) and domain features 03-06.
+- **Target Location:** `crates/cli/src/commands/` and `crates/cli/src/args.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `clap` (`4.5.x` with `derive`, `env`, `cargo` features).
+- **Subcommands:**
+  - `routine`: List current schedule, complete blocks, start blocks.
+  - `habit`: List habits, check-in (`roubit habit checkin <id> [--value <v>]`), show streaks.
+  - `okr`: Display quarterly objectives and Key Results progress.
+  - `journal`: Write encrypted daily entry, read entries with passphrase, list metadata.
+  - `config`: View or set database path and remote API URL.
+- **Global Arguments:** `--json` (machine-readable output for shell scripting/piping), `-v`/`--verbose`.
+
+## 3. Data Structures & Signatures
+
+```rust
+use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(name = "roubit", author, version, about = "Personal high-performance routine and habit tracker", long_about = None)]
+pub struct CliArgs {
+    #[arg(global = true, short, long, help = "Path to database file or SQLite URL")]
+    pub db: Option<String>,
+
+    #[arg(global = true, long, help = "Output response in raw JSON format")]
+    pub json: bool,
+
+    #[arg(global = true, short, long, action = clap::ArgAction::Count, help = "Increase logging verbosity")]
+    pub verbose: u8,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    Routine(RoutineArgs),
+    Habit(HabitArgs),
+    Okr(OkrArgs),
+    Journal(JournalArgs),
+    Config(ConfigArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct HabitArgs {
+    #[command(subcommand)]
+    pub action: HabitSubcommands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum HabitSubcommands {
+    List {
+        #[arg(short, long, help = "Show archived habits")]
+        all: bool,
+    },
+    Checkin {
+        habit_id: String,
+        #[arg(short, long, help = "Value for numeric or timer habits (default: 1.0)")]
+        value: Option<f64>,
+    },
+    Streaks,
+}
+```
+
+## 4. Implementation Steps
+1. Add `clap = { version = "4.5", features = ["derive", "env", "cargo"] }` to `crates/cli/Cargo.toml`.
+2. Implement `crates/cli/src/args.rs` with top-level `CliArgs` and subcommands.
+3. Modularize command handlers in `crates/cli/src/commands/`:
+   - `routine_cmd.rs`
+   - `habit_cmd.rs`
+   - `okr_cmd.rs`
+   - `journal_cmd.rs`
+   - `config_cmd.rs`
+4. Wire command dispatch in `crates/cli/src/main.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Help Output:** Clap automatically generates `--help` and shell auto-completion scripts.
+- **Graceful Error Messages:** Catch domain and repository errors, formatting user-friendly stderr outputs without printing raw panics or backtraces unless `--verbose` is passed.
+
+## 6. Verification & Automated Tests
+- Test parsing subcommands:
+  ```rust
+  #[test]
+  fn test_clap_parse_habit_checkin() {
+      use clap::Parser;
+      let args = CliArgs::try_parse_from(["roubit", "habit", "checkin", "run-10k", "--value", "10"]).unwrap();
+      match args.command {
+          Commands::Habit(h) => match h.action {
+              HabitSubcommands::Checkin { habit_id, value } => {
+                  assert_eq!(habit_id, "run-10k");
+                  assert_eq!(value, Some(10.0));
+              }
+              _ => panic!("Wrong variant"),
+          },
+          _ => panic!("Wrong command"),
+      }
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Clap command tree parses all subcommands (`routine`, `habit`, `okr`, `journal`, `config`).
+- [ ] Global flags (`--json`, `--verbose`, `--db`) work consistently across all subcommands.
+- [ ] Unit tests verify CLI argument parsing and validation.

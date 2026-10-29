@@ -1,0 +1,49 @@
+# Activity: Routine Integration Tests & Use Case Validation
+
+## 1. Objective & Context
+Implement end-to-end integration tests for the Routine domain, validating interactions between the SQLite database repository, validation rules, and progress tracking service under realistic conditions.
+
+- **Prerequisites:** Activities 01 to 04 of Feature 03.
+- **Target Location:** `crates/core/tests/routine_integration.rs`.
+
+## 2. Technical Scope & Specifications
+- **Test Harness:** Tokio async test runner (`#[tokio::test]`).
+- **Database:** Isolated SQLite in-memory instance per test run (`sqlite::memory:`).
+- **Coverage Areas:**
+  - Complete lifecycle: Routine creation -> Block assignment -> Daily check-in -> Adherence reporting.
+  - Cascade deletion verification: Deleting a routine deletes blocks and daily logs.
+  - Rejection of invalid schedules.
+
+## 3. Test Scenarios
+
+1. **Happy Path:** Create "Workday Routine", add 4 consecutive blocks, complete block 1, verify progress is 25%.
+2. **Conflict Prevention:** Attempt to add an overlapping block; verify transaction rolls back.
+3. **Idempotent Day Logs:** Complete the same block twice on the same date with updated notes; ensure record is updated rather than duplicated.
+
+## 4. Implementation Steps
+1. Create `crates/core/tests/routine_integration.rs`.
+2. Implement test setup fixture:
+   ```rust
+   async fn setup_test_db() -> SqliteRoutineRepository {
+       let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+       sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+       SqliteRoutineRepository::new(pool)
+   }
+   ```
+3. Implement test cases asserting domain invariants and repository error handling.
+
+## 5. Security, Error Handling & Edge Cases
+- **Database Isolation:** Ensure each test initializes a fresh database to prevent shared state contamination.
+- **Timeout Protection:** Use `tokio::time::timeout` on async database tests to prevent hanging in case of deadlocks.
+
+## 6. Verification & Automated Tests
+- Run test:
+  ```bash
+  cargo test --test routine_integration
+  ```
+- All assertions must pass cleanly.
+
+## 7. Definition of Done (DoD)
+- [ ] Integration test suite covers full Routine lifecycle.
+- [ ] Cascade deletes and constraint violations verified.
+- [ ] All tests execute without warnings or memory leaks.

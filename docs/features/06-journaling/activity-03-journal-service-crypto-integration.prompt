@@ -1,0 +1,101 @@
+# Activity: Journal Cryptographic Application Service
+
+## 1. Objective & Context
+Integrate the cryptographic subsystem (Argon2id KDF and AES-256-GCM cipher) with the Journal repository into a unified domain service (`JournalService`). Provide safe encryption during write and verified decryption during read, while guaranteeing automatic zeroization of decrypted plaintext buffers.
+
+- **Prerequisites:** Activities 01 and 02 of Feature 06, and Feature 02 (Cryptography).
+- **Target Location:** `crates/core/src/domain/journal/service.rs`.
+
+## 2. Technical Scope & Specifications
+- **Write Pipeline:** Plaintext + Passphrase $\to$ Argon2id Key Derivation $\to$ Random Nonce $\to$ AES-256-GCM Encrypt $\to$ Save to Database $\to$ Drop & Zeroize Plaintext and Key.
+- **Read Pipeline:** Passphrase $\to$ Fetch Salt, Nonce, Ciphertext $\to$ Derive Key $\to$ Decrypt & Authenticate $\to$ Return Plaintext in `SecretString` wrapper.
+- **Integrity Validation:** If authentication tag fails, reject immediately without saving or returning partial plaintext.
+
+## 3. Data Structures & Signatures
+
+```rust
+use chrono::NaiveDate;
+use uuid::Uuid;
+use crate::crypto::{kdf::KdfService, cipher::AesGcmCipher, memory::SecretString};
+use super::models::{DecryptedJournalEntry, JournalMetadata};
+use super::repository::JournalRepository;
+
+#[derive(Debug, thiserror::Error)]
+pub enum JournalServiceError {
+    #[error("Repository error: {0}")]
+    Repository(#[from] super::repository::JournalRepositoryError),
+    #[error("Crypto KDF error: {0}")]
+    Kdf(#[from] crate::crypto::kdf::KdfError),
+    #[error("Decryption failed: wrong passphrase or corrupted data")]
+    DecryptionFailed,
+}
+
+pub struct JournalService<R: JournalRepository> {
+    repo: R,
+    kdf: KdfService,
+}
+
+impl<R: JournalRepository> JournalService<R> {
+    pub fn new(repo: R, kdf: KdfService) -> Self;
+
+    pub async fn create_or_update_entry(
+        &self,
+        date: NaiveDate,
+        mood: Option<u8>,
+        tags: Vec<String>,
+        plaintext: SecretString,
+        passphrase: &SecretString,
+    ) -> Result<JournalMetadata, JournalServiceError>;
+
+    pub async fn read_and_decrypt_entry(
+        &self,
+        id: Uuid,
+        passphrase: &SecretString,
+    ) -> Result<DecryptedJournalEntry, JournalServiceError>;
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/core/src/domain/journal/service.rs`.
+2. Implement `create_or_update_entry`:
+   - Generate unique 16-byte salt via `KdfService::generate_salt()`.
+   - Derive master key using `kdf.derive_key(passphrase.as_bytes(), &salt)`.
+   - Encrypt `plaintext.as_bytes()` via `AesGcmCipher::encrypt`.
+   - Persist to repository.
+   - Let `DerivedKey` and `SecretString` drop naturally to trigger zeroization.
+3. Implement `read_and_decrypt_entry`:
+   - Fetch entry by ID.
+   - Derive key using stored salt and user passphrase.
+   - Decrypt payload via `AesGcmCipher::decrypt`.
+   - Return decrypted entry wrapped in `SecretString`.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Passphrase Storage:** The service must never store or cache the master passphrase in any struct field.
+- **Authentication Failure:** Tampering with a single byte in SQLite produces a clean `JournalServiceError::DecryptionFailed`.
+
+## 6. Verification & Automated Tests
+```rust
+#[tokio::test]
+async fn test_journal_service_encryption_and_decryption() {
+    let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repo = SqliteJournalRepository::new(pool);
+    let service = JournalService::new(repo, KdfService::default_recommended());
+
+    let pass = SecretString::new("my-master-vault-password".into());
+    let reflection = SecretString::new("Today was highly productive with deep focus.".into());
+    let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
+
+    let meta = service.create_or_update_entry(date, Some(5), vec!["focus".into()], reflection, &pass)
+        .await
+        .unwrap();
+
+    let decrypted = service.read_and_decrypt_entry(meta.id, &pass).await.unwrap();
+    assert_eq!(decrypted.plaintext_content, "Today was highly productive with deep focus.");
+}
+```
+
+## 7. Definition of Done (DoD)
+- [ ] `JournalService` coordinates KDF, cipher, and repository cleanly.
+- [ ] Automatic memory zeroization active on all cryptographic keys and plaintext buffers.
+- [ ] Integration tests verify full write-read roundtrip with authenticated decryption.

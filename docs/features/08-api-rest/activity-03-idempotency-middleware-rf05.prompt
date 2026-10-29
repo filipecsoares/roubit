@@ -1,0 +1,79 @@
+# Activity: Idempotency-Key Interceptor & Guard Middleware
+
+## 1. Objective & Context
+Implement the core requirement **RF05 — Transactional Idempotency**. Mobile clients, web apps, or slow networks frequently retry network requests upon timeout. The `Idempotency-Key` interceptor prevents duplicate records (e.g. double check-ins or duplicate routine logs) by caching and replaying the original response when an identical request is received.
+
+- **Prerequisites:** Activity 01 (Axum Server Architecture).
+- **Target Location:** `crates/api/src/middleware/idempotency.rs`.
+
+## 2. Technical Scope & Specifications
+- **Header:** `Idempotency-Key` (UUIDv4 or arbitrary unique client string up to 64 chars).
+- **Scope:** Evaluated exclusively on state-mutating HTTP methods (`POST`, `PUT`, `PATCH`).
+- **Payload Fingerprinting:** Compute SHA-256 hash of incoming request body. If the key matches but the body hash differs, return `422 Unprocessable Entity` or `409 Conflict`.
+- **States:**
+  - `InFlight`: Request is currently processing; concurrent requests with the same key receive `409 Conflict` (or wait briefly).
+  - `Completed`: Cached status code, headers, and response body are returned immediately with `X-Cache: HIT`.
+
+## 3. Data Structures & Schema
+
+### Idempotency Storage Table
+```sql
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL,
+    request_path TEXT NOT NULL,
+    request_hash BLOB NOT NULL, -- SHA-256 of request body
+    response_status INTEGER,    -- NULL while in-flight
+    response_headers TEXT,      -- JSON-encoded headers
+    response_body BLOB,
+    created_at TEXT NOT NULL,
+    locked_until TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_keys_locked ON idempotency_keys(locked_until);
+```
+
+### Middleware Trait / Struct
+```rust
+use axum::{
+    body::Body,
+    extract::Request,
+    middleware::Next,
+    response::Response,
+};
+
+pub async fn idempotency_middleware(
+    req: Request,
+    next: Next,
+) -> Result<Response, super::errors::ApiError>;
+```
+
+## 4. Implementation Steps
+1. Create `crates/api/src/middleware/idempotency.rs`.
+2. Extract `Idempotency-Key` header:
+   - If missing on a `POST` request, either proceed without caching or require it on critical routes (e.g., `/checkin`).
+3. Compute SHA-256 of request body using `sha2` crate.
+4. Check database:
+   - If record exists with `response_status IS NOT NULL`:
+     - Compare payload hash; if different, return `ApiError::Conflict("Idempotency key payload mismatch".into())`.
+     - Replay cached status code, headers, and body.
+   - If record exists with `locked_until > now`:
+     - Another worker is currently handling this request; return `StatusCode::CONFLICT`.
+5. If new:
+   - Insert row with lock.
+   - Execute downstream handler via `next.run(req).await`.
+   - Update database with response status, headers, and body bytes.
+
+## 5. Security, Error Handling & Edge Cases
+- **User Scoping:** `Idempotency-Key` must always be scoped to `(user_id, key)` so one user cannot replay or intercept another user's cached response.
+- **TTL / Cleanup:** Old idempotency records (> 24-48 hours) should be purged automatically to conserve database storage.
+
+## 6. Verification & Automated Tests
+- Test sending request with key `K1`: succeeds and processes.
+- Test sending identical request with key `K1`: returns cached response instantly without re-executing business logic.
+- Test sending different payload with key `K1`: rejected with `409 Conflict`.
+
+## 7. Definition of Done (DoD)
+- [ ] `Idempotency-Key` middleware intercepts POST requests.
+- [ ] SHA-256 payload hashing prevents key reuse with different parameters.
+- [ ] Automated tests verify replay of cached responses and conflict detection.

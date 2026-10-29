@@ -1,0 +1,64 @@
+# Activity: Web Crypto API Client-Side Selective Encryption
+
+## 1. Objective & Context
+Implement client-side cryptographic routines for **RF04 — Encrypted Journaling** directly in the browser using the W3C standard **Web Crypto API** (`window.crypto.subtle`). Passphrases derive 256-bit keys via Argon2id (WASM), and entries are encrypted with AES-256-GCM before transmission over the network.
+
+- **Prerequisites:** Activity 01 (Vite & Setup) and Feature 02 (Crypto specifications).
+- **Target Location:** `frontend/src/services/crypto.ts`.
+
+## 2. Technical Scope & Specifications
+- **Cipher:** AES-256-GCM via `crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, plaintext)`.
+- **KDF:** Argon2id compiled to WebAssembly via `@noble/hashes` or `hash-wasm` (`4.11.x`).
+- **Key Retention Policy:**
+  - Master key is held exclusively in browser memory (`CryptoKey` object).
+  - NEVER persist key or passphrase in `localStorage`, `sessionStorage`, or IndexedDB.
+  - Page refresh or tab close automatically clears the key, locking the vault.
+
+## 3. Cryptographic Service Signatures
+
+```typescript
+export interface EncryptedPayload {
+  saltBase64: string;
+  nonceBase64: string;
+  ciphertextBase64: string;
+}
+
+export class WebCryptoService {
+  /** Derives a CryptoKey using Argon2id via WASM */
+  static async deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey>;
+
+  /** Generates 16 cryptographically secure random bytes for salt */
+  static generateSalt(): Uint8Array;
+
+  /** Encrypts string using AES-256-GCM and returns Base64 envelope */
+  static async encrypt(plaintext: string, key: CryptoKey, salt: Uint8Array): Promise<EncryptedPayload>;
+
+  /** Decrypts Base64 envelope and verifies authentication tag */
+  static async decrypt(payload: EncryptedPayload, key: CryptoKey): Promise<string>;
+}
+```
+
+## 4. Implementation Steps
+1. Install WASM Argon2 library:
+   ```bash
+   cd frontend && npm install hash-wasm
+   ```
+2. Implement `frontend/src/services/crypto.ts`:
+   - Use `hash-wasm.argon2id` with memory: 64MiB, iterations: 3, parallelism: 4.
+   - Import derived 32-byte raw key into Web Crypto: `crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])`.
+   - Implement `encrypt`: Generate 12-byte random IV (`crypto.getRandomValues(new Uint8Array(12))`), call `crypto.subtle.encrypt`, encode results to Base64.
+   - Implement `decrypt`: Decode Base64, call `crypto.subtle.decrypt`.
+3. Create `useVaultStore` managing unlocked `CryptoKey` state in memory.
+
+## 5. Security, Error Handling & Edge Cases
+- **Non-Exportable Key:** Set `extractable: false` when importing into `crypto.subtle` so the raw key cannot be read by malicious browser extensions.
+- **Lock on Inactivity:** Implement an optional 15-minute auto-lock timer that drops the `CryptoKey` reference.
+
+## 6. Verification & Automated Tests
+- Unit test verifying encryption and decryption roundtrip using Vitest with Web Crypto polyfill.
+- Test that incorrect key or tampered ciphertext throws a decryption error.
+
+## 7. Definition of Done (DoD)
+- [ ] Web Crypto API AES-256-GCM service implemented.
+- [ ] Argon2id WASM key derivation matches backend parameter specifications.
+- [ ] Master key retained strictly in volatile session memory.

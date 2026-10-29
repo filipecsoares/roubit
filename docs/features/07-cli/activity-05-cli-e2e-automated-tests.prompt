@@ -1,0 +1,73 @@
+# Activity: CLI End-to-End Automated Tests
+
+## 1. Objective & Context
+Ensure CLI stability, argument handling, and output correctness through automated end-to-end (E2E) binary testing using `assert_cmd` and `predicates`.
+
+- **Prerequisites:** Activities 01 to 04 of Feature 07.
+- **Target Location:** `crates/cli/tests/cli_e2e.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crates:** `assert_cmd` (`2.0.x`), `predicates` (`3.1.x`), `tempfile` (`3.15.x`).
+- **Test Scenarios:**
+  - Running `roubit --help` and `roubit --version`.
+  - Creating and listing habits in a temporary SQLite database.
+  - Recording check-in and validating stdout formatting.
+  - Asserting `--json` produces valid parseable JSON.
+
+## 3. Test Cases Implementation
+
+```rust
+use assert_cmd::Command;
+use predicates::prelude::*;
+use tempfile::NamedTempFile;
+
+#[test]
+fn test_cli_help_and_version() {
+    let mut cmd = Command::cargo_bin("roubit").unwrap();
+    cmd.arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Personal high-performance routine and habit tracker"));
+}
+
+#[test]
+fn test_cli_habit_workflow_in_temp_db() {
+    let temp_db = NamedTempFile::new().unwrap();
+    let db_path = temp_db.path().to_str().unwrap();
+
+    // 1. Check in to a habit
+    let mut cmd = Command::cargo_bin("roubit").unwrap();
+    cmd.args(["--db", db_path, "habit", "checkin", "water", "--value", "500"])
+        .assert()
+        .success();
+
+    // 2. List habits as JSON
+    let mut cmd_json = Command::cargo_bin("roubit").unwrap();
+    let assert = cmd_json.args(["--db", db_path, "--json", "habit", "list"])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Must be valid JSON");
+    assert!(parsed.is_array());
+}
+```
+
+## 4. Implementation Steps
+1. Add `assert_cmd = "2.0"` and `predicates = "3.1"` to `crates/cli/Cargo.toml` under `[dev-dependencies]`.
+2. Implement `crates/cli/tests/cli_e2e.rs`.
+3. Test failure states (e.g. invalid arguments exit with non-zero code).
+
+## 5. Security, Error Handling & Edge Cases
+- Test that missing database file creates a new SQLite database with WAL mode automatically rather than panicking.
+
+## 6. Verification & Automated Tests
+- Run CLI tests:
+  ```bash
+  cargo test -p roubit-cli --test cli_e2e
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] End-to-end tests execute compiled `roubit` binary.
+- [ ] Subcommands and `--json` outputs validated with `predicates`.
+- [ ] All tests pass cleanly in local and CI environments.

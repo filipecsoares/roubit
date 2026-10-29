@@ -1,0 +1,62 @@
+# Activity: Dual-Database Support (SQLite & PostgreSQL) with SQLx
+
+## 1. Objective & Context
+Fulfill the evolutionary architecture requirement: maintain zero-configuration local SQLite for CLI and early phases, while providing production-ready PostgreSQL support for multi-user server deployments. Ensure database queries remain dialect-agnostic or conditionally compiled, and implement an automated SQLite-to-PostgreSQL migration utility.
+
+- **Prerequisites:** Features 03 to 06 (Database Schemas) and Feature 08 (API REST).
+- **Target Location:** `crates/core/src/db/` and `crates/core/migrations_pg/`.
+
+## 2. Technical Scope & Specifications
+- **SQLx Drivers:** Conditional compilation or dynamic runtime support for `sqlx::Sqlite` and `sqlx::Postgres`.
+- **Dialect Differences Handled:**
+  - SQLite: `INTEGER NOT NULL DEFAULT 1` for booleans; Postgres: `BOOLEAN NOT NULL DEFAULT true`.
+  - SQLite: `TEXT` or `BLOB` for UUIDs; Postgres: native `UUID` and `BYTEA` types.
+  - SQLite: `strftime` / ISO strings; Postgres: `TIMESTAMPTZ` and `DATE`.
+- **Migration Tool:** CLI utility `roubit admin migrate-to-postgres --from <sqlite.db> --to <postgres_url>`.
+
+## 3. Data Structures & Abstraction
+
+```rust
+use async_trait::async_trait;
+
+#[derive(Clone)]
+pub enum DatabasePool {
+    Sqlite(sqlx::SqlitePool),
+    Postgres(sqlx::PgPool),
+}
+
+impl DatabasePool {
+    pub async fn from_url(url: &str) -> Result<Self, sqlx::Error> {
+        if url.starts_with("postgres://") || url.starts_with("postgresql://") {
+            let pool = sqlx::PgPool::connect(url).await?;
+            Ok(Self::Postgres(pool))
+        } else {
+            let pool = crate::domain::routine::repository::create_sqlite_pool(url).await?;
+            Ok(Self::Sqlite(pool))
+        }
+    }
+}
+```
+
+## 4. Implementation Steps
+1. Add `sqlx = { version = "0.8", features = ["postgres", "sqlite", "runtime-tokio", "chrono", "uuid"] }` to `crates/core/Cargo.toml`.
+2. Create PostgreSQL migrations directory `crates/core/migrations_pg/` mirroring the SQLite schema with native Postgres types (`UUID PRIMARY KEY`, `BYTEA`, `BOOLEAN`, `TIMESTAMPTZ`).
+3. Parameterize repository queries using standard ANSI SQL or conditional branching where SQLx compile-time macros differ.
+4. Implement data migration script:
+   - Connect to SQLite and Postgres concurrently.
+   - Run Postgres migrations.
+   - Stream rows from SQLite tables in dependency order (`routines`, `time_blocks`, `habits`, `habit_logs`, `objectives`, `key_results`, `journal_entries`).
+   - Batch insert into PostgreSQL inside an atomic transaction.
+
+## 5. Security, Error Handling & Edge Cases
+- **Transaction Atomicity:** If migration fails midway on a table, rollback the PostgreSQL transaction to avoid partial data corruption.
+- **Connection Limits:** Set Postgres pool size appropriately (`max_connections = 20-50`).
+
+## 6. Verification & Automated Tests
+- Integration test running against both SQLite in-memory and PostgreSQL (via testcontainers or Docker).
+- Test migration script successfully ports sample database with 100% data parity.
+
+## 7. Definition of Done (DoD)
+- [ ] Database pool dynamically connects to SQLite or PostgreSQL based on URL scheme.
+- [ ] PostgreSQL migrations created and validated.
+- [ ] SQLite-to-PostgreSQL migration script transfers all records without data loss.

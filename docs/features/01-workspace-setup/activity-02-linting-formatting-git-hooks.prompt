@@ -1,0 +1,108 @@
+# Activity: Linting, Code Formatting & Quality Standards
+
+## 1. Objective & Context
+Enforce strict, automated code quality and stylistic consistency across all Rust code in the Roubit project. This ensures zero tolerance for unhandled warnings, enforces idiomatic Rust practices, and prevents formatting discrepancies across contributors.
+
+- **Prerequisites:** Activity 01 (Cargo Workspace Initialization).
+- **Target Location:** Repository root configuration files.
+
+## 2. Technical Scope & Specifications
+- **Format Tool:** `rustfmt` with 2021 edition conventions.
+- **Linter:** `clippy` configured with pedantic rules, denying warnings in CI.
+- **Git Hooks:** Optional pre-commit hook checking formatting and quick clippy lints.
+- **Editor Config:** Unified indentation (4 spaces for Rust, 2 spaces for JSON/YAML/Markdown/Vue), UTF-8 encoding, and trailing newline enforcement.
+
+## 3. Configuration Files
+
+### `.rustfmt.toml`
+```toml
+edition = "2021"
+newline_style = "Unix"
+tab_spaces = 4
+max_width = 100
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+```
+
+### `clippy.toml`
+```toml
+# Clippy configuration
+avoid-breaking-exported-api = false
+cognitive-complexity-threshold = 25
+```
+
+### Clippy Flags in `api/Cargo.toml`
+Add to `api/Cargo.toml`:
+```toml
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+```
+
+### `.editorconfig`
+```ini
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+[*.{json,yaml,yml,md,toml}]
+indent_size = 2
+
+[*.{vue,js,ts,css,html}]
+indent_size = 2
+```
+
+## 4. Implementation Steps
+1. Create `api/.rustfmt.toml` (or root `.rustfmt.toml`).
+2. Create `.editorconfig` in repository root.
+3. Add `[workspace.lints]` table to `api/Cargo.toml` and configure crates to inherit via `[lints] workspace = true`.
+4. Configure an optional lightweight pre-commit script under `scripts/pre-commit.sh` that developers can link to `.git/hooks/pre-commit`:
+   ```bash
+   #!/usr/bin/env bash
+   set -euo pipefail
+   cd api
+   cargo fmt --check
+   cargo clippy --workspace --all-targets -- -D warnings
+   ```
+5. Ensure executable permissions: `chmod +x scripts/pre-commit.sh`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Unsafe Code Prevention:** `unsafe_code = "deny"` prevents introducing memory safety risks unless explicitly audited and allowed by exception.
+- **Explicit Panics:** Discouraging `.unwrap()` in production crates forces proper `Result` and `Option` handling via `thiserror` and `?`.
+
+## 6. Verification & Automated Tests
+- Run format check:
+  ```bash
+  cd api && cargo fmt --all -- --check
+  ```
+- Run clippy linting:
+  ```bash
+  cd api && cargo clippy --workspace --all-targets -- -D warnings
+  ```
+- Both commands must succeed with exit code `0`.
+
+## 7. Definition of Done (DoD)
+- [ ] `.rustfmt.toml` and `.editorconfig` present and configured.
+- [ ] `[workspace.lints]` applied across all workspace crates in `api/`.
+- [ ] `cargo fmt` and `cargo clippy` run with zero warnings.

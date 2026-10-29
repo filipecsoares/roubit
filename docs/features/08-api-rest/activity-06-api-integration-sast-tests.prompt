@@ -1,0 +1,78 @@
+# Activity: REST API Integration & SAST Security Scanning
+
+## 1. Objective & Context
+Implement an end-to-end integration test suite for the REST API using `tower::ServiceExt` and configure Static Application Security Testing (SAST) to audit all compiled dependencies and API contracts.
+
+- **Prerequisites:** Activities 01 to 05 of Feature 08.
+- **Target Location:** `crates/api/tests/api_integration.rs` and `.github/workflows/rust-ci.yml`.
+
+## 2. Technical Scope & Specifications
+- **Test Driver:** `axum::Router` tested in-memory via `tower::ServiceExt::oneshot` without opening real network TCP sockets.
+- **Security Scanning:** `cargo audit` in CI to detect vulnerabilities in the dependency tree.
+- **Scenarios Tested:**
+  - Complete registration, login, and authenticated request flow.
+  - Idempotency-Key duplicate request prevention.
+  - Rejection of unauthenticated and malformed requests.
+
+## 3. Test Cases Implementation
+
+```rust
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
+use tower::ServiceExt;
+
+#[tokio::test]
+async fn test_auth_and_protected_habit_endpoint() {
+    let app = setup_test_api_app().await;
+
+    // 1. Attempt unauthenticated call
+    let req = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    // 2. Perform Login and acquire JWT
+    let token = login_test_user(&app).await;
+
+    // 3. Make authenticated call with Bearer token
+    let auth_req = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let auth_response = app.oneshot(auth_req).await.unwrap();
+    assert_eq!(auth_response.status(), StatusCode::OK);
+}
+```
+
+## 4. Implementation Steps
+1. Create `crates/api/tests/api_integration.rs`.
+2. Implement test setup fixture creating in-memory database and configuring Axum router.
+3. Test idempotency middleware caching behavior under mocked requests.
+4. Verify `cargo audit` runs cleanly across all workspace crates.
+
+## 5. Security, Error Handling & Edge Cases
+- Test that missing or corrupted JWTs return structured RFC 7807 problem details instead of empty responses.
+
+## 6. Verification & Automated Tests
+- Run API tests:
+  ```bash
+  cargo test -p roubit-api --test api_integration
+  ```
+- Run SAST scan:
+  ```bash
+  cargo audit
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] In-memory integration tests cover authentication and domain routes.
+- [ ] Idempotency-Key behavior validated through HTTP mock requests.
+- [ ] `cargo audit` passes with 0 known vulnerabilities.

@@ -1,0 +1,65 @@
+# Activity: Terminal UI Formatting, Tables & Visual Metrics
+
+## 1. Objective & Context
+Provide sleek, modern, and readable terminal visualization for Roubit. Render beautiful tables, progress bars, and colored status indicators for routines, habit streaks, and OKR progress when `--json` is not requested.
+
+- **Prerequisites:** Activity 01 (Clap Command Tree).
+- **Target Location:** `crates/cli/src/ui/`.
+
+## 2. Technical Scope & Specifications
+- **Crates:**
+  - `comfy-table` (`7.1.x`): UTF-8 rounded borders, dynamic column wrapping.
+  - `colored` (`2.1.x` or `2.2.x`): Semantic colors (green for completed, yellow for in-progress, red for missed, cyan for active).
+  - `indicatif` (`0.17.x`): Progress bars for OKRs and routine time blocks.
+- **Terminal Detection:** Automatically detect whether stdout is a TTY (`std::io::stdout().is_terminal()`). Strip colors and animations when piping to files or scripts.
+
+## 3. UI Helpers & Signatures
+
+```rust
+use comfy_table::{Table, presets::UTF8_FULL, modifiers::UTF8_ROUND_CORNERS};
+use colored::Colorize;
+
+pub struct TerminalUi;
+
+impl TerminalUi {
+    pub fn render_routine_table(blocks: &[crate::domain::routine::models::TimeBlock]);
+    pub fn render_habits_table(habits_with_streaks: &[(String, String, u32, bool)]);
+    pub fn render_okr_progress(title: &str, progress: f32);
+    pub fn print_success(msg: &str);
+    pub fn print_warning(msg: &str);
+    pub fn print_error(msg: &str);
+}
+```
+
+## 4. Implementation Steps
+1. Add `comfy-table = "7.1"`, `colored = "2.1"`, and `indicatif = "0.17"` to `crates/cli/Cargo.toml`.
+2. Implement `render_routine_table` using `UTF8_ROUND_CORNERS` preset:
+   - Columns: `Start`, `End`, `Category`, `Name`, `Status`.
+   - Highlight active block in bold cyan.
+3. Implement `render_habits_table`:
+   - Columns: `Habit Name`, `Target`, `Streak (Days)`, `Today's Status`.
+   - Show streak with fire icon/emoji (`🔥 7d`) and green checkmark `✓` or circle `○`.
+4. Implement `render_okr_progress` with horizontal progress bar `[████████░░░░] 65%`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Non-TTY Output:** When stdout is redirected (`roubit habit list > habits.txt`), disable ANSI escape codes to keep text clean.
+- **Narrow Terminals:** Set max width constraints on `comfy-table` to prevent wrapping glitches on smaller terminals.
+
+## 6. Verification & Automated Tests
+- Test table string generation without panic:
+  ```rust
+  #[test]
+  fn test_table_formatting_does_not_panic() {
+      let mut table = comfy_table::Table::new();
+      table.set_header(vec!["Col 1", "Col 2"]);
+      table.add_row(vec!["Val 1", "Val 2"]);
+      let output = table.to_string();
+      assert!(output.contains("Val 1"));
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Table formatting implemented with clean rounded borders.
+- [ ] Semantic colors applied to completed vs. pending tasks.
+- [ ] Progress bars render accurately for OKRs and routines.
+- [ ] Non-TTY output gracefully disables ANSI color codes.

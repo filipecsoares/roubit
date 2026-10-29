@@ -1,0 +1,113 @@
+# Activity: OKR Domain Models & SQLite Schema
+
+## 1. Objective & Context
+Define domain models and SQLite migrations for **RF03 — Goal & OKR Alignment Engine**. Objectives represent quarterly or annual aspirational goals, broken down into measurable Key Results (KRs) which directly connect to daily habits.
+
+- **Prerequisites:** Feature 01 (Workspace Setup).
+- **Target Location:** `crates/core/src/domain/okr/` and `crates/core/migrations/0003_create_okrs.sql`.
+
+## 2. Technical Scope & Specifications
+- **Key Result Modalities:**
+  - `NumericTarget`: Tracking numeric metrics from start to target (e.g., Run 100km total, Save $5,000).
+  - `HabitLinked`: Progress automatically driven by completion of associated habits.
+- **Relational Integrity:**
+  - Cascading deletes from Objectives to Key Results.
+  - Many-to-many or one-to-many linkage between Key Results and Habits.
+
+## 3. Data Structures & Schema
+
+### Domain Entities (`crates/core/src/domain/okr/models.rs`)
+```rust
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Objective {
+    pub id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub quarter: String,            // e.g. "2026-Q4" or "2026-Annual"
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+    pub progress_percentage: f32,   // 0.0 to 100.0 (weighted average of KRs)
+    pub is_completed: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KeyResult {
+    pub id: Uuid,
+    pub objective_id: Uuid,
+    pub linked_habit_id: Option<Uuid>, // Optional link to daily habit
+    pub title: String,
+    pub initial_value: f64,
+    pub target_value: f64,
+    pub current_value: f64,
+    pub unit: String,                  // e.g. "km", "books", "check-ins"
+    pub weight: f32,                   // Relative weight for objective progress (e.g., 1.0)
+    pub progress_percentage: f32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+```
+
+### Database Migration (`migrations/0003_create_okrs.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS objectives (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    quarter TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    progress_percentage REAL NOT NULL DEFAULT 0.0,
+    is_completed INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS key_results (
+    id TEXT PRIMARY KEY NOT NULL,
+    objective_id TEXT NOT NULL REFERENCES objectives(id) ON DELETE CASCADE,
+    linked_habit_id TEXT REFERENCES habits(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    initial_value REAL NOT NULL DEFAULT 0.0,
+    target_value REAL NOT NULL,
+    current_value REAL NOT NULL DEFAULT 0.0,
+    unit TEXT NOT NULL DEFAULT '',
+    weight REAL NOT NULL DEFAULT 1.0,
+    progress_percentage REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_key_results_objective_id ON key_results(objective_id);
+CREATE INDEX IF NOT EXISTS idx_key_results_habit_id ON key_results(linked_habit_id);
+```
+
+## 4. Implementation Steps
+1. Create migration file `crates/core/migrations/0003_create_okrs.sql`.
+2. Implement domain structs in `crates/core/src/domain/okr/models.rs`.
+3. Add `sqlx::FromRow` and Serde derives.
+4. Export models in `crates/core/src/domain/okr/mod.rs`.
+
+## 5. Security, Error Handling & Edge Cases
+- **Habit Deletion Safety:** `ON DELETE SET NULL` on `linked_habit_id` ensures that if a user deletes a daily habit, the historic Key Result retains its numerical value without crashing.
+- **Div-by-Zero Protection:** Ensure `target_value != initial_value` in validation before calculating percentages.
+
+## 6. Verification & Automated Tests
+- Test schema creation and constraints:
+  ```rust
+  #[tokio::test]
+  async fn test_okr_migration() {
+      let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+      sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] `Objective` and `KeyResult` domain models implemented.
+- [ ] SQLite migration with foreign keys and cascading rules created.
+- [ ] Unit test verifies database migration passes.

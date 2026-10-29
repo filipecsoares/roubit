@@ -1,0 +1,56 @@
+# Activity: Interactive Prompts & Terminal Journal Editor
+
+## 1. Objective & Context
+Provide an interactive experience for writing and unlocking confidential reflections in the CLI. Passphrases must be securely prompted without echoing to the terminal (`rpassword`), and reflection entries can be entered via interactive multi-line prompt or by opening the user's preferred `$EDITOR` (e.g. `nvim`, `vim`, `nano`).
+
+- **Prerequisites:** Activity 01 (Clap Tree), Feature 02 (Crypto), and Feature 06 (Journaling).
+- **Target Location:** `crates/cli/src/interactive/`.
+
+## 2. Technical Scope & Specifications
+- **Passphrase Prompt:** `rpassword` (`7.3.x`) to read user input with terminal echo disabled.
+- **External Editor Spawning:** Check `$VISUAL`, then `$EDITOR`, defaulting to `nano` or `vi`. Create temporary file with restricted permissions (`0600`), launch editor process, read contents into `SecretString`, and securely wipe/delete the temporary file.
+- **Memory Hygiene:** Memory buffers holding the passphrase and text must be wrapped in `SecretString` to guarantee zeroization on drop.
+
+## 3. Data Structures & Signatures
+
+```rust
+use roubit_core::crypto::memory::SecretString;
+
+pub struct TerminalPrompt;
+
+impl TerminalPrompt {
+    /// Securely prompts for passphrase with hidden keystrokes
+    pub fn prompt_passphrase(prompt_label: &str) -> Result<SecretString, std::io::Error>;
+
+    /// Spawns user's $EDITOR on a secure temp file to compose multi-line reflection
+    pub fn compose_in_editor(initial_content: Option<&str>) -> Result<SecretString, std::io::Error>;
+}
+```
+
+## 4. Implementation Steps
+1. Add `rpassword = "7.3"` and `tempfile = "3.15"` to `crates/cli/Cargo.toml`.
+2. Implement `prompt_passphrase`:
+   - Print label to `stderr` (so piping stdout is unaffected).
+   - Call `rpassword::prompt_password()`.
+   - Wrap result in `SecretString::new()`.
+3. Implement `compose_in_editor`:
+   - Create temp file via `tempfile::Builder::new().permissions(std::fs::Permissions::from_mode(0o600)).tempfile()?`.
+   - Write initial template if provided (e.g., date header and prompt questions).
+   - Detect editor: `std::env::var("VISUAL").or_else(|_| std::env::var("EDITOR")).unwrap_or_else(|_| "nano".into())`.
+   - Spawn child process: `std::process::Command::new(editor).arg(temp_file.path()).status()?`.
+   - Read saved contents into `SecretString`.
+   - Explicitly overwrite temp file with zeros before closing/dropping.
+
+## 5. Security, Error Handling & Edge Cases
+- **No Echo:** Keystrokes must never be shown on screen during passphrase entry.
+- **Temp File Permissions:** Temp files created on Linux must strictly use `0600` permissions (read/write only by the current user) to prevent local privilege snooping in `/tmp`.
+- **Temp File Scrubbing:** Always wipe the temp file on disk after reading.
+
+## 6. Verification & Automated Tests
+- Test passphrase reading with mocked stdin reader.
+- Test editor detection and fallback logic.
+
+## 7. Definition of Done (DoD)
+- [ ] `prompt_passphrase` securely prompts without echo.
+- [ ] `$EDITOR` integration writes to restricted temp files and scrubs upon exit.
+- [ ] Passphrase and reflection text are stored exclusively in zeroized `SecretString`.

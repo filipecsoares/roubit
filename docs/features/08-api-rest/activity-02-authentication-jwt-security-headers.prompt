@@ -1,0 +1,80 @@
+# Activity: Authentication, JWT & OWASP Security Headers
+
+## 1. Objective & Context
+Implement user authentication, password hashing with Argon2id, signed JWT emission/validation, and security hardening following OWASP standards (Cookies `HttpOnly`, `Secure`, `SameSite=Strict`, Content Security Policy, and CORS restriction).
+
+- **Prerequisites:** Activity 01 (Axum Architecture) and Feature 02 (Crypto).
+- **Target Location:** `crates/api/src/auth/` and `crates/api/src/middleware/security.rs`.
+
+## 2. Technical Scope & Specifications
+- **Password Hashing:** Argon2id (`password-hash` / `argon2` crate).
+- **Token Mechanism:** JSON Web Tokens (`jsonwebtoken` `9.3.x`) using HMAC-SHA256 (`HS256`) or EdDSA.
+- **OWASP Hardening Rules (RNF03):**
+  - Cookies: `HttpOnly = true`, `Secure = true` (in production), `SameSite = Strict`.
+  - Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=63072000; includeSubDomains`.
+  - CORS: Restricted to allowed client origins (e.g. `http://localhost:5173` in development).
+
+## 3. Data Structures & Signatures
+
+```rust
+use axum::{
+    async_trait,
+    extract::{FromRequestParts, Request},
+    http::request::Parts,
+};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use super::errors::ApiError;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: Uuid,        // User ID
+    pub email: String,
+    pub exp: usize,       // Expiration timestamp
+    pub iat: usize,       // Issued at timestamp
+}
+
+/// Axum extractor for authenticated user context
+#[derive(Debug, Clone)]
+pub struct AuthenticatedUser {
+    pub id: Uuid,
+    pub email: String,
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for AuthenticatedUser
+where
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Extract Bearer token from Authorization header or HttpOnly cookie
+        // Validate signature and expiration
+        // Return AuthenticatedUser
+    }
+}
+```
+
+## 4. Implementation Steps
+1. Add `jsonwebtoken = "9.3"` and `tower-http = { version = "0.6", features = ["cors", "set-header"] }` to `crates/api/Cargo.toml`.
+2. Implement user database table `users` with `id`, `email`, `password_hash`, `created_at`.
+3. Implement `/api/v1/auth/register` and `/api/v1/auth/login` handlers.
+4. Implement `AuthenticatedUser` extractor validating JWT claims.
+5. Create `security_headers_layer()` middleware injecting OWASP recommended headers.
+
+## 5. Security, Error Handling & Edge Cases
+- **Timing Attack Mitigation:** Use constant-time password verification via `argon2::PasswordHash::verify_password`.
+- **Token Expiry:** Access tokens must have short lifespans (e.g. 15-60 minutes).
+- **CORS Leak Prevention:** Never use `Access-Control-Allow-Origin: *` when credentials/cookies are accepted.
+
+## 6. Verification & Automated Tests
+- Test user registration with invalid email returns `400 Bad Request`.
+- Test accessing a protected endpoint without token returns `401 Unauthorized`.
+- Test valid token successfully populates `AuthenticatedUser` extractor.
+
+## 7. Definition of Done (DoD)
+- [ ] User registration and login endpoints implemented with Argon2id.
+- [ ] `AuthenticatedUser` extractor guards protected routes.
+- [ ] OWASP headers and strict CORS middleware active.
+- [ ] Automated tests cover valid, expired, and tampered tokens.

@@ -1,0 +1,89 @@
+# Activity: Redis Connection Pooling, Distributed Locks & Idempotency Cache
+
+## 1. Objective & Context
+Integrate Redis into the Roubit backend platform for high-throughput distributed locking, fast key-value caching, and offloading the transactional `Idempotency-Key` store from the primary database to Redis with automatic TTL expiration.
+
+- **Prerequisites:** Feature 08 (API REST).
+- **Target Location:** `crates/core/src/redis/` and `crates/api/src/middleware/idempotency.rs`.
+
+## 2. Technical Scope & Specifications
+- **Crate & Version:** `deadpool-redis` (`0.19.x` or `0.20.x`) and `redis` (`0.28.x` with `tokio-comp`).
+- **Distributed Lock Pattern:** Redlock / atomic SET with NX and PX (`SET lock:<resource> <uuid> NX PX 10000`).
+- **Idempotency Migration:**
+  - In-flight lock: Redis key `idempotency:lock:<user_id>:<key>` with 15-second TTL.
+  - Cached response: Redis key `idempotency:response:<user_id>:<key>` with 24-hour TTL (`EX 86400`).
+
+## 3. Data Structures & Signatures
+
+```rust
+use deadpool_redis::{Config, Pool, Runtime};
+use redis::AsyncCommands;
+
+pub struct RedisService {
+    pool: Pool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RedisError {
+    #[error("Redis pool error: {0}")]
+    Pool(#[from] deadpool_redis::PoolError),
+    #[error("Redis command error: {0}")]
+    Command(#[from] redis::RedisError),
+    #[error("Lock acquisition failed: resource is currently busy")]
+    LockBusy,
+}
+
+impl RedisService {
+    pub fn new(redis_url: &str) -> Result<Self, deadpool_redis::CreatePoolError>;
+
+    /// Acquires distributed lock with TTL (in milliseconds)
+    pub async fn acquire_lock(&self, resource_key: &str, lock_token: &str, ttl_ms: u64) -> Result<bool, RedisError>;
+
+    /// Releases distributed lock safely using Lua script (verifies token match)
+    pub async fn release_lock(&self, resource_key: &str, lock_token: &str) -> Result<bool, RedisError>;
+
+    /// Saves cached API response under idempotency key with TTL
+    pub async fn cache_idempotency_response(
+        &self,
+        user_id: &str,
+        key: &str,
+        response_bytes: &[u8],
+        ttl_seconds: usize,
+    ) -> Result<(), RedisError>;
+}
+```
+
+## 4. Implementation Steps
+1. Add dependencies to `crates/core/Cargo.toml`:
+   ```toml
+   deadpool-redis = "0.19"
+   redis = { version = "0.28", features = ["tokio-comp", "connection-manager"] }
+   ```
+2. Implement `crates/core/src/redis/mod.rs` with `RedisService`.
+3. Implement Lua script for atomic lock release:
+   ```lua
+   if redis.call("get", KEYS[1]) == ARGV[1] then
+       return redis.call("del", KEYS[1])
+   else
+       return 0
+   end
+   ```
+4. Refactor `idempotency_middleware` in `crates/api` to check Redis before hitting SQLite.
+
+## 5. Security, Error Handling & Edge Cases
+- **Fail-Open or Fail-Closed:** If Redis becomes temporarily unreachable, log a warning and fall back to SQLite idempotency storage gracefully.
+- **Lock Renewal / Safe TTL:** Ensure lock TTLs are long enough to cover typical handler latency (10-15 seconds).
+
+## 6. Verification & Automated Tests
+- Integration test with running Redis container or mocked test runner:
+  ```rust
+  #[tokio::test]
+  async fn test_redis_lock_acquire_and_release() {
+      // Test acquires lock, duplicate acquire fails, release succeeds
+  }
+  ```
+
+## 7. Definition of Done (DoD)
+- [ ] Redis connection pool configured with automatic reconnection.
+- [ ] Atomic distributed lock acquisition and Lua release implemented.
+- [ ] Idempotency middleware utilizes Redis with 24-hour TTL expiration.
