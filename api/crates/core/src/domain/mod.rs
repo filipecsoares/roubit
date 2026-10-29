@@ -5,4 +5,7 @@
 
 pub mod routine;
 
-pub use routine::{BlockStatus, DailyRoutineLog, Routine, TimeBlock};
+pub use routine::{
+    create_sqlite_pool, BlockStatus, DailyRoutineLog, Routine, RoutineRepository,
+    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock,
+};

@@ -45,7 +45,7 @@ flowchart TD
 *Objetivo: Implementar as entidades centrais, regras de negócio puras, persistência relacional com SQLite e uma interface CLI funcional e autônoma.*
 
 - [ ] **1.1 Modelagem do Banco de Dados e Migrations (SQLx + SQLite WAL)**
-  - [ ] Configurar conexão SQLite com modo WAL (`PRAGMA journal_mode=WAL`) e `PRAGMA foreign_keys = ON`.
+  - [x] Configurar conexão SQLite com modo WAL (`PRAGMA journal_mode=WAL`) e `PRAGMA foreign_keys = ON`.
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
   - [ ] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
   - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).

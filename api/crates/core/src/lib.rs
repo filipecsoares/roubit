@@ -11,7 +11,10 @@ pub use crypto::{
     AesGcmCipher, CipherError, DerivedKey, EncryptedEnvelope, KdfError, KdfService, SecretBytes,
     SecretString,
 };
-pub use domain::{BlockStatus, DailyRoutineLog, Routine, TimeBlock};
+pub use domain::{
+    create_sqlite_pool, BlockStatus, DailyRoutineLog, Routine, RoutineRepository,
+    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock,
+};
 pub use telemetry::init_telemetry;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

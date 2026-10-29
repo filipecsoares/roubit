@@ -115,8 +115,8 @@ impl TimeBlock {
 
 /// Execution status of a scheduled time block for a specific calendar day.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
-#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "TEXT", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum BlockStatus {
     /// Block is scheduled but not yet reached or started.
     #[default]
