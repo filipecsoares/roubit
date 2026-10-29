@@ -13,7 +13,10 @@ pub use habit::{
     StreakMetrics,
 };
 
-pub use okr::{KeyResult, Objective};
+pub use okr::{
+    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError,
+    SqliteOkrRepository,
+};
 
 pub use routine::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Routine,

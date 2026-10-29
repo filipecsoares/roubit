@@ -14,9 +14,10 @@ pub use crypto::{
 pub use domain::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit,
     HabitAnalyticsService, HabitAnalyticsSummary, HabitLog, HabitRepository, HabitRepositoryError,
-    HabitType, HeatmapCell, KeyResult, Objective, Routine, RoutineProgressTracker,
-    RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteRoutineRepository,
-    StreakCalculator, StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
+    HabitType, HeatmapCell, KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository,
+    OkrRepositoryError, Routine, RoutineProgressTracker, RoutineRepository, RoutineRepositoryError,
+    SqliteHabitRepository, SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator,
+    StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
     MINIMUM_BLOCK_DURATION_MINUTES,
 };
 
