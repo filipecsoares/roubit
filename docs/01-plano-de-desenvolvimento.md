@@ -54,14 +54,13 @@ flowchart TD
   - [x] Implementar derivação de chave a partir de senha mestre usando Argon2id.
   - [x] Implementar cifragem e decifragem autenticada usando AES-256-GCM (nonce aleatório + tag de autenticação).
   - [x] Desenvolver suíte de testes de vetores criptográficos e tratamento seguro de memória (zeroize para dados sensíveis).
-- [ ] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
+- [x] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
   - [x] **Gestão de Rotinas (RF01):** Criação, edição e acompanhamento de blocos de tempo; cálculo de aderência do dia.
-
   - [x] **Rastreamento de Hábitos (RF02):**
     - Lógica de registro para hábitos binários, contadores numéricos (ex: ml, páginas) e timer (minutos).
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
   - [x] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
-  - [ ] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
+  - [x] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
 - [ ] **1.4 Interface de Linha de Comando (CLI com Clap)**
   - [ ] Implementar subcomando `roubit routine` (listar rotina de hoje, iniciar bloco, finalizar bloco).
   - [ ] Implementar subcomando `roubit habit` (listar hábitos, check-in com valor/tempo, status dos streaks).

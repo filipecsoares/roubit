@@ -6,9 +6,11 @@
 
 pub mod models;
 pub mod repository;
+pub mod service;
 
 pub use models::{
     deserialize_tags, serialize_tags, DecryptedJournalEntry, EncryptedJournalEntry,
     JournalMetadata, JournalModelError,
 };
 pub use repository::{JournalRepository, JournalRepositoryError, SqliteJournalRepository};
+pub use service::{JournalService, JournalServiceError};
