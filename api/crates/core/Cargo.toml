@@ -21,6 +21,16 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 dotenvy.workspace = true
 envy.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+rand_core.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+hex-literal.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "crypto_bench"
+harness = false
