@@ -24,6 +24,11 @@ anyhow = "1.0"
 dotenvy = "0.15"
 envy = "0.4"
 
+# Cryptography & Memory Security
+argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+zeroize = { version = "1.8", features = ["derive"] }
+
 # Async & Runtime
 tokio = { version = "1.43", features = ["full"] }
 

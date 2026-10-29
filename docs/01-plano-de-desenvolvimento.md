@@ -51,7 +51,7 @@ flowchart TD
   - [ ] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
   - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [ ] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
-  - [ ] Implementar derivação de chave a partir de senha mestre usando Argon2id.
+  - [x] Implementar derivação de chave a partir de senha mestre usando Argon2id.
   - [ ] Implementar cifragem e decifragem autenticada usando AES-256-GCM (nonce aleatório + tag de autenticação).
   - [ ] Desenvolver suíte de testes de vetores criptográficos e tratamento seguro de memória (zeroize para dados sensíveis).
 - [ ] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
