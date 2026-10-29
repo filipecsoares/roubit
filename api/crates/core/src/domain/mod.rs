@@ -14,8 +14,8 @@ pub use habit::{
 };
 
 pub use okr::{
-    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError,
-    SqliteOkrRepository,
+    KeyResult, Objective, ObjectiveWithKeyResults, OkrProgressEngine, OkrRepository,
+    OkrRepositoryError, OkrSyncService, SqliteOkrRepository,
 };
 
 pub use routine::{

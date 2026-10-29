@@ -15,13 +15,13 @@
 | **02. Criptografia & Memory Safety** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **03. Gestão de Rotinas (Time Blocks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
-| **05. Objetivos & OKRs** | 4 | 2 | 0 | 2 | 🟡 Em Progresso (50%) |
+| **05. Objetivos & OKRs** | 4 | 3 | 0 | 1 | 🟡 Em Progresso (75%) |
 | **06. Journaling Criptografado** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **07. Aplicação CLI (Terminal)** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **20** | **0** | **28** | **41.7%** |
+| **TOTAL** | **48** | **21** | **0** | **27** | **43.8%** |
 
 ---
 
@@ -74,7 +74,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **05.1** | Modelos de Domínio & Schema de OKRs | [activity-01-okr-domain-models-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/05-okrs/activity-01-okr-domain-models-schema.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **05.2** | Repositório SQLx de OKRs | [activity-02-okr-repository-sqlx.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/05-okrs/activity-02-okr-repository-sqlx.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
-| **05.3** | Motor de Vínculo Hábito-KR & Progresso | [activity-03-habit-to-kr-linkage-progress-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/05-okrs/activity-03-habit-to-kr-linkage-progress-engine.prompt) | ⚪ NÃO INICIADO | - |
+| **05.3** | Motor de Vínculo Hábito-KR & Progresso | [activity-03-habit-to-kr-linkage-progress-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/05-okrs/activity-03-habit-to-kr-linkage-progress-engine.prompt) | 🟢 CONCLUÍDO | 2026-10-29 |
 | **05.4** | Testes de Integração & Cascata de OKRs | [activity-04-okr-unit-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/05-okrs/activity-04-okr-unit-integration-tests.prompt) | ⚪ NÃO INICIADO | - |
 
 ---

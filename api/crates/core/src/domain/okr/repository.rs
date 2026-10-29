@@ -22,6 +22,10 @@ pub enum OkrRepositoryError {
     /// Target key result was not found.
     #[error("Key Result not found: {0}")]
     KeyResultNotFound(Uuid),
+
+    /// Error related to habit integration or retrieval.
+    #[error("Habit repository error: {0}")]
+    Habit(String),
 }
 
 /// A composite view combining an [`Objective`] with its child [`KeyResult`] items.
@@ -57,6 +61,12 @@ pub trait OkrRepository: Send + Sync {
     /// Lists all objectives across all quarters.
     async fn list_all_objectives(&self)
         -> Result<Vec<ObjectiveWithKeyResults>, OkrRepositoryError>;
+
+    /// Lists all key results linked to a specific habit.
+    async fn list_key_results_by_habit(
+        &self,
+        habit_id: Uuid,
+    ) -> Result<Vec<KeyResult>, OkrRepositoryError>;
 
     /// Updates the current achieved value of a [`KeyResult`], atomically updating both the
     /// Key Result's progress percentage and the parent Objective's weighted progress.
@@ -266,6 +276,20 @@ impl OkrRepository for SqliteOkrRepository {
         }
 
         Ok(results)
+    }
+
+    async fn list_key_results_by_habit(
+        &self,
+        habit_id: Uuid,
+    ) -> Result<Vec<KeyResult>, OkrRepositoryError> {
+        let key_results = sqlx::query_as::<_, KeyResult>(
+            "SELECT * FROM key_results WHERE linked_habit_id = ? ORDER BY created_at ASC",
+        )
+        .bind(habit_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(key_results)
     }
 
     async fn update_key_result_value(
