@@ -15,6 +15,6 @@ async fn main() -> anyhow::Result<()> {
 mod tests {
     #[test]
     fn test_cli_version_is_accessible() {
-        assert!(!roubit_core::VERSION.is_empty());
+        assert_eq!(roubit_core::VERSION, "0.1.0");
     }
 }
