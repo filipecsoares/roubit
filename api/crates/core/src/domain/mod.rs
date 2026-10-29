@@ -10,7 +10,8 @@ pub mod routine;
 
 pub use journal::{
     deserialize_tags, serialize_tags, DecryptedJournalEntry, EncryptedJournalEntry,
-    JournalMetadata, JournalModelError,
+    JournalMetadata, JournalModelError, JournalRepository, JournalRepositoryError,
+    SqliteJournalRepository,
 };
 
 pub use habit::{
