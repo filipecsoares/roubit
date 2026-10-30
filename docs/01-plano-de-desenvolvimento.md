@@ -153,11 +153,11 @@ flowchart TD
   - [x] Parametrização do SQLx para compatibilidade de dialetos SQL entre SQLite (desenvolvimento/CLI local) e PostgreSQL (servidor corporativo).
   - [x] Migrations SQL versionadas compatíveis com PostgreSQL.
   - [x] Script utilitário para migração e transição de dados do SQLite para o PostgreSQL.
-- [ ] **4.4 Orquestração com Docker Compose**
-  - [ ] `Dockerfile` multi-stage otimizado para o backend Rust (binário mínimo e sem runtime dependencies).
-  - [ ] `Dockerfile` multi-stage para o frontend Vue 3 (build estático servido via Nginx).
-  - [ ] `docker-compose.yml` completo integrando: API Rust + Frontend SPA + PostgreSQL + Redis.
-  - [ ] Healthchecks automáticos e inicialização de todo o ecossistema com um único comando (`docker compose up -d`).
+- [x] **4.4 Orquestração com Docker Compose**
+  - [x] `Dockerfile` multi-stage otimizado para o backend Rust (binário mínimo e sem runtime dependencies).
+  - [x] `Dockerfile` multi-stage para o frontend Vue 3 (build estático servido via Nginx).
+  - [x] `docker-compose.yml` completo integrando: API Rust + Frontend SPA + PostgreSQL + Redis.
+  - [x] Healthchecks automáticos e inicialização de todo o ecossistema com um único comando (`docker compose up -d`).
 
 ---
 
