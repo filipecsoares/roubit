@@ -1,6 +1,6 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 2: API REST & Idempotência)  
+> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 4: Infraestrutura Redis & PostgreSQL)  
 > **Última Atualização:** 2026-10-30  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
@@ -19,9 +19,9 @@
 | **06. Journaling Criptografado** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **07. Aplicação CLI (Terminal)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **08. API REST & Idempotência** | 6 | 6 | 0 | 0 | 🟢 Concluído |
-| **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
+| **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **37** | **0** | **11** | **77.1%** |
+| **TOTAL** | **48** | **43** | **0** | **5** | **89.6%** |
 
 ---
 
@@ -115,12 +115,12 @@
 ### Feature 09: Frontend SPA (Vue 3 / Vite)
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **09.1** | Scaffolding Vue 3, TS & TailwindCSS | [activity-01-vite-vue3-tailwind-scaffolding.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-01-vite-vue3-tailwind-scaffolding.prompt) | ⚪ NÃO INICIADO | - |
-| **09.2** | Cliente HTTP, Idempotência & Pinia | [activity-02-api-client-idempotency-state-management.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-02-api-client-idempotency-state-management.prompt) | ⚪ NÃO INICIADO | - |
-| **09.3** | Criptografia no Cliente via Web Crypto API | [activity-03-web-crypto-selective-encryption.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-03-web-crypto-selective-encryption.prompt) | ⚪ NÃO INICIADO | - |
-| **09.4** | Dashboard Unificado (Rotinas & Hábitos) | [activity-04-daily-dashboard-routines-habits.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-04-daily-dashboard-routines-habits.prompt) | ⚪ NÃO INICIADO | - |
-| **09.5** | Visualização de Heatmap & Árvore de OKRs | [activity-05-habits-heatmap-okrs-views.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-05-habits-heatmap-okrs-views.prompt) | ⚪ NÃO INICIADO | - |
-| **09.6** | UI do Diário Criptografado & Testes Vitest | [activity-06-encrypted-journal-component-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-06-encrypted-journal-component-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **09.1** | Scaffolding Vue 3, TS & TailwindCSS | [activity-01-vite-vue3-tailwind-scaffolding.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-01-vite-vue3-tailwind-scaffolding.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **09.2** | Cliente HTTP, Idempotência & Pinia | [activity-02-api-client-idempotency-state-management.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-02-api-client-idempotency-state-management.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **09.3** | Criptografia no Cliente via Web Crypto API | [activity-03-web-crypto-selective-encryption.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-03-web-crypto-selective-encryption.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **09.4** | Dashboard Unificado (Rotinas & Hábitos) | [activity-04-daily-dashboard-routines-habits.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-04-daily-dashboard-routines-habits.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **09.5** | Visualização de Heatmap & Árvore de OKRs | [activity-05-habits-heatmap-okrs-views.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-05-habits-heatmap-okrs-views.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **09.6** | UI do Diário Criptografado & Testes Vitest | [activity-06-encrypted-journal-component-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-06-encrypted-journal-component-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 
 ---
 

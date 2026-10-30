@@ -1,0 +1,228 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { Target, TrendingUp, Sparkles, AlertCircle } from 'lucide-vue-next'
+import { useOkrStore } from '@/stores/okr'
+import { useHabitStore } from '@/stores/habit'
+import ObjectiveCard from '@/components/okrs/ObjectiveCard.vue'
+import LinkHabitModal from '@/components/okrs/LinkHabitModal.vue'
+
+const okrStore = useOkrStore()
+const habitStore = useHabitStore()
+
+const quarters = ['2026-Q4', '2026-Q3', '2027-Q1', '2027-Q2']
+const selectedQuarter = ref('2026-Q4')
+
+// Link habit modal state
+const isLinkModalOpen = ref(false)
+const selectedKrId = ref<string | null>(null)
+const selectedKrTitle = ref('')
+
+// Toast notifications
+const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
+function showToast(text: string, type: 'success' | 'error' = 'success') {
+  toastMessage.value = { text, type }
+  setTimeout(() => {
+    if (toastMessage.value?.text === text) {
+      toastMessage.value = null
+    }
+  }, 4000)
+}
+
+// Habits map: habitId -> habitName
+const habitsMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  habitStore.habits.forEach((h) => {
+    map[h.habit.id] = h.habit.name
+  })
+  return map
+})
+
+const habitsList = computed(() => {
+  return habitStore.habits.map((h) => ({
+    id: h.habit.id,
+    name: h.habit.name,
+  }))
+})
+
+// Analytics metrics
+const totalObjectives = computed(() => okrStore.objectives.length)
+
+const averageProgress = computed(() => {
+  if (okrStore.objectives.length === 0) return 0
+  const sum = okrStore.objectives.reduce((acc, curr) => acc + curr.objective.progress_percentage, 0)
+  return Math.round(sum / okrStore.objectives.length)
+})
+
+const totalKeyResults = computed(() => {
+  return okrStore.objectives.reduce((acc, curr) => acc + curr.key_results.length, 0)
+})
+
+const linkedKeyResultsCount = computed(() => {
+  return okrStore.objectives.reduce((acc, curr) => {
+    return acc + curr.key_results.filter((kr) => !!kr.linked_habit_id).length
+  }, 0)
+})
+
+function openLinkModal(krId: string) {
+  for (const obj of okrStore.objectives) {
+    const kr = obj.key_results.find((k) => k.id === krId)
+    if (kr) {
+      selectedKrId.value = kr.id
+      selectedKrTitle.value = kr.title
+      isLinkModalOpen.value = true
+      return
+    }
+  }
+}
+
+function handleLinkConfirm(habitId: string) {
+  if (!selectedKrId.value) return
+
+  // Update in local store
+  for (const obj of okrStore.objectives) {
+    const kr = obj.key_results.find((k) => k.id === selectedKrId.value)
+    if (kr) {
+      kr.linked_habit_id = habitId
+      const habitName = habitsMap.value[habitId] || 'Hábito'
+      showToast(`Resultado-Chave vinculado ao hábito "${habitName}"!`)
+      break
+    }
+  }
+  isLinkModalOpen.value = false
+  selectedKrId.value = null
+}
+
+async function handleQuarterChange(quarter: string) {
+  selectedQuarter.value = quarter
+  try {
+    await okrStore.fetchOkrs(quarter)
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao carregar OKRs do trimestre', 'error')
+  }
+}
+
+onMounted(async () => {
+  try {
+    await Promise.allSettled([
+      okrStore.fetchOkrs(selectedQuarter.value),
+      habitStore.fetchHabits(),
+    ])
+  } catch (e) {}
+})
+</script>
+
+<template>
+  <div class="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+    <!-- Toast Notification -->
+    <div
+      v-if="toastMessage"
+      class="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
+      :class="
+        toastMessage.type === 'success'
+          ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+          : 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+      "
+    >
+      <AlertCircle v-if="toastMessage.type === 'error'" class="w-4 h-4 shrink-0" />
+      <Sparkles v-else class="w-4 h-4 shrink-0 text-emerald-400" />
+      <span>{{ toastMessage.text }}</span>
+    </div>
+
+    <!-- Header & Quarter Switcher -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold tracking-tight text-white font-outfit">
+          Objetivos & Resultados-Chave (OKRs)
+        </h1>
+        <p class="text-sm text-slate-400 mt-1">
+          Alinhamento estratégico conectando metas trimestrais diretamente à cadência dos seus hábitos diários.
+        </p>
+      </div>
+
+      <!-- Quarter Pills -->
+      <div class="flex items-center gap-1.5 p-1 bg-surface-card rounded-xl border border-surface-border">
+        <button
+          v-for="q in quarters"
+          :key="q"
+          type="button"
+          @click="handleQuarterChange(q)"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          :class="
+            selectedQuarter === q
+              ? 'bg-brand-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white'
+          "
+        >
+          {{ q }}
+        </button>
+      </div>
+    </header>
+
+    <!-- Overview Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Objetivos</span>
+        <p class="text-2xl font-bold text-white mt-1">{{ totalObjectives }}</p>
+      </div>
+
+      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Progresso Médio</span>
+        <div class="flex items-center gap-1.5 mt-1">
+          <TrendingUp class="w-5 h-5 text-brand-400" />
+          <p class="text-2xl font-bold text-white">{{ averageProgress }}%</p>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resultados-Chave</span>
+        <p class="text-2xl font-bold text-white mt-1">{{ totalKeyResults }}</p>
+      </div>
+
+      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">KRs com Hábitos</span>
+        <p class="text-2xl font-bold text-emerald-400 mt-1">
+          {{ linkedKeyResultsCount }} <span class="text-xs font-normal text-slate-400">/ {{ totalKeyResults }}</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Objectives Tree Section -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-white">Objetivos em {{ selectedQuarter }}</h2>
+      </div>
+
+      <div
+        v-if="okrStore.objectives.length === 0"
+        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border"
+      >
+        <Target class="w-8 h-8 text-slate-500 mx-auto mb-2" />
+        <h3 class="text-sm font-semibold text-white">Nenhum objetivo cadastrado para este trimestre</h3>
+        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+          Defina seus objetivos estratégicos e adicione Resultados-Chave mensuráveis para impulsionar suas metas.
+        </p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <ObjectiveCard
+          v-for="item in okrStore.objectives"
+          :key="item.objective.id"
+          :objective="item.objective"
+          :key-results="item.key_results"
+          :habits-map="habitsMap"
+          @link-habit="openLinkModal"
+        />
+      </div>
+    </section>
+
+    <!-- Link Habit Modal -->
+    <LinkHabitModal
+      :is-open="isLinkModalOpen"
+      :kr-title="selectedKrTitle"
+      :habits="habitsList"
+      @close="isLinkModalOpen = false"
+      @link="handleLinkConfirm"
+    />
+  </div>
+</template>

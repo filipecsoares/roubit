@@ -108,34 +108,34 @@ flowchart TD
 ### Fase 3: Frontend SPA Reativo em Vue.js 3
 *Objetivo: Construir interface gráfica reativa, moderna, minimalista e com criptografia no cliente para o Journaling.*
 
-- [ ] **3.1 Setup do Frontend com Vue 3 & Vite**
-  - [ ] Inicialização do projeto Vue 3 (Composition API, TypeScript, Vite, Vue Router, Pinia).
-  - [ ] Integração do TailwindCSS com design system minimalista, tipografia moderna e suporte a Dark Mode.
-  - [ ] Configuração do pipeline `.github/workflows/vue-ci.yml` (linting, checagem de tipos, build).
-- [ ] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
-  - [ ] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
-  - [ ] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
-- [ ] **3.3 Módulo de Criptografia no Cliente (Web Crypto API / Argon2)**
-  - [ ] Implementar fluxo de desbloqueio de chave: usuário insere senha mestre/passphrase no navegador.
-  - [ ] Derivação de chave AES-256-GCM via Web Crypto API / WASM.
-  - [ ] Cifragem de reflexões do Journaling antes do envio HTTP e decifragem local após o recebimento.
-  - [ ] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
-- [ ] **3.4 Telas e Componentes da Interface**
-  - [ ] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
-  - [ ] **Dashboard Unificado Diário:**
-    - Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
-    - Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
-    - Barra de progresso diário consolidada.
-  - [ ] **Módulo Habit Tracker & Streaks:**
-    - Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
-  - [ ] **Módulo de OKRs:**
-    - Árvore de visualização de Objetivos e Resultados-Chave com medidores de progresso interativos.
-  - [ ] **Módulo de Journaling Criptografado:**
-    - Editor minimalista com foco em escrita reflexiva (intenções do dia e retrospectiva noturna).
-    - Indicador visual de criptografia ativa (cadeado fechado e status da chave).
-- [ ] **3.5 Testes de Frontend e Acessibilidade**
-  - [ ] Testes unitários de componentes e stores com Vitest.
-  - [ ] Validação de responsividade (Desktop e Mobile) e ergonomia visual.
+- [x] **3.1 Setup do Frontend com Vue 3 & Vite**
+  - [x] Inicialização do projeto Vue 3 (Composition API, TypeScript, Vite, Vue Router, Pinia).
+  - [x] Integração do TailwindCSS com design system minimalista, tipografia moderna e suporte a Dark Mode.
+  - [x] Configuração do pipeline `.github/workflows/vue-ci.yml` (linting, checagem de tipos, build).
+- [x] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
+  - [x] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
+  - [x] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
+- [x] **3.3 Módulo de Criptografia no Cliente (Web Crypto API / Argon2)**
+  - [x] Implementar fluxo de desbloqueio de chave: usuário insere senha mestre/passphrase no navegador.
+  - [x] Derivação de chave AES-256-GCM via Web Crypto API / WASM.
+  - [x] Cifragem de reflexões do Journaling antes do envio HTTP e decifragem local após o recebimento.
+  - [x] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
+- [x] **3.4 Telas e Componentes da Interface**
+  - [x] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
+  - [x] **Dashboard Unificado Diário:**
+    - [x] Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
+    - [x] Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
+    - [x] Barra de progresso diário consolidada.
+  - [x] **Módulo Habit Tracker & Streaks:**
+    - [x] Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
+  - [x] **Módulo de OKRs:**
+    - [x] Árvore de visualização de Objetivos e Resultados-Chave com medidores de progresso interativos.
+  - [x] **Módulo de Journaling Criptografado:**
+    - [x] Editor minimalista com foco em escrita reflexiva (intenções do dia e retrospectiva noturna).
+    - [x] Indicador visual de criptografia ativa (cadeado fechado e status da chave).
+- [x] **3.5 Testes de Frontend e Acessibilidade**
+  - [x] Testes unitários de componentes e stores com Vitest.
+  - [x] Validação de responsividade (Desktop e Mobile) e ergonomia visual.
 
 ---
 
