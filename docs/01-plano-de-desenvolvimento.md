@@ -126,10 +126,10 @@ flowchart TD
     - [x] Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
     - [x] Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
     - [x] Barra de progresso diário consolidada.
-  - [ ] **Módulo Habit Tracker & Streaks:**
-    - Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
-  - [ ] **Módulo de OKRs:**
-    - Árvore de visualização de Objetivos e Resultados-Chave com medidores de progresso interativos.
+  - [x] **Módulo Habit Tracker & Streaks:**
+    - [x] Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
+  - [x] **Módulo de OKRs:**
+    - [x] Árvore de visualização de Objetivos e Resultados-Chave com medidores de progresso interativos.
   - [ ] **Módulo de Journaling Criptografado:**
     - Editor minimalista com foco em escrita reflexiva (intenções do dia e retrospectiva noturna).
     - Indicador visual de criptografia ativa (cadeado fechado e status da chave).
