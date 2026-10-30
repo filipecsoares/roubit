@@ -199,10 +199,7 @@ async fn test_unauthenticated_and_malformed_requests() {
     let bad_jwt_req = Request::builder()
         .uri("/api/v1/auth/me")
         .method("GET")
-        .header(
-            "authorization",
-            "Bearer invalid-signature-token",
-        )
+        .header("authorization", "Bearer invalid-signature-token")
         .body(Body::empty())
         .expect("Build bad JWT request");
 

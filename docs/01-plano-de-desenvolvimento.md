@@ -122,10 +122,10 @@ flowchart TD
   - [x] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
 - [ ] **3.4 Telas e Componentes da Interface**
   - [ ] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
-  - [ ] **Dashboard Unificado Diário:**
-    - Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
-    - Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
-    - Barra de progresso diário consolidada.
+  - [x] **Dashboard Unificado Diário:**
+    - [x] Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
+    - [x] Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
+    - [x] Barra de progresso diário consolidada.
   - [ ] **Módulo Habit Tracker & Streaks:**
     - Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
   - [ ] **Módulo de OKRs:**
