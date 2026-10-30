@@ -108,10 +108,10 @@ flowchart TD
 ### Fase 3: Frontend SPA Reativo em Vue.js 3
 *Objetivo: Construir interface gráfica reativa, moderna, minimalista e com criptografia no cliente para o Journaling.*
 
-- [ ] **3.1 Setup do Frontend com Vue 3 & Vite**
-  - [ ] Inicialização do projeto Vue 3 (Composition API, TypeScript, Vite, Vue Router, Pinia).
-  - [ ] Integração do TailwindCSS com design system minimalista, tipografia moderna e suporte a Dark Mode.
-  - [ ] Configuração do pipeline `.github/workflows/vue-ci.yml` (linting, checagem de tipos, build).
+- [x] **3.1 Setup do Frontend com Vue 3 & Vite**
+  - [x] Inicialização do projeto Vue 3 (Composition API, TypeScript, Vite, Vue Router, Pinia).
+  - [x] Integração do TailwindCSS com design system minimalista, tipografia moderna e suporte a Dark Mode.
+  - [x] Configuração do pipeline `.github/workflows/vue-ci.yml` (linting, checagem de tipos, build).
 - [ ] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
   - [ ] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
   - [ ] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
