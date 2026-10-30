@@ -12,14 +12,24 @@ pub use crypto::{
     SecretString,
 };
 pub use domain::{
-    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog, Habit,
-    HabitAnalyticsService, HabitAnalyticsSummary, HabitLog, HabitRepository, HabitRepositoryError,
-    HabitType, HeatmapCell, KeyResult, Objective, ObjectiveWithKeyResults, OkrProgressEngine,
+    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog,
+    DecryptedJournalEntry, EncryptedJournalEntry, Habit, HabitAnalyticsService,
+    HabitAnalyticsSummary, HabitLog, HabitRepository, HabitRepositoryError, HabitType, HeatmapCell,
+    JournalMetadata, JournalModelError, JournalRepository, JournalRepositoryError, JournalService,
+    JournalServiceError, KeyResult, Objective, ObjectiveWithKeyResults, OkrProgressEngine,
     OkrRepository, OkrRepositoryError, OkrSyncService, Routine, RoutineProgressTracker,
-    RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteOkrRepository,
-    SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock, TimeBlockValidationError,
-    TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
+    RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteJournalRepository,
+    SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
+    TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
+
+/// Runs all embedded database migrations against the provided SQLite connection pool.
+///
+/// # Errors
+/// Returns [`sqlx::migrate::MigrateError`] if applying migrations fails.
+pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
 
 pub use telemetry::init_telemetry;
 
