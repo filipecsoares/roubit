@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   Play,
   Pause,
@@ -40,7 +40,18 @@ const emit = defineEmits<{
 const focusStore = useFocusStore()
 const routineStore = useRoutineStore()
 
-const radius = computed(() => (props.size - props.strokeWidth) / 2)
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+
+function updateWidth() {
+  windowWidth.value = window.innerWidth
+}
+
+const currentSize = computed(() => {
+  if (props.size !== 240) return props.size
+  return windowWidth.value < 640 ? 200 : 240
+})
+
+const radius = computed(() => (currentSize.value - props.strokeWidth) / 2)
 const circumference = computed(() => 2 * Math.PI * radius.value)
 const strokeDashoffset = computed(() => {
   const percent = focusStore.progressPercentage
@@ -93,10 +104,12 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', updateWidth)
   window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateWidth)
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -231,8 +244,8 @@ onUnmounted(() => {
         </div>
 
         <!-- Circular Countdown Gauge -->
-        <div class="relative flex items-center justify-center my-1" :style="{ width: `${size}px`, height: `${size}px` }">
-          <svg class="transform -rotate-90" :width="size" :height="size">
+        <div class="relative flex items-center justify-center my-1" :style="{ width: `${currentSize}px`, height: `${currentSize}px` }">
+          <svg class="transform -rotate-90" :width="currentSize" :height="currentSize">
             <!-- Background circle track -->
             <circle
               class="text-surface-border/40"
@@ -240,8 +253,8 @@ onUnmounted(() => {
               stroke="currentColor"
               fill="transparent"
               :r="radius"
-              :cx="size / 2"
-              :cy="size / 2"
+              :cx="currentSize / 2"
+              :cy="currentSize / 2"
             />
             <!-- Progress circle with gradient glow -->
             <circle
@@ -251,8 +264,8 @@ onUnmounted(() => {
               stroke-linecap="round"
               fill="transparent"
               :r="radius"
-              :cx="size / 2"
-              :cy="size / 2"
+              :cx="currentSize / 2"
+              :cy="currentSize / 2"
               :style="{
                 strokeDasharray: circumference,
                 strokeDashoffset: strokeDashoffset,

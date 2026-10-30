@@ -36,7 +36,7 @@ const sortedBlocks = computed(() => {
     <!-- Empty state -->
     <div
       v-if="blocks.length === 0"
-      class="text-center py-12 px-4 rounded-xl border border-dashed border-surface-border space-y-3"
+      class="text-center py-8 sm:py-12 px-4 rounded-xl border border-dashed border-surface-border space-y-3"
     >
       <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400">
         <Calendar class="w-6 h-6" />
