@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Clock, AlertCircle, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Clock, AlertCircle, RefreshCw, Sparkles, Plus } from 'lucide-vue-next'
 import { useRoutineStore } from '@/stores/routine'
 import { useHabitStore } from '@/stores/habit'
 import RoutineTimeline from '@/components/dashboard/RoutineTimeline.vue'
 import HabitChecklist from '@/components/dashboard/HabitChecklist.vue'
 import DailyProgressGauge from '@/components/dashboard/DailyProgressGauge.vue'
+import RoutineManageModal from '@/components/dashboard/RoutineManageModal.vue'
 import type { BlockStatusType } from '@/types'
 
 const routineStore = useRoutineStore()
@@ -16,6 +17,7 @@ let timerId: ReturnType<typeof setInterval> | null = null
 
 const completedBlockIds = ref<string[]>([])
 const skippedBlockIds = ref<string[]>([])
+const isRoutineModalOpen = ref(false)
 const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
 // Format today's date in Portuguese (e.g., Sexta-feira, 30 de Outubro de 2026)
@@ -103,6 +105,28 @@ async function handleCompleteBlock(blockId: string, status: BlockStatusType) {
     completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
     skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
     showToast(err.message || 'Erro ao registrar progresso do bloco', 'error')
+  }
+}
+
+async function handleCreateRoutine(payload: {
+  name: string
+  description?: string
+  is_active: boolean
+  blocks: Array<{
+    name: string
+    start_time: string
+    end_time: string
+    category?: string
+    color_hex?: string
+    order_index: number
+  }>
+}) {
+  try {
+    await routineStore.createRoutine(payload)
+    isRoutineModalOpen.value = false
+    showToast('Rotina e cronograma de blocos salvos com sucesso!')
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao criar rotina', 'error')
   }
 }
 
@@ -215,12 +239,23 @@ onUnmounted(() => {
             <Clock class="w-5 h-5 text-brand-400" />
             <h2 class="text-lg font-bold text-white">Cronograma de Rotina</h2>
           </div>
-          <span
-            v-if="activeBlock"
-            class="text-xs font-medium text-brand-300 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full"
-          >
-            Em andamento: {{ activeBlock.name }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span
+              v-if="activeBlock"
+              class="text-xs font-medium text-brand-300 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full hidden sm:inline"
+            >
+              Em andamento: {{ activeBlock.name }}
+            </span>
+            <button
+              type="button"
+              @click="isRoutineModalOpen = true"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 transition-colors"
+              title="Criar ou reconfigurar rotina"
+            >
+              <Plus class="w-3.5 h-3.5" />
+              Configurar Rotina
+            </button>
+          </div>
         </div>
 
         <RoutineTimeline
@@ -230,6 +265,7 @@ onUnmounted(() => {
           :skipped-block-ids="skippedBlockIds"
           :loading="routineStore.loading"
           @complete="handleCompleteBlock"
+          @open-create="isRoutineModalOpen = true"
         />
       </section>
 
@@ -249,5 +285,13 @@ onUnmounted(() => {
         />
       </section>
     </div>
+
+    <!-- Routine Manage Modal -->
+    <RoutineManageModal
+      :is-open="isRoutineModalOpen"
+      :loading="routineStore.loading"
+      @close="isRoutineModalOpen = false"
+      @save="handleCreateRoutine"
+    />
   </div>
 </template>
