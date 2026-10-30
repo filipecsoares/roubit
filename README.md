@@ -2,7 +2,7 @@
 
 > **Routine + Habit** — A high-performance personal operating system that integrates daily time-blocking, habit tracking, OKR goal alignment, and zero-knowledge encrypted journaling.
 
-[![Progress](https://img.shields.io/badge/Progress-48%2F48%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
+[![Progress](https://img.shields.io/badge/Progress-50%2F50%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![Vue 3](https://img.shields.io/badge/Vue.js-3.5%2B-4FC08D?logo=vuedotjs)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6?logo=typescript)](https://www.typescriptlang.org/)
@@ -29,10 +29,11 @@ Most productivity setups are fragmented: a to-do list in one app, habit tracking
 
 ## ✨ Core Features
 
-### ⏱️ 1. Time-Blocked Daily Routines (RF01)
+### ⏱️ 1. Time-Blocked Daily Routines & Focus Mode (RF01)
 - **Chronological Day Planning:** Build daily schedules with distinct focus blocks (*Deep Work*, *Workout*, *Study*, *Rest*).
 - **Conflict Prevention Engine:** Mathematical non-overlap validation running in $O(N \log N)$ prevents scheduling collisions.
 - **Real-Time Day Tracker:** Follow the active block in real time and log state transitions (`Pending` $\to$ `In Progress` $\to$ `Completed` / `Skipped`).
+- **Integrated Focus Mode & Pomodoro Timer:** Launch distraction-free fullscreen focus sessions directly from routine blocks, featuring animated circular countdowns, cycle tracking, keyboard shortcuts, and native Web Audio API harmonic chime synthesis.
 - **Adherence Score:** Automatically calculates your scheduled vs. completed duration percentage at the end of each day.
 
 ### ⚡ 2. Smart Habit Tracker & Resilient Streaks (RF02)

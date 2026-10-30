@@ -23,6 +23,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'complete', blockId: string, status: BlockStatusType): void
   (e: 'openCreate'): void
+  (e: 'openFocus', block: TimeBlock): void
 }>()
 
 const sortedBlocks = computed(() => {
@@ -85,6 +86,7 @@ const sortedBlocks = computed(() => {
           :is-skipped="skippedBlockIds.includes(block.id)"
           :loading="loading"
           @complete="(id, status) => emit('complete', id, status)"
+          @open-focus="(b) => emit('openFocus', b)"
         />
       </div>
     </div>

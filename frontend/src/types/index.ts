@@ -171,3 +171,18 @@ export interface SaveEncryptedJournalRequest {
   nonce_base64: string
   ciphertext_base64: string
 }
+
+// Focus Mode & Pomodoro Timer (Feature 11)
+export type FocusModeType = 'pomodoro' | 'short_break' | 'long_break' | 'block'
+export type FocusState = 'idle' | 'running' | 'paused' | 'break' | 'completed'
+
+export interface FocusSession {
+  mode: FocusModeType
+  durationSeconds: number
+  remainingSeconds: number
+  state: FocusState
+  associatedBlockId?: string
+  associatedBlockName?: string
+  completedCycles: number
+}
+

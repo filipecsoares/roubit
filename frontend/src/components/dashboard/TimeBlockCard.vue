@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Check, Clock, SkipForward, Sparkles } from 'lucide-vue-next'
+import { Check, Clock, SkipForward, Sparkles, Timer } from 'lucide-vue-next'
 import type { TimeBlock, BlockStatusType } from '@/types'
 
 const props = withDefaults(
@@ -23,6 +23,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'complete', blockId: string, status: BlockStatusType): void
+  (e: 'openFocus', block: TimeBlock): void
 }>()
 
 const formattedTime = computed(() => {
@@ -47,7 +48,7 @@ const cardClasses = computed(() => {
 
 <template>
   <div
-    class="relative p-4 rounded-xl border transition-all duration-200 group"
+    class="relative p-3.5 sm:p-4 rounded-xl border transition-all duration-200 group"
     :class="cardClasses"
   >
     <!-- Glowing pulse bar for active block -->
@@ -58,7 +59,7 @@ const cardClasses = computed(() => {
 
     <div class="flex items-start justify-between gap-3">
       <div class="space-y-1 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <!-- Time range badge -->
           <span
             class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium"
@@ -87,7 +88,7 @@ const cardClasses = computed(() => {
         </div>
 
         <h3
-          class="text-base font-semibold truncate transition-colors"
+          class="text-sm sm:text-base font-semibold truncate transition-colors"
           :class="{
             'text-white': isActive,
             'text-emerald-300 line-through': isCompleted,
@@ -107,7 +108,7 @@ const cardClasses = computed(() => {
           :disabled="loading"
           @click="emit('complete', block.id, 'completed')"
           title="Marcar como concluído"
-          class="p-2 rounded-lg bg-surface-border/40 hover:bg-emerald-500/20 hover:text-emerald-400 text-slate-400 transition-colors"
+          class="p-2 rounded-xl bg-surface-border/40 hover:bg-emerald-500/20 hover:text-emerald-400 text-slate-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <Check class="w-4 h-4" />
         </button>
@@ -118,14 +119,26 @@ const cardClasses = computed(() => {
           :disabled="loading"
           @click="emit('complete', block.id, 'skipped')"
           title="Pular bloco"
-          class="p-2 rounded-lg bg-surface-border/40 hover:bg-slate-700 text-slate-400 transition-colors"
+          class="p-2 rounded-xl bg-surface-border/40 hover:bg-slate-700 text-slate-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <SkipForward class="w-4 h-4" />
         </button>
 
+        <!-- Focus Mode Launch Button for Active Block -->
+        <button
+          v-if="isActive && !isCompleted"
+          type="button"
+          @click="emit('openFocus', block)"
+          title="Iniciar Modo Foco neste bloco"
+          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/25 transition-all active:scale-95 touch-target sm:min-h-0 sm:min-w-0"
+        >
+          <Timer class="w-3.5 h-3.5" />
+          <span class="hidden sm:inline">Focar</span>
+        </button>
+
         <span
           v-if="isCompleted"
-          class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20"
+          class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
         >
           <Check class="w-3.5 h-3.5" /> Concluído
         </span>

@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Clock, AlertCircle, RefreshCw, Sparkles, Plus } from 'lucide-vue-next'
+import { Clock, AlertCircle, RefreshCw, Sparkles, Plus, Timer } from 'lucide-vue-next'
 import { useRoutineStore } from '@/stores/routine'
 import { useHabitStore } from '@/stores/habit'
+import { useFocusStore } from '@/stores/focus'
 import RoutineTimeline from '@/components/dashboard/RoutineTimeline.vue'
 import HabitChecklist from '@/components/dashboard/HabitChecklist.vue'
 import DailyProgressGauge from '@/components/dashboard/DailyProgressGauge.vue'
 import RoutineManageModal from '@/components/dashboard/RoutineManageModal.vue'
+import FocusModeModal from '@/components/dashboard/FocusModeModal.vue'
 import type { BlockStatusType } from '@/types'
 
 const routineStore = useRoutineStore()
 const habitStore = useHabitStore()
+const focusStore = useFocusStore()
 
 const now = ref(new Date())
 let timerId: ReturnType<typeof setInterval> | null = null
@@ -269,6 +272,7 @@ onUnmounted(() => {
             :loading="routineStore.loading"
             @complete="handleCompleteBlock"
             @open-create="isRoutineModalOpen = true"
+            @open-focus="(b) => focusStore.openFocusModal(b)"
           />
         </div>
       </section>
@@ -292,12 +296,35 @@ onUnmounted(() => {
       </section>
     </div>
 
+    <!-- Floating Focus Pill (When timer is running in background) -->
+    <div
+      v-if="focusStore.isRunning && !focusStore.isModalOpen"
+      @click="focusStore.openFocusModal()"
+      class="fixed bottom-20 md:bottom-8 right-4 sm:right-6 z-40 bg-surface-card/95 border border-brand-500/50 shadow-2xl shadow-brand-500/20 rounded-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-xl cursor-pointer hover:scale-105 transition-all animate-bounce-short"
+      title="Retornar ao Modo Foco em tela cheia"
+    >
+      <div class="p-2 rounded-xl bg-brand-500/20 text-brand-300">
+        <Timer class="w-4 h-4 animate-spin" style="animation-duration: 4s;" />
+      </div>
+      <div class="flex flex-col text-left">
+        <span class="text-xs font-bold text-white font-mono tracking-tight">{{ focusStore.formattedTime }}</span>
+        <span class="text-[10px] text-brand-300 font-medium -mt-0.5">
+          {{ focusStore.isBreak ? 'Pausa Ativa' : (focusStore.associatedBlockName || 'Foco Ativo') }}
+        </span>
+      </div>
+    </div>
+
     <!-- Routine Manage Modal -->
     <RoutineManageModal
       :is-open="isRoutineModalOpen"
       :loading="routineStore.loading"
       @close="isRoutineModalOpen = false"
       @save="handleCreateRoutine"
+    />
+
+    <!-- Focus Mode Overlay Modal -->
+    <FocusModeModal
+      @complete-block="(blockId) => handleCompleteBlock(blockId, 'completed')"
     />
   </div>
 </template>

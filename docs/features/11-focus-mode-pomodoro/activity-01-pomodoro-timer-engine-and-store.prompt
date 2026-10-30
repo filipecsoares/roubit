@@ -1,0 +1,59 @@
+# Activity: Focus Mode & Pomodoro Timer Engine (Pinia Store & Web Audio Synthesis)
+
+## 1. Objective & Context
+Implement the core focus state machine and reactive state management for the integrated Pomodoro and time block focus timer in `frontend/src/stores/focus.ts`. The store manages countdown intervals, session states (focus, short break, long break), audio chime synthesized via the browser's native Web Audio API (zero external assets), and mobile haptic vibration feedback.
+
+- **Prerequisites:** Feature 03 (Routines) and Feature 09 (Frontend SPA).
+- **Target Location:** `frontend/src/stores/focus.ts` and `frontend/src/types/index.ts`.
+
+## 2. Technical Scope & Specifications
+- **State Machine States:**
+  - `idle`: Timer stopped / reset.
+  - `running`: Active focus session in progress.
+  - `paused`: Focus session paused by user.
+  - `break`: Active break session (short or long).
+  - `completed`: Cycle completed, awaiting user action.
+- **Session Types:**
+  - `pomodoro`: 25 minutes standard focus.
+  - `short_break`: 5 minutes rest.
+  - `long_break`: 15 minutes extended rest (every 4 pomodoros).
+  - `block`: Customized duration matching the remaining duration of the active routine time block.
+- **Accurate Timing:**
+  - Use `Date.now()` delta calculation rather than simple `setInterval` decrement to prevent drift when browser tab is backgrounded.
+- **Native Audio & Haptics:**
+  - Synthesize a gentle bell/chime using `window.AudioContext` or `webkitAudioContext` (sine wave oscillator at 587Hz -> 880Hz with exponential decay).
+  - Trigger `navigator.vibrate([100, 50, 100])` for mobile feedback when session completes.
+
+## 3. Data Structures & Types
+```typescript
+export type FocusModeType = 'pomodoro' | 'short_break' | 'long_break' | 'block'
+export type FocusState = 'idle' | 'running' | 'paused' | 'break' | 'completed'
+
+export interface FocusSession {
+  mode: FocusModeType
+  durationSeconds: number
+  remainingSeconds: number
+  state: FocusState
+  associatedBlockId?: string
+  associatedBlockName?: string
+  completedCycles: number
+}
+```
+
+## 4. Implementation Steps
+1. Add focus types in `frontend/src/types/index.ts`.
+2. Implement `useFocusStore` in `frontend/src/stores/focus.ts` using Pinia Composition API.
+3. Add Web Audio chime player utility within the store or service.
+4. Implement actions: `startFocus(block?)`, `startBreak(isLong?)`, `pauseTimer()`, `resumeTimer()`, `resetTimer()`, `skipToBreak()`.
+5. Write unit tests in `frontend/src/stores/__tests__/focus.spec.ts`.
+
+## 5. Security & Edge Cases
+- Handle browsers where Web Audio API requires user interaction before context initialization (`AudioContext.state === 'suspended'`).
+- Handle `navigator.vibrate` graceful degradation when unsupported (iOS Safari).
+- Clean up `setInterval` on store disposal or unmount to prevent memory leaks.
+
+## 6. Definition of Done (DoD)
+- [ ] `useFocusStore` handles countdown with accurate `Date.now()` timestamp math.
+- [ ] Supports Pomodoro (25m), short break (5m), long break (15m), and custom time block duration.
+- [ ] Native audio chime plays upon completion without external network requests.
+- [ ] Unit tests validate state transitions and cycle increments.
