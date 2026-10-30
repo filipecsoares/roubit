@@ -59,6 +59,14 @@ fn extract_user_id(parts: &axum::http::request::Parts, jwt_secret: &str) -> Stri
     "anonymous".to_string()
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct CachedIdempotencyPayload {
+    status: u16,
+    headers: HashMap<String, String>,
+    body: Vec<u8>,
+    request_hash: Vec<u8>,
+}
+
 /// Idempotency middleware for transactional state mutation endpoints
 ///
 /// # Errors
@@ -103,10 +111,75 @@ pub async fn idempotency_middleware(
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("Failed to read request body: {e}")))?;
     let request_hash = Sha256::digest(&body_bytes).to_vec();
 
+    // Fast path: Check Redis cache first if configured
+    if let Some(ref redis) = state.redis {
+        match redis.get_idempotency_response(&user_id, &key).await {
+            Ok(Some(cached_bytes)) => {
+                if let Ok(cached) =
+                    serde_json::from_slice::<CachedIdempotencyPayload>(&cached_bytes)
+                {
+                    if cached.request_hash != request_hash {
+                        return Err(ApiError::Conflict(
+                            "Idempotency key payload mismatch: request body differs from original request"
+                                .to_string(),
+                        ));
+                    }
+
+                    let u16_status = cached.status;
+                    let status = StatusCode::from_u16(u16_status)
+                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
+                    let mut response = Response::builder()
+                        .status(status)
+                        .header(X_CACHE_HEADER, HeaderValue::from_static("HIT"));
+
+                    for (h_name, h_val) in cached.headers {
+                        if let (Ok(h_n), Ok(h_v)) = (
+                            HeaderName::from_bytes(h_name.as_bytes()),
+                            HeaderValue::from_str(&h_val),
+                        ) {
+                            response = response.header(h_n, h_v);
+                        }
+                    }
+
+                    return response.body(Body::from(cached.body)).map_err(|e| {
+                        ApiError::Internal(anyhow::anyhow!("Failed to build response: {e}"))
+                    });
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(error = %e, "Redis get_idempotency_response failed; falling back to SQLite");
+            }
+        }
+    }
+
+    // Try acquiring Redis distributed in-flight lock (15s TTL)
+    let redis_lock_token = uuid::Uuid::new_v4().to_string();
+    let mut redis_locked = false;
+    if let Some(ref redis) = state.redis {
+        match redis
+            .acquire_idempotency_lock(&user_id, &key, &redis_lock_token, 15)
+            .await
+        {
+            Ok(true) => {
+                redis_locked = true;
+            }
+            Ok(false) => {
+                return Err(ApiError::Conflict(
+                    "A request with this idempotency key is currently being processed".to_string(),
+                ));
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Redis acquire_idempotency_lock failed; falling back to SQLite");
+            }
+        }
+    }
+
     let now = chrono::Utc::now();
     let locked_until = now + chrono::Duration::seconds(IN_FLIGHT_LOCK_DURATION_SECONDS);
 
-    // Query existing key state for this scoped user
+    // Query existing key state for this scoped user in SQLite
     let existing_row = sqlx::query(
         r"
         SELECT response_status, response_headers, response_body, request_hash, locked_until
@@ -127,6 +200,13 @@ pub async fn idempotency_middleware(
 
         // Payload fingerprint verification
         if stored_hash != request_hash {
+            if redis_locked {
+                if let Some(ref redis) = state.redis {
+                    let _ = redis
+                        .release_idempotency_lock(&user_id, &key, &redis_lock_token)
+                        .await;
+                }
+            }
             return Err(ApiError::Conflict(
                 "Idempotency key payload mismatch: request body differs from original request"
                     .to_string(),
@@ -135,6 +215,14 @@ pub async fn idempotency_middleware(
 
         // Case 1: Request already completed -> Replay cached response
         if let Some(status_code) = response_status_opt {
+            if redis_locked {
+                if let Some(ref redis) = state.redis {
+                    let _ = redis
+                        .release_idempotency_lock(&user_id, &key, &redis_lock_token)
+                        .await;
+                }
+            }
+
             let u16_status = u16::try_from(status_code)
                 .map_err(|_| ApiError::Internal(anyhow::anyhow!("Invalid status code in cache")))?;
             let status =
@@ -234,6 +322,7 @@ pub async fn idempotency_middleware(
         let status_code_i64 = i64::from(res_parts.status.as_u16());
         let res_slice: &[u8] = &res_bytes;
 
+        // Persist to SQLite
         sqlx::query(
             r"
             UPDATE idempotency_keys
@@ -249,6 +338,36 @@ pub async fn idempotency_middleware(
         .execute(&state.db)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
+
+        // Cache in Redis with 24-hour TTL (86,400 seconds)
+        if let Some(ref redis) = state.redis {
+            let payload = CachedIdempotencyPayload {
+                status: res_parts.status.as_u16(),
+                headers: headers_to_cache,
+                body: res_bytes.to_vec(),
+                request_hash: request_hash.clone(),
+            };
+            if let Ok(serialized) = serde_json::to_vec(&payload) {
+                if let Err(e) = redis
+                    .cache_idempotency_response(&user_id, &key, &serialized, 86_400)
+                    .await
+                {
+                    tracing::warn!(error = %e, "Failed to cache idempotency response in Redis");
+                }
+            }
+        }
+    }
+
+    // Release Redis distributed in-flight lock
+    if redis_locked {
+        if let Some(ref redis) = state.redis {
+            if let Err(e) = redis
+                .release_idempotency_lock(&user_id, &key, &redis_lock_token)
+                .await
+            {
+                tracing::warn!(error = %e, "Failed to release Redis in-flight lock");
+            }
+        }
     }
 
     let mut response = Response::from_parts(res_parts, Body::from(res_bytes));

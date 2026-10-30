@@ -22,6 +22,9 @@ pub struct AppConfig {
 
     #[serde(default = "default_allowed_origins")]
     pub allowed_origins: String,
+
+    #[serde(default)]
+    pub redis_url: Option<String>,
 }
 
 fn default_database_url() -> String {
@@ -57,6 +60,7 @@ impl Default for AppConfig {
             log_level: default_log_level(),
             jwt_secret: default_jwt_secret(),
             allowed_origins: default_allowed_origins(),
+            redis_url: None,
         }
     }
 }

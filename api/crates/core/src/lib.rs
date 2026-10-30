@@ -3,7 +3,9 @@
 
 pub mod config;
 pub mod crypto;
+pub mod db;
 pub mod domain;
+pub mod redis;
 pub mod telemetry;
 
 pub use config::AppConfig;
@@ -11,6 +13,7 @@ pub use crypto::{
     AesGcmCipher, CipherError, DerivedKey, EncryptedEnvelope, KdfError, KdfService, SecretBytes,
     SecretString,
 };
+pub use db::{migrate_sqlite_to_postgres, DatabaseError, DatabasePool, MigrationReport};
 pub use domain::{
     create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog,
     DecryptedJournalEntry, EncryptedJournalEntry, Habit, HabitAnalyticsService,
@@ -22,6 +25,7 @@ pub use domain::{
     SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
     TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
+pub use redis::{RedisError, RedisService, ReminderNotification, ReminderScheduler};
 
 /// Runs all embedded database migrations against the provided SQLite connection pool.
 ///

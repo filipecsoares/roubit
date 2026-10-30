@@ -83,6 +83,10 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/habits", crate::controllers::habit_routes())
         .nest("/okrs", crate::controllers::okr_routes())
         .nest("/journal", crate::controllers::journal_routes())
+        .route(
+            "/notifications/stream",
+            get(crate::workers::notification_stream_handler),
+        )
         .layer(from_fn_with_state(
             state.clone(),
             crate::middleware::idempotency_middleware,
@@ -144,7 +148,31 @@ pub async fn run_server(
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!(address = %addr, "Roubit server listening");
 
-    let state = AppState::new(pool, config);
+    let redis_service = config.redis_url.as_ref().and_then(|redis_url| {
+        match roubit_core::redis::RedisService::new(redis_url) {
+            Ok(svc) => {
+                tracing::info!(redis_url = %redis_url, "Redis connection pool initialized");
+                Some(svc)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, redis_url = %redis_url, "Failed to initialize Redis pool, falling back to SQLite");
+                None
+            }
+        }
+    });
+
+    let mut state = AppState::new(pool, config);
+    if let Some(redis) = redis_service {
+        state = state.with_redis(redis);
+    }
+
+    // Spawn background reminder worker for Redis keyspace events
+    let _worker_handle = crate::workers::start_reminder_worker(
+        state.config.redis_url.clone(),
+        state.db.clone(),
+        state.tx_notification.clone(),
+    );
+
     let app = build_router(state);
 
     axum::serve(listener, app)
