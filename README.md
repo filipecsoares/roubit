@@ -170,27 +170,29 @@ sudo cp target/release/roubit /usr/local/bin/
 
 #### Daily CLI Commands:
 ```bash
-# 📅 View today's scheduled routine blocks
+# 📅 Routines: Create, activate, list, and transition blocks
+roubit routine create --name "Workday" --blocks "08:00-12:00:Deep Work,12:00-13:00:Lunch,13:00-17:00:Projects" --active
 roubit routine list
-
-# Mark time blocks in-progress or completed
 roubit routine start <BLOCK_ID>
 roubit routine complete <BLOCK_ID>
 
-# ⚡ Record a habit check-in
+# ⚡ Habits: Create, check in, view streaks, archive, or delete
+roubit habit create --name "Meditate" --kind timer --target 20 --unit min
+roubit habit create --name "Hydration" --kind numeric --target 2500 --unit ml
 roubit habit checkin <HABIT_ID> --value 1.0
-
-# View current streaks and consistency
 roubit habit streaks
+roubit habit archive <HABIT_ID>
 
-# 🎯 Inspect quarterly OKRs and progress
+# 🎯 OKRs: Create objectives, add Key Results, inspect progress
+roubit okr create --title "Improve Physical Health" --quarter "2026-Q4"
+roubit okr add-kr --objective-id <OBJ_ID> --title "Run 100km" --target 100 --unit km
 roubit okr list
+roubit okr summary
 
-# 🔒 Write an encrypted journal entry (prompts securely for passphrase)
+# 🔒 Journal: Write encrypted reflections, read, or delete
 roubit journal write --mood 5 --tags "focus,shipping"
-
-# Read today's decrypted journal entry
 roubit journal read
+roubit journal delete --date 2026-10-30
 
 # ⚙️ Migrate SQLite data to PostgreSQL
 roubit admin migrate-to-postgres \

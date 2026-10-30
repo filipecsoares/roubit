@@ -94,6 +94,33 @@ pub enum RoutineSubcommands {
         date: Option<String>,
     },
 
+    /// Create a new routine with optional time blocks.
+    Create {
+        /// Name of the routine.
+        #[arg(short, long, help = "Name of the routine")]
+        name: String,
+
+        /// Comma-separated blocks in format 'HH:MM-HH:MM:Name' (e.g., "08:00-12:00:Deep Work,12:00-13:00:Lunch").
+        #[arg(short, long, help = "Blocks: HH:MM-HH:MM:Name,...")]
+        blocks: Option<String>,
+
+        /// Activate this routine immediately.
+        #[arg(long, help = "Activate this routine")]
+        active: bool,
+    },
+
+    /// Set a routine as the active daily template.
+    Activate {
+        /// Unique ID of the routine to activate.
+        routine_id: String,
+    },
+
+    /// Delete a routine and its time blocks.
+    Delete {
+        /// Unique ID of the routine to delete.
+        routine_id: String,
+    },
+
     /// Mark a scheduled time block as in-progress.
     Start {
         /// Unique ID of the time block to start.
@@ -147,6 +174,29 @@ pub enum HabitSubcommands {
         all: bool,
     },
 
+    /// Create a new habit definition.
+    Create {
+        /// Habit name.
+        #[arg(short, long, help = "Name of the habit")]
+        name: String,
+
+        /// Habit type: binary, numeric, or timer (default: binary).
+        #[arg(short = 'k', long, help = "Habit type (binary, numeric, timer)")]
+        kind: Option<String>,
+
+        /// Daily target value (default: 1.0).
+        #[arg(short = 't', long, help = "Daily target value")]
+        target: Option<f64>,
+
+        /// Unit of measurement (e.g. ml, pages, min).
+        #[arg(short = 'u', long, help = "Unit of measurement")]
+        unit: Option<String>,
+
+        /// Optional habit description.
+        #[arg(long, help = "Habit description")]
+        description: Option<String>,
+    },
+
     /// Record a check-in progress entry for a habit.
     Checkin {
         /// Unique identifier of the habit.
@@ -163,6 +213,18 @@ pub enum HabitSubcommands {
 
     /// Display streak statistics and consistency metrics.
     Streaks,
+
+    /// Archive a habit to hide it from active dashboards.
+    Archive {
+        /// Unique identifier of the habit to archive.
+        habit_id: String,
+    },
+
+    /// Delete a habit and its check-in history.
+    Delete {
+        /// Unique identifier of the habit to delete.
+        habit_id: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +232,7 @@ pub enum HabitSubcommands {
 // ---------------------------------------------------------------------------
 
 /// Arguments for OKR management.
-#[derive(Args, Debug, Clone, PartialEq, Eq)]
+#[derive(Args, Debug, Clone, PartialEq)]
 pub struct OkrArgs {
     /// Action to execute on OKRs.
     #[command(subcommand)]
@@ -178,13 +240,57 @@ pub struct OkrArgs {
 }
 
 /// Supported OKR actions.
-#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+#[derive(Subcommand, Debug, Clone, PartialEq)]
 pub enum OkrSubcommands {
     /// List quarterly objectives and their key results.
     List {
         /// Filter objectives by quarter (e.g. "2026-Q4").
         #[arg(short = 'q', long, help = "Filter by quarter (e.g., 2026-Q4)")]
         quarter: Option<String>,
+    },
+
+    /// Create a new objective.
+    Create {
+        /// Objective title.
+        #[arg(short, long, help = "Objective title")]
+        title: String,
+
+        /// Planning quarter (e.g., 2026-Q4).
+        #[arg(short = 'q', long, help = "Planning quarter (e.g. 2026-Q4)")]
+        quarter: String,
+
+        /// Optional description.
+        #[arg(long, help = "Description")]
+        description: Option<String>,
+    },
+
+    /// Add a Key Result to an existing Objective.
+    AddKr {
+        /// Parent Objective UUID.
+        #[arg(long, help = "Parent objective ID")]
+        objective_id: String,
+
+        /// Key Result title.
+        #[arg(short, long, help = "Key Result title")]
+        title: String,
+
+        /// Target metric value.
+        #[arg(short = 't', long, help = "Target value")]
+        target: f64,
+
+        /// Metric unit (e.g. %, users, km).
+        #[arg(short = 'u', long, help = "Unit")]
+        unit: Option<String>,
+
+        /// Optional linked habit UUID for automated progress roll-up.
+        #[arg(long, help = "Linked habit ID")]
+        habit_id: Option<String>,
+    },
+
+    /// Delete an objective and all its key results.
+    Delete {
+        /// Unique identifier of the objective to delete.
+        objective_id: String,
     },
 
     /// Display a high-level summary of active objectives and progress roll-ups.
@@ -250,6 +356,13 @@ pub enum JournalSubcommands {
         /// Inclusive end date in YYYY-MM-DD format.
         #[arg(long, help = "End date in YYYY-MM-DD format")]
         to: Option<String>,
+    },
+
+    /// Delete an encrypted journal entry for a specific date.
+    Delete {
+        /// Calendar date of the entry to delete in YYYY-MM-DD format.
+        #[arg(long, help = "Target date in YYYY-MM-DD format")]
+        date: String,
     },
 }
 

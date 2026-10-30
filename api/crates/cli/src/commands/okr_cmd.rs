@@ -10,6 +10,7 @@ use crate::args::{OkrArgs, OkrSubcommands};
 ///
 /// # Errors
 /// Returns an error if database access or JSON serialization fails.
+#[allow(clippy::too_many_lines)]
 pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> {
     let repo = SqliteOkrRepository::new(pool.clone());
 
@@ -56,6 +57,92 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
                         );
                     }
                 }
+            }
+        }
+
+        OkrSubcommands::Create {
+            title,
+            quarter,
+            description,
+        } => {
+            let today = chrono::Local::now().date_naive();
+            let quarter_end = today + chrono::Duration::days(90);
+            let objective =
+                roubit_core::Objective::new(title, description, quarter, today, quarter_end);
+
+            repo.create_objective(&objective)
+                .await
+                .context("failed to create objective")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&objective)?);
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Objective '{}' [{}] created successfully (id: {}).",
+                    objective.title, objective.quarter, objective.id
+                ));
+            }
+        }
+
+        OkrSubcommands::AddKr {
+            objective_id,
+            title,
+            target,
+            unit,
+            habit_id,
+        } => {
+            let obj_uuid = uuid::Uuid::parse_str(&objective_id)
+                .with_context(|| format!("Invalid UUID: '{objective_id}'"))?;
+
+            let linked_uuid = habit_id.and_then(|h| uuid::Uuid::parse_str(&h).ok());
+
+            let kr = if let Some(h_id) = linked_uuid {
+                roubit_core::KeyResult::new_habit_linked(
+                    obj_uuid,
+                    h_id,
+                    title,
+                    target,
+                    unit.unwrap_or_else(|| "%".to_string()),
+                    1.0,
+                )
+            } else {
+                roubit_core::KeyResult::new_numeric(
+                    obj_uuid,
+                    title,
+                    0.0,
+                    target,
+                    unit.unwrap_or_else(|| "%".to_string()),
+                    1.0,
+                )
+            };
+
+            repo.create_key_result(&kr)
+                .await
+                .context("failed to create key result")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&kr)?);
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Key Result '{}' added to objective {} (target: {:.1} {}).",
+                    kr.title, obj_uuid, kr.target_value, kr.unit
+                ));
+            }
+        }
+
+        OkrSubcommands::Delete { objective_id } => {
+            let id = uuid::Uuid::parse_str(&objective_id)
+                .with_context(|| format!("Invalid UUID: '{objective_id}'"))?;
+            repo.delete_objective(id)
+                .await
+                .context("failed to delete objective")?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "deleted": true, "objective_id": id })
+                );
+            } else {
+                crate::ui::TerminalUi::print_success(&format!("Objective {id} deleted."));
             }
         }
 

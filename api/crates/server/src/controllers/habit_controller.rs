@@ -192,9 +192,27 @@ pub async fn record_checkin(
     Ok((StatusCode::OK, Json(CheckinResponse { log, streak })))
 }
 
+/// Handler for `DELETE /api/v1/habits/:id`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] on db error.
+pub async fn delete_habit(
+    State(state): State<AppState>,
+    _user: AuthenticatedUser,
+    Path(habit_id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let repo = SqliteHabitRepository::new(state.db);
+    repo.delete_habit(habit_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+}
+
 /// Constructs router for habit endpoints
 pub fn habit_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_habits).post(create_habit))
         .route("/{id}/checkin", post(record_checkin))
+        .route("/{id}", axum::routing::delete(delete_habit))
 }

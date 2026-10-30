@@ -47,6 +47,76 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
             }
         }
 
+        HabitSubcommands::Create {
+            name,
+            kind,
+            target,
+            unit,
+            description,
+        } => {
+            let habit_type = match kind.as_deref().unwrap_or("binary").to_lowercase().as_str() {
+                "numeric" => roubit_core::HabitType::Numeric,
+                "timer" => roubit_core::HabitType::Timer,
+                _ => roubit_core::HabitType::Binary,
+            };
+
+            let habit = roubit_core::Habit {
+                id: Uuid::new_v4(),
+                name,
+                description,
+                habit_type,
+                target_value: target.unwrap_or(1.0),
+                unit,
+                frequency_days: 0b0111_1111,
+                is_archived: false,
+                color_hex: "#10B981".to_string(),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            };
+
+            repo.create_habit(&habit)
+                .await
+                .context("failed to create habit")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&habit)?);
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Habit '{}' created successfully (id: {}).",
+                    habit.name, habit.id
+                ));
+            }
+        }
+
+        HabitSubcommands::Archive { habit_id } => {
+            let id = Uuid::parse_str(&habit_id)
+                .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
+            repo.archive_habit(id)
+                .await
+                .context("failed to archive habit")?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "archived": true, "habit_id": id })
+                );
+            } else {
+                crate::ui::TerminalUi::print_success(&format!("Habit {id} archived."));
+            }
+        }
+
+        HabitSubcommands::Delete { habit_id } => {
+            let id = Uuid::parse_str(&habit_id)
+                .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
+            repo.delete_habit(id)
+                .await
+                .context("failed to delete habit")?;
+            if json {
+                println!("{}", serde_json::json!({ "deleted": true, "habit_id": id }));
+            } else {
+                crate::ui::TerminalUi::print_success(&format!("Habit {id} deleted."));
+            }
+        }
+
         HabitSubcommands::Checkin {
             habit_id,
             value,

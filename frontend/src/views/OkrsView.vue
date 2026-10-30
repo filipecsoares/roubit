@@ -129,6 +129,18 @@ async function handleCreateObjective(payload: {
   }
 }
 
+async function handleDeleteObjective(objectiveId: string) {
+  const obj = okrStore.objectives.find((o) => o.objective.id === objectiveId)
+  const title = obj?.objective.title || 'este objetivo'
+  if (!confirm(`Tem certeza que deseja excluir "${title}" e todos os seus Resultados-Chave?`)) return
+  try {
+    await okrStore.deleteObjective(objectiveId)
+    showToast(`Objetivo "${title}" excluído com sucesso.`)
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao excluir objetivo', 'error')
+  }
+}
+
 onMounted(async () => {
   try {
     await Promise.allSettled([
@@ -264,6 +276,7 @@ onMounted(async () => {
           :key-results="item.key_results"
           :habits-map="habitsMap"
           @link-habit="openLinkModal"
+          @delete="handleDeleteObjective"
         />
       </div>
     </section>

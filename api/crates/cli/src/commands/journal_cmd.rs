@@ -142,6 +142,38 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 }
             }
         }
+
+        JournalSubcommands::Delete { date } => {
+            let target_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                .with_context(|| format!("Invalid date format '{date}'. Expected YYYY-MM-DD"))?;
+
+            if let Some(entry) = repo
+                .get_entry_by_date(target_date)
+                .await
+                .context("failed to check journal entry")?
+            {
+                repo.delete_entry(entry.metadata.id)
+                    .await
+                    .context("failed to delete journal entry")?;
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({ "deleted": true, "date": date, "id": entry.metadata.id })
+                    );
+                } else {
+                    crate::ui::TerminalUi::print_success(&format!(
+                        "Journal entry for {date} deleted."
+                    ));
+                }
+            } else if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "deleted": false, "message": "not found" })
+                );
+            } else {
+                println!("No journal entry found for {date}.");
+            }
+        }
     }
 
     Ok(())

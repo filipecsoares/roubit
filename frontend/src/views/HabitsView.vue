@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Flame, Plus, Sparkles, Trophy, Check, AlertCircle } from 'lucide-vue-next'
+import { Flame, Plus, Sparkles, Trophy, Check, AlertCircle, Trash2 } from 'lucide-vue-next'
 import { useHabitStore } from '@/stores/habit'
 import StreakBadge from '@/components/habits/StreakBadge.vue'
 import HeatmapCalendar from '@/components/habits/HeatmapCalendar.vue'
@@ -89,6 +89,16 @@ async function handleCheckin(habitId: string, isCompletedCurrently: boolean) {
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
     showToast(err.message || 'Erro ao registrar check-in', 'error')
+  }
+}
+
+async function handleDeleteHabit(habitId: string, habitName: string) {
+  if (!confirm(`Tem certeza que deseja excluir o hábito "${habitName}"?`)) return
+  try {
+    await habitStore.deleteHabit(habitId)
+    showToast(`Hábito "${habitName}" excluído com sucesso.`)
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao excluir hábito', 'error')
   }
 }
 
@@ -219,20 +229,31 @@ onMounted(() => {
               Meta: {{ item.habit.target_value }} {{ item.habit.unit || (item.habit.habit_type === 'binary' ? 'check' : '') }}
             </span>
 
-            <button
-              type="button"
-              @click="handleCheckin(item.habit.id, item.streak.is_active_today)"
-              :disabled="habitStore.loading"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95"
-              :class="
-                item.streak.is_active_today
-                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                  : 'bg-surface-border/60 hover:bg-slate-700 text-slate-300 hover:text-white'
-              "
-            >
-              <Check class="w-3.5 h-3.5" />
-              {{ item.streak.is_active_today ? 'Concluído' : 'Check-in' }}
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click.stop="handleDeleteHabit(item.habit.id, item.habit.name)"
+                title="Excluir hábito"
+                class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                @click="handleCheckin(item.habit.id, item.streak.is_active_today)"
+                :disabled="habitStore.loading"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95"
+                :class="
+                  item.streak.is_active_today
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                    : 'bg-surface-border/60 hover:bg-slate-700 text-slate-300 hover:text-white'
+                "
+              >
+                <Check class="w-3.5 h-3.5" />
+                {{ item.streak.is_active_today ? 'Concluído' : 'Check-in' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
