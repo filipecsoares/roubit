@@ -34,6 +34,9 @@ pub trait HabitRepository: Send + Sync {
     /// Lists all active (non-archived) habits.
     async fn list_active_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError>;
 
+    /// Lists all habits, including archived ones.
+    async fn list_all_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError>;
+
     /// Atomically records a daily check-in for a habit.
     ///
     /// If `is_increment` is `true`, `value` is added to the existing `actual_value` for that date.
@@ -129,6 +132,20 @@ impl HabitRepository for SqliteHabitRepository {
             SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
             FROM habits
             WHERE is_archived = 0
+            ORDER BY created_at ASC
+            ",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(habits)
+    }
+
+    async fn list_all_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError> {
+        let habits = sqlx::query_as::<_, Habit>(
+            r"
+            SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            FROM habits
             ORDER BY created_at ASC
             ",
         )

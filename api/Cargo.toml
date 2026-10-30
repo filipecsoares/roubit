@@ -24,6 +24,13 @@ anyhow = "1.0"
 async-trait = "0.1"
 dotenvy = "0.15"
 envy = "0.4"
+clap = { version = "~4.5.30", features = ["derive", "env", "cargo"] }
+comfy-table = "7.1"
+colored = "2.2"
+indicatif = "0.17"
+rpassword = "7.3"
+tempfile = "3.17"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # Cryptography & Memory Security
 aes-gcm = "0.10"
@@ -34,6 +41,8 @@ hex-literal = "0.4"
 
 # Benchmarking & Testing
 criterion = { version = "0.5", features = ["html_reports"] }
+assert_cmd = "2.0"
+predicates = "3.1"
 
 # Database & Persistence
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate", "macros"] }

@@ -9,6 +9,10 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[lib]
+name = "roubit"
+path = "src/lib.rs"
+
 [[bin]]
 name = "roubit"
 path = "src/main.rs"
@@ -19,3 +23,21 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+sqlx.workspace = true
+comfy-table.workspace = true
+colored.workspace = true
+indicatif.workspace = true
+rpassword.workspace = true
+tempfile.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
