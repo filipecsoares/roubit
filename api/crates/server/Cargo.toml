@@ -35,6 +35,7 @@ jsonwebtoken.workspace = true
 argon2.workspace = true
 zeroize.workspace = true
 chrono.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 reqwest.workspace = true

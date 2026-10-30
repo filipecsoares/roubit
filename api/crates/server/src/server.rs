@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use axum::{
     http::{HeaderName, StatusCode, Uri},
-    middleware::from_fn,
+    middleware::{from_fn, from_fn_with_state},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -77,7 +77,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/login", post(crate::auth::login))
         .route("/me", get(crate::auth::me));
 
-    let api_v1 = Router::new().nest("/auth", auth_routes);
+    let api_v1 = Router::new()
+        .nest("/auth", auth_routes)
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::middleware::idempotency_middleware,
+        ));
 
     Router::new()
         .route("/health", get(health_check))
@@ -483,10 +488,115 @@ mod tests {
             .body(Body::empty())
             .expect("Failed to build request");
 
-        let me_cookie_res = build_router(state)
+        let me_cookie_res = build_router(state.clone())
             .oneshot(me_cookie_req)
             .await
             .expect("Failed to execute");
         assert_eq!(me_cookie_res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_idempotency_key_replay_and_mismatch() {
+        let pool = create_sqlite_pool("sqlite::memory:")
+            .await
+            .expect("Failed to create memory db");
+        roubit_core::run_migrations(&pool)
+            .await
+            .expect("Failed to apply migrations");
+        let config = AppConfig::default();
+        let state = AppState::new(pool, config);
+
+        let idempotency_key = "test-key-uuid-123456";
+        let payload1 = serde_json::to_string(&crate::auth::RegisterRequest {
+            email: "idempotent_user@roubit.app".to_string(),
+            password: "supersecurepassword123".to_string(),
+        })
+        .expect("Valid JSON");
+
+        // First call: initial execution -> 201 Created, X-Cache: MISS
+        let req1 = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .header("idempotency-key", idempotency_key)
+            .body(Body::from(payload1.clone()))
+            .expect("Failed to build request");
+
+        let res1 = build_router(state.clone())
+            .oneshot(req1)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res1.status(), StatusCode::CREATED);
+        assert_eq!(
+            res1.headers().get("x-cache").and_then(|v| v.to_str().ok()),
+            Some("MISS")
+        );
+
+        let body1 = to_bytes(res1.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let auth1: crate::auth::AuthResponse = serde_json::from_slice(&body1).expect("Valid JSON");
+
+        // Second call with EXACT SAME key and payload -> returns cached response (201 Created, X-Cache: HIT)
+        let req2 = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .header("idempotency-key", idempotency_key)
+            .body(Body::from(payload1))
+            .expect("Failed to build request");
+
+        let res2 = build_router(state.clone())
+            .oneshot(req2)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res2.status(), StatusCode::CREATED);
+        assert_eq!(
+            res2.headers().get("x-cache").and_then(|v| v.to_str().ok()),
+            Some("HIT")
+        );
+
+        let body2 = to_bytes(res2.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let auth2: crate::auth::AuthResponse = serde_json::from_slice(&body2).expect("Valid JSON");
+        assert_eq!(auth1, auth2);
+
+        // Third call with SAME key but DIFFERENT payload -> 409 Conflict
+        let payload_different = serde_json::to_string(&crate::auth::RegisterRequest {
+            email: "different_user@roubit.app".to_string(),
+            password: "anotherpassword123".to_string(),
+        })
+        .expect("Valid JSON");
+
+        let req3 = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .header("idempotency-key", idempotency_key)
+            .body(Body::from(payload_different))
+            .expect("Failed to build request");
+
+        let res3 = build_router(state.clone())
+            .oneshot(req3)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res3.status(), StatusCode::CONFLICT);
+
+        // Fourth call with key > 64 chars -> 400 Bad Request
+        let long_key = "a".repeat(65);
+        let req_long_key = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .header("idempotency-key", long_key)
+            .body(Body::from("{}"))
+            .expect("Failed to build request");
+
+        let res_long = build_router(state)
+            .oneshot(req_long_key)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res_long.status(), StatusCode::BAD_REQUEST);
     }
 }

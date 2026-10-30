@@ -87,10 +87,10 @@ flowchart TD
   - [x] Hash de senha via Argon2id.
   - [x] Emissão e validação de tokens JWT / Cookies seguros (`HttpOnly`, `Secure`, `SameSite=Strict`).
   - [x] Extractor personalizado do Axum para autenticação e injeção do usuário autenticado no contexto dos handlers.
-- [ ] **2.3 Middleware de Idempotência Transacional (RF05)**
-  - [ ] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
-  - [ ] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).
-  - [ ] Garantia de bloqueio para requisições concorrentes idênticas e retorno de resposta cacheada para reenvios.
+- [x] **2.3 Middleware de Idempotência Transacional (RF05)**
+  - [x] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
+  - [x] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).
+  - [x] Garantia de bloqueio para requisições concorrentes idênticas e retorno de resposta cacheada para reenvios.
 - [ ] **2.4 Endpoints da API REST (Rotas e Controladores)**
   - [ ] **Rotinas:** `GET /api/v1/routines`, `POST /api/v1/routines`, `POST /api/v1/routines/blocks/:id/complete`.
   - [ ] **Hábitos:** `GET /api/v1/habits`, `POST /api/v1/habits`, `POST /api/v1/habits/:id/checkin` (com suporte a Idempotency-Key).

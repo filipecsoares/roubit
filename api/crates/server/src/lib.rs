@@ -11,7 +11,10 @@ pub use auth::{
     Claims, LoginRequest, RegisterRequest, UserDto,
 };
 pub use errors::{ApiError, ProblemDetails};
-pub use middleware::{build_cors_layer, security_headers_middleware, IDEMPOTENCY_KEY_HEADER};
+pub use middleware::{
+    build_cors_layer, idempotency_middleware, purge_expired_keys, security_headers_middleware,
+    IDEMPOTENCY_KEY_HEADER, X_CACHE_HEADER,
+};
 pub use server::{
     build_router, fallback_handler, health_check, run_server, shutdown_signal, HealthResponse,
     REQUEST_ID_HEADER,
