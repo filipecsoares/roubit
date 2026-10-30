@@ -73,6 +73,20 @@ export const useHabitStore = defineStore('habit', () => {
     }
   }
 
+  async function deleteHabit(habitId: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      await apiClient.delete(`/habits/${habitId}`)
+      habits.value = habits.value.filter((h) => h.habit.id !== habitId)
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Erro ao excluir hábito'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     habits,
     loading,
@@ -80,5 +94,6 @@ export const useHabitStore = defineStore('habit', () => {
     fetchHabits,
     createHabit,
     checkin,
+    deleteHabit,
   }
 })

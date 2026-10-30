@@ -14,7 +14,7 @@ use crate::args::{RoutineArgs, RoutineSubcommands};
 ///
 /// # Errors
 /// Returns an error if database access or JSON serialization fails.
-#[allow(clippy::option_if_let_else)]
+#[allow(clippy::too_many_lines, clippy::option_if_let_else)]
 pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<()> {
     let repo = SqliteRoutineRepository::new(pool.clone());
 
@@ -86,6 +86,118 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                 json,
             )
             .await?;
+        }
+
+        RoutineSubcommands::Create {
+            name,
+            blocks,
+            active,
+        } => {
+            let routine_id = Uuid::new_v4();
+            let mut domain_blocks = Vec::new();
+
+            if let Some(blocks_str) = blocks {
+                for (idx, part) in blocks_str.split(',').enumerate() {
+                    let segments: Vec<&str> = part.split(':').collect();
+                    if segments.len() >= 2 {
+                        let times: Vec<&str> = segments[0].split('-').collect();
+                        if times.len() == 2 {
+                            let start = chrono::NaiveTime::parse_from_str(times[0].trim(), "%H:%M")
+                                .with_context(|| format!("invalid start time {}", times[0]))?;
+                            let end = chrono::NaiveTime::parse_from_str(times[1].trim(), "%H:%M")
+                                .with_context(|| format!("invalid end time {}", times[1]))?;
+                            let block_name = segments[1..].join(":").trim().to_string();
+
+                            domain_blocks.push(roubit_core::TimeBlock {
+                                id: Uuid::new_v4(),
+                                routine_id,
+                                name: block_name,
+                                start_time: start,
+                                end_time: end,
+                                category: "General".to_string(),
+                                color_hex: "#6366F1".to_string(),
+                                order_index: i32::try_from(idx).unwrap_or(0),
+                                created_at: chrono::Utc::now(),
+                            });
+                        }
+                    }
+                }
+            }
+
+            if !domain_blocks.is_empty() {
+                roubit_core::TimeBlockValidator::validate_schedule(&domain_blocks)
+                    .context("invalid time blocks schedule")?;
+            }
+
+            let routine = roubit_core::Routine {
+                id: routine_id,
+                name,
+                description: None,
+                is_active: active,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            };
+
+            repo.create_routine_with_blocks(&routine, &domain_blocks)
+                .await
+                .context("failed to create routine")?;
+
+            if active {
+                let _ = repo.set_active_routine(routine_id).await;
+            }
+
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "routine": routine,
+                        "blocks_count": domain_blocks.len()
+                    })
+                );
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Routine '{}' created with {} block(s) (id: {}).",
+                    routine.name,
+                    domain_blocks.len(),
+                    routine.id
+                ));
+            }
+        }
+
+        RoutineSubcommands::Activate { routine_id } => {
+            let id = Uuid::parse_str(&routine_id)
+                .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
+            repo.set_active_routine(id)
+                .await
+                .context("failed to activate routine")?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "activated": true, "routine_id": id })
+                );
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Routine {id} activated successfully."
+                ));
+            }
+        }
+
+        RoutineSubcommands::Delete { routine_id } => {
+            let id = Uuid::parse_str(&routine_id)
+                .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
+            repo.delete_routine(id)
+                .await
+                .context("failed to delete routine")?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "deleted": true, "routine_id": id })
+                );
+            } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Routine {id} deleted successfully."
+                ));
+            }
         }
 
         RoutineSubcommands::Skip { block_id, date } => {

@@ -217,9 +217,27 @@ pub async fn complete_block(
     ))
 }
 
+/// Handler for `DELETE /api/v1/routines/:id`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] on db error.
+pub async fn delete_routine(
+    State(state): State<AppState>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let repo = SqliteRoutineRepository::new(state.db);
+    repo.delete_routine(id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+}
+
 /// Constructs router for routine endpoints
 pub fn routine_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_routine).post(create_routine))
+        .route("/{id}", axum::routing::delete(delete_routine))
         .route("/blocks/{id}/complete", post(complete_block))
 }

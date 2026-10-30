@@ -58,6 +58,20 @@ export const useOkrStore = defineStore('okr', () => {
     }
   }
 
+  async function deleteObjective(objectiveId: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      await apiClient.delete(`/okrs/${objectiveId}`)
+      objectives.value = objectives.value.filter((o) => o.objective.id !== objectiveId)
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Erro ao excluir objetivo'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     objectives,
     quarter,
@@ -65,5 +79,6 @@ export const useOkrStore = defineStore('okr', () => {
     error,
     fetchOkrs,
     createObjective,
+    deleteObjective,
   }
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChevronDown, ChevronUp, Target } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Target, Trash2 } from 'lucide-vue-next'
 import KeyResultProgressBar from './KeyResultProgressBar.vue'
 import type { Objective, KeyResult } from '@/types'
 
@@ -17,6 +17,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'linkHabit', krId: string): void
+  (e: 'delete', objectiveId: string): void
 }>()
 
 const isExpanded = ref(true)
@@ -80,6 +81,15 @@ const badgeStatusClasses = computed(() => {
             />
           </div>
         </div>
+
+        <button
+          type="button"
+          @click.stop="emit('delete', objective.id)"
+          title="Excluir objetivo"
+          class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+        >
+          <Trash2 class="w-4 h-4" />
+        </button>
 
         <button
           type="button"

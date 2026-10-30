@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Sparkles,
   KeyRound,
+  Trash2,
 } from 'lucide-vue-next'
 import { useVaultStore } from '@/stores/vault'
 import { useJournalStore } from '@/stores/journal'
@@ -61,6 +62,25 @@ function changeDate(daysOffset: number) {
 function setToday() {
   entryDate.value = todayStr
   loadEntryForDate()
+}
+
+const hasEntryForCurrentDate = computed(() => {
+  return journalStore.metadataList.some((m) => m.entry_date === entryDate.value)
+})
+
+async function handleDeleteEntry() {
+  const meta = journalStore.metadataList.find((m) => m.entry_date === entryDate.value)
+  if (!meta) return
+  if (!confirm(`Tem certeza que deseja excluir a reflexão do dia ${entryDate.value}?`)) return
+  try {
+    await journalStore.deleteEntry(meta.id)
+    plaintextReflection.value = ''
+    moodScore.value = 3
+    tags.value = []
+    showToast(`Entrada do dia ${entryDate.value} excluída com sucesso.`)
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao excluir reflexão', 'error')
+  }
 }
 
 async function loadEntryForDate() {
@@ -250,13 +270,25 @@ onMounted(async () => {
           </button>
         </div>
 
-        <button
-          type="button"
-          @click="setToday"
-          class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-border/40 transition-colors"
-        >
-          Hoje
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="hasEntryForCurrentDate"
+            type="button"
+            @click="handleDeleteEntry"
+            title="Excluir reflexão deste dia"
+            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+          >
+            <Trash2 class="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            @click="setToday"
+            class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-border/40 transition-colors"
+          >
+            Hoje
+          </button>
+        </div>
       </div>
 
       <!-- Journal Editor -->

@@ -1,7 +1,7 @@
 //! OKRs & Goal Alignment REST API Controllers (RF03)
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -149,7 +149,26 @@ pub async fn create_objective(
     ))
 }
 
+/// Handler for `DELETE /api/v1/okrs/:id`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] on db error.
+pub async fn delete_objective(
+    State(state): State<AppState>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let repo = SqliteOkrRepository::new(state.db);
+    repo.delete_objective(id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+}
+
 /// Constructs router for OKR endpoints
 pub fn okr_routes() -> Router<AppState> {
-    Router::new().route("/", get(list_okrs).post(create_objective))
+    Router::new()
+        .route("/", get(list_okrs).post(create_objective))
+        .route("/{id}", axum::routing::delete(delete_objective))
 }
