@@ -11,8 +11,16 @@ import {
   Coffee,
   Clock,
   Flame,
+  PenLine,
 } from 'lucide-vue-next'
-import { useFocusStore } from '@/stores/focus'
+import {
+  useFocusStore,
+  POMODORO_FOCUS_SECONDS,
+  POMODORO_LONG_FOCUS_SECONDS,
+  POMODORO_SHORT_BREAK_SECONDS,
+  POMODORO_LONG_BREAK_SECONDS,
+} from '@/stores/focus'
+import { useRoutineStore } from '@/stores/routine'
 
 const props = withDefaults(
   defineProps<{
@@ -30,6 +38,7 @@ const emit = defineEmits<{
 }>()
 
 const focusStore = useFocusStore()
+const routineStore = useRoutineStore()
 
 const radius = computed(() => (props.size - props.strokeWidth) / 2)
 const circumference = computed(() => 2 * Math.PI * radius.value)
@@ -46,7 +55,7 @@ const modeTitle = computed(() => {
 
 const modeSubtitle = computed(() => {
   if (focusStore.isBreak) return 'Relaxe a mente, hidrate-se e descanse a visão'
-  if (focusStore.associatedBlockName) return `Focando em: ${focusStore.associatedBlockName}`
+  if (focusStore.associatedBlockId) return `Rotina: ${focusStore.associatedBlockName}`
   return 'Elimine distrações e concentre-se na tarefa atual'
 })
 
@@ -58,7 +67,12 @@ const progressColor = computed(() => {
 
 function handleCompleteBlock() {
   if (focusStore.associatedBlockId) {
-    emit('completeBlock', focusStore.associatedBlockId)
+    const blockId = focusStore.associatedBlockId
+    emit('completeBlock', blockId)
+    focusStore.associatedBlockId = undefined
+    focusStore.associatedBlockName = undefined
+    focusStore.closeFocusModal()
+    routineStore.completeBlock(blockId, 'completed').catch(() => {})
   }
 }
 
@@ -95,10 +109,10 @@ onUnmounted(() => {
       @click="focusStore.closeFocusModal"
     >
       <div
-        class="relative w-full max-w-lg rounded-3xl bg-surface-card/90 border border-surface-border/80 shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center space-y-6 max-h-[95vh] overflow-y-auto glow-card"
+        class="relative w-full max-w-lg rounded-3xl bg-surface-card/90 border border-surface-border/80 shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center space-y-5 max-h-[95vh] overflow-y-auto glow-card"
         @click.stop
       >
-        <!-- Top bar: Close/minimize button -->
+        <!-- Top bar: Close/minimize button & Badges -->
         <div class="w-full flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span
@@ -134,18 +148,90 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <!-- Block Context info -->
-        <div class="space-y-1">
-          <h2 class="text-xl sm:text-2xl font-extrabold text-white font-outfit tracking-tight">
-            {{ focusStore.associatedBlockName || 'Sessão de Foco' }}
-          </h2>
-          <p class="text-xs sm:text-sm text-slate-400 max-w-sm">
-            {{ modeSubtitle }}
-          </p>
+        <!-- Task / Focus Title -->
+        <div class="w-full space-y-1">
+          <div v-if="focusStore.associatedBlockId" class="space-y-0.5">
+            <h2 class="text-xl sm:text-2xl font-extrabold text-white font-outfit tracking-tight truncate">
+              {{ focusStore.associatedBlockName }}
+            </h2>
+            <p class="text-xs text-brand-300 flex items-center justify-center gap-1 font-medium">
+              <Clock class="w-3 h-3" /> Bloco da sua rotina diária
+            </p>
+          </div>
+          <div v-else class="space-y-1">
+            <div class="relative max-w-sm mx-auto">
+              <input
+                v-model="focusStore.associatedBlockName"
+                type="text"
+                placeholder="Foco Livre (clique para nomear tarefa)"
+                class="w-full text-center text-lg sm:text-xl font-bold text-white bg-surface-dark/50 hover:bg-surface-dark/80 focus:bg-surface-dark border border-surface-border/60 focus:border-brand-500 rounded-xl px-3 py-1.5 placeholder:text-slate-500 transition-all outline-none"
+              />
+              <PenLine class="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+            </div>
+            <p class="text-xs text-slate-400">
+              {{ modeSubtitle }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Preset Selection Pills (Accessible anytime, ideal when idle/paused) -->
+        <div class="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+          <button
+            type="button"
+            @click="focusStore.selectPreset('pomodoro', POMODORO_FOCUS_SECONDS)"
+            title="Sessão padrão de 25 minutos"
+            class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
+            :class="
+              focusStore.mode === 'pomodoro' && focusStore.durationSeconds === POMODORO_FOCUS_SECONDS
+                ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
+                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+            "
+          >
+            Pomodoro (25m)
+          </button>
+          <button
+            type="button"
+            @click="focusStore.selectPreset('pomodoro', POMODORO_LONG_FOCUS_SECONDS)"
+            title="Sessão profunda de 50 minutos"
+            class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
+            :class="
+              focusStore.mode === 'pomodoro' && focusStore.durationSeconds === POMODORO_LONG_FOCUS_SECONDS
+                ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
+                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+            "
+          >
+            Foco Profundo (50m)
+          </button>
+          <button
+            type="button"
+            @click="focusStore.selectPreset('short_break', POMODORO_SHORT_BREAK_SECONDS)"
+            title="Pausa curta de 5 minutos"
+            class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
+            :class="
+              focusStore.mode === 'short_break'
+                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+            "
+          >
+            Pausa (5m)
+          </button>
+          <button
+            type="button"
+            @click="focusStore.selectPreset('long_break', POMODORO_LONG_BREAK_SECONDS)"
+            title="Pausa longa de 15 minutos"
+            class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
+            :class="
+              focusStore.mode === 'long_break'
+                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+            "
+          >
+            Pausa Longa (15m)
+          </button>
         </div>
 
         <!-- Circular Countdown Gauge -->
-        <div class="relative flex items-center justify-center my-2" :style="{ width: `${size}px`, height: `${size}px` }">
+        <div class="relative flex items-center justify-center my-1" :style="{ width: `${size}px`, height: `${size}px` }">
           <svg class="transform -rotate-90" :width="size" :height="size">
             <!-- Background circle track -->
             <circle
@@ -249,7 +335,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <!-- Bottom Actions (Complete routine block if tied to one) -->
+        <!-- Bottom Actions -->
         <div
           v-if="focusStore.associatedBlockId"
           class="w-full pt-4 border-t border-surface-border/60 flex items-center justify-between gap-3 text-xs"
@@ -268,6 +354,12 @@ onUnmounted(() => {
             <CheckCircle2 class="w-3.5 h-3.5" />
             <span>Concluir Bloco</span>
           </button>
+        </div>
+
+        <div v-else class="w-full pt-3 border-t border-surface-border/60 text-center">
+          <p class="text-[11px] text-slate-500">
+            Dica: use <kbd class="px-1.5 py-0.5 rounded bg-surface-dark border border-surface-border font-mono text-slate-400">Espaço</kbd> para pausar/retomar e <kbd class="px-1.5 py-0.5 rounded bg-surface-dark border border-surface-border font-mono text-slate-400">Esc</kbd> para minimizar.
+          </p>
         </div>
       </div>
     </div>

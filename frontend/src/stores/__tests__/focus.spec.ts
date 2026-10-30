@@ -120,4 +120,24 @@ describe('useFocusStore (Pomodoro & Focus Mode Engine)', () => {
     store.closeFocusModal()
     expect(store.isModalOpen).toBe(false)
   })
+
+  it('supports standalone focus without any routine or block', () => {
+    const store = useFocusStore()
+
+    store.openFocusModal() // No block argument
+    expect(store.isModalOpen).toBe(true)
+    expect(store.associatedBlockId).toBeUndefined()
+    expect(store.associatedBlockName).toBe('Foco Livre')
+
+    // Allows renaming the custom focus objective
+    store.setCustomBlockName('Estudar Arquitetura Hexagonal')
+    expect(store.associatedBlockName).toBe('Estudar Arquitetura Hexagonal')
+
+    // Allows choosing presets freely
+    store.selectPreset('pomodoro', 50 * 60)
+    expect(store.durationSeconds).toBe(3000)
+    expect(store.remainingSeconds).toBe(3000)
+    expect(store.formattedTime).toBe('50:00')
+    expect(store.state).toBe('idle')
+  })
 })

@@ -94,4 +94,33 @@ describe('FocusModeModal.vue', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
     expect(closeSpy).toHaveBeenCalledTimes(2)
   })
+
+  it('renders and supports standalone focus mode without routines', async () => {
+    const focusStore = useFocusStore()
+    focusStore.openFocusModal() // Standalone, no block
+
+    const wrapper = mountModal()
+
+    // Standalone custom input should be present
+    const taskInput = wrapper.find('input[placeholder*="Foco Livre"]')
+    expect(taskInput.exists()).toBe(true)
+    expect((taskInput.element as HTMLInputElement).value).toBe('Foco Livre')
+
+    // Preset pills should be rendered
+    const deepFocusBtn = wrapper.find('button[title*="50 minutos"]')
+    expect(deepFocusBtn.exists()).toBe(true)
+    await deepFocusBtn.trigger('click')
+
+    expect(focusStore.durationSeconds).toBe(3000)
+    expect(wrapper.text()).toContain('50:00')
+
+    // Preset short break pill
+    const shortBreakBtn = wrapper.find('button[title*="Pausa curta"]')
+    expect(shortBreakBtn.exists()).toBe(true)
+    await shortBreakBtn.trigger('click')
+
+    expect(focusStore.mode).toBe('short_break')
+    expect(focusStore.durationSeconds).toBe(300)
+    expect(wrapper.text()).toContain('05:00')
+  })
 })

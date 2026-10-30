@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { Timer } from 'lucide-vue-next'
 import AppNavbar from '@/components/common/AppNavbar.vue'
+import FocusModeModal from '@/components/dashboard/FocusModeModal.vue'
+import { useFocusStore } from '@/stores/focus'
+
+const focusStore = useFocusStore()
 </script>
 
 <template>
@@ -15,6 +20,27 @@ import AppNavbar from '@/components/common/AppNavbar.vue'
         </transition>
       </router-view>
     </main>
+
+    <!-- Global Floating Focus Pill (When timer is running in background) -->
+    <div
+      v-if="focusStore.isRunning && !focusStore.isModalOpen"
+      @click="focusStore.openFocusModal()"
+      class="fixed bottom-20 md:bottom-8 right-4 sm:right-6 z-40 bg-surface-card/95 border border-brand-500/50 shadow-2xl shadow-brand-500/20 rounded-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-xl cursor-pointer hover:scale-105 transition-all animate-bounce-short"
+      title="Retornar ao Modo Foco"
+    >
+      <div class="p-2 rounded-xl bg-brand-500/20 text-brand-300">
+        <Timer class="w-4 h-4 animate-spin" style="animation-duration: 4s;" />
+      </div>
+      <div class="flex flex-col text-left">
+        <span class="text-xs font-bold text-white font-mono tracking-tight">{{ focusStore.formattedTime }}</span>
+        <span class="text-[10px] text-brand-300 font-medium -mt-0.5 truncate max-w-[140px]">
+          {{ focusStore.isBreak ? 'Pausa Ativa' : (focusStore.associatedBlockName || 'Foco Livre') }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Global Focus Mode Modal -->
+    <FocusModeModal />
   </div>
 </template>
 

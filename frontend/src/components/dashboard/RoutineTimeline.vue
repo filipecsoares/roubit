@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar, Plus } from 'lucide-vue-next'
+import { Calendar, Plus, Timer } from 'lucide-vue-next'
 import TimeBlockCard from './TimeBlockCard.vue'
 import type { TimeBlock, BlockStatusType } from '@/types'
 
@@ -23,7 +23,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'complete', blockId: string, status: BlockStatusType): void
   (e: 'openCreate'): void
-  (e: 'openFocus', block: TimeBlock): void
+  (e: 'openFocus', block?: TimeBlock): void
 }>()
 
 const sortedBlocks = computed(() => {
@@ -44,17 +44,25 @@ const sortedBlocks = computed(() => {
       <div class="max-w-xs mx-auto">
         <h3 class="text-sm font-medium text-white">Nenhum bloco de rotina ativo</h3>
         <p class="text-xs text-slate-400 mt-1">
-          Estruture seus blocos de foco e rotina diária para manter sua produtividade.
+          Estruture seus blocos de rotina diária ou use o Modo Foco a qualquer momento.
         </p>
       </div>
-      <div>
+      <div class="flex items-center justify-center gap-2 flex-wrap pt-1">
         <button
           type="button"
           @click="emit('openCreate')"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/20 transition-all"
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/20 transition-all touch-target sm:min-h-0 sm:min-w-0"
         >
           <Plus class="w-3.5 h-3.5" />
-          Configurar Primeira Rotina
+          Configurar Rotina
+        </button>
+        <button
+          type="button"
+          @click="emit('openFocus')"
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-surface-card hover:bg-surface-border/60 text-brand-300 border border-brand-500/30 transition-all touch-target sm:min-h-0 sm:min-w-0"
+        >
+          <Timer class="w-3.5 h-3.5 text-brand-400" />
+          Iniciar Foco Livre
         </button>
       </div>
     </div>

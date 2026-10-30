@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { FocusModeType, FocusState, FocusSession } from '@/types'
 
 export const POMODORO_FOCUS_SECONDS = 25 * 60      // 25 minutes
+export const POMODORO_LONG_FOCUS_SECONDS = 50 * 60 // 50 minutes (deep work)
 export const POMODORO_SHORT_BREAK_SECONDS = 5 * 60  // 5 minutes
 export const POMODORO_LONG_BREAK_SECONDS = 15 * 60  // 15 minutes
 
@@ -180,6 +181,18 @@ export const useFocusStore = defineStore('focus', () => {
     state.value = 'idle'
   }
 
+  function selectPreset(presetMode: FocusModeType, seconds: number) {
+    stopInterval()
+    mode.value = presetMode
+    durationSeconds.value = seconds
+    remainingSeconds.value = seconds
+    state.value = (presetMode === 'short_break' || presetMode === 'long_break') ? 'break' : 'idle'
+  }
+
+  function setCustomBlockName(name: string) {
+    associatedBlockName.value = name
+  }
+
   function skipToBreak() {
     const isLong = completedCycles.value > 0 && completedCycles.value % 4 === 0
     startFocus(isLong ? 'long_break' : 'short_break')
@@ -197,6 +210,11 @@ export const useFocusStore = defineStore('focus', () => {
       // If timer is idle, setup focus for this block
       if (state.value === 'idle' || state.value === 'completed') {
         startFocus('pomodoro', POMODORO_FOCUS_SECONDS, block)
+      }
+    } else {
+      // Standalone focus session (no routine required)
+      if (!associatedBlockId.value && !associatedBlockName.value) {
+        associatedBlockName.value = 'Foco Livre'
       }
     }
     isModalOpen.value = true
@@ -225,6 +243,8 @@ export const useFocusStore = defineStore('focus', () => {
     resumeTimer,
     togglePlayPause,
     resetTimer,
+    selectPreset,
+    setCustomBlockName,
     skipToBreak,
     skipToFocus,
     openFocusModal,

@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LayoutDashboard, CheckCircle2, Target, BookOpen, LogOut, Shield } from 'lucide-vue-next'
+import { LayoutDashboard, CheckCircle2, Target, BookOpen, LogOut, Shield, Timer } from 'lucide-vue-next'
+import { useFocusStore } from '@/stores/focus'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const focusStore = useFocusStore()
 
 const isLoginPage = computed(() => route.name === 'login')
 
@@ -61,6 +63,23 @@ function handleLogout() {
 
         <!-- Right Side Actions -->
         <div class="flex items-center gap-2">
+          <!-- Focus Mode Quick Trigger -->
+          <button
+            type="button"
+            @click="focusStore.openFocusModal()"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all touch-target"
+            :class="
+              focusStore.isRunning
+                ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40 shadow-sm animate-pulse'
+                : 'text-slate-300 hover:text-white bg-surface-dark/60 hover:bg-slate-800/60 border border-surface-border/60'
+            "
+            title="Abrir Modo Foco & Timer Pomodoro"
+          >
+            <Timer class="w-4 h-4 text-brand-400" />
+            <span v-if="focusStore.isRunning" class="font-mono font-bold">{{ focusStore.formattedTime }}</span>
+            <span v-else class="hidden sm:inline">Modo Foco</span>
+          </button>
+
           <!-- User / Status Badge (desktop) -->
           <div class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
