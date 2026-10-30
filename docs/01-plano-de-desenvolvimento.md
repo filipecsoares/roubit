@@ -78,9 +78,9 @@ flowchart TD
 *Objetivo: Expor os casos de uso do domínio através de uma API HTTP assíncrona, robusta, protegida e com garantia de idempotência.*
 
 - [ ] **2.1 Fundação da API Web com Axum**
-  - [ ] Configuração do servidor HTTP Tokio/Axum, graceful shutdown e injeção de estado (`AppState`).
-  - [ ] Middleware estruturado de Tracing/Logs (`tracing`, `tracing-subscriber`).
-  - [ ] Middleware global de tratamento de erros com respostas JSON padronizadas (RFC 7807 Problem Details).
+  - [x] Configuração do servidor HTTP Tokio/Axum, graceful shutdown e injeção de estado (`AppState`).
+  - [x] Middleware estruturado de Tracing/Logs (`tracing`, `tracing-subscriber`).
+  - [x] Middleware global de tratamento de erros com respostas JSON padronizadas (RFC 7807 Problem Details).
   - [ ] Configuração de CORS restrito e headers de segurança (OWASP: HSTS, Content-Security-Policy, X-Frame-Options).
 - [ ] **2.2 Autenticação, Sessão e Criptografia de Usuário**
   - [ ] Tabela e endpoints de Usuários (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`).
