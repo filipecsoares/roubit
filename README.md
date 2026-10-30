@@ -5,7 +5,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![Vue 3](https://img.shields.io/badge/Vue.js-3.5%2B-4FC08D?logo=vuedotjs)](https://vuejs.org/)
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Progress](https://img.shields.io/badge/Progress-47%2F48%20Tasks%20(97.9%25)-brightgreen)](docs/02-status-atividades.md)
+[![Progress](https://img.shields.io/badge/Progress-48%2F48%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
 
 ---
 
@@ -32,7 +32,7 @@
 | **07. Terminal CLI** | Clap commands, TUI tables, interactive prompts | 🟢 Concluído (5/5) |
 | **08. REST API & Idempotência** | Axum HTTP server, JWT auth, transactional idempotency | 🟢 Concluído (6/6) |
 | **09. Frontend SPA** | Vue 3, Pinia, TypeScript, TailwindCSS, Web Crypto | 🟢 Concluído (6/6) |
-| **10. Infrastructure** | Redis distributed locks, TTL reminders, Dual DB, Docker | 🟡 Em progresso (4/5) |
+| **10. Infrastructure** | Redis distributed locks, TTL reminders, Dual DB, Docker | 🟢 Concluído (5/5) |
 
 Detailed tracking is maintained in the **[Activity Status Tracker](docs/02-status-atividades.md)**.
 
@@ -40,13 +40,24 @@ Detailed tracking is maintained in the **[Activity Status Tracker](docs/02-statu
 
 ## ⚡ Quick Start & Verification
 
+### 1-Command Stack via Docker Compose (PostgreSQL + Redis + API + SPA)
+```bash
+docker compose up -d
+# Frontend SPA available at http://localhost
+# Backend REST API available at http://localhost:8080
+```
+
+### Local Development & Testing
 ```bash
 # Clone repository
 git clone https://github.com/filipecsoares/roubit.git
 cd roubit
 
-# Run all 183 automated unit & integration tests
+# Run all automated tests
 cargo test --workspace --manifest-path api/Cargo.toml
+
+# Run load test and P99 latency benchmark (RNF04)
+cargo test --test load_p99_benchmark --manifest-path api/Cargo.toml --release -- --nocapture
 
 # Run quality checks (formatting, pedantic clippy)
 ./scripts/pre-commit.sh
