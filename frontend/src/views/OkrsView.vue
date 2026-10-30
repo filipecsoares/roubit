@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Target, TrendingUp, Sparkles, AlertCircle } from 'lucide-vue-next'
+import { Target, TrendingUp, Sparkles, AlertCircle, Plus } from 'lucide-vue-next'
 import { useOkrStore } from '@/stores/okr'
 import { useHabitStore } from '@/stores/habit'
 import ObjectiveCard from '@/components/okrs/ObjectiveCard.vue'
 import LinkHabitModal from '@/components/okrs/LinkHabitModal.vue'
+import OkrManageModal from '@/components/okrs/OkrManageModal.vue'
 
 const okrStore = useOkrStore()
 const habitStore = useHabitStore()
@@ -12,10 +13,12 @@ const habitStore = useHabitStore()
 const quarters = ['2026-Q4', '2026-Q3', '2027-Q1', '2027-Q2']
 const selectedQuarter = ref('2026-Q4')
 
-// Link habit modal state
+// Modals state
 const isLinkModalOpen = ref(false)
 const selectedKrId = ref<string | null>(null)
 const selectedKrTitle = ref('')
+
+const isCreateModalOpen = ref(false)
 
 // Toast notifications
 const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -102,6 +105,30 @@ async function handleQuarterChange(quarter: string) {
   }
 }
 
+async function handleCreateObjective(payload: {
+  title: string
+  description?: string
+  quarter: string
+  start_date?: string
+  end_date?: string
+  key_results: Array<{
+    title: string
+    initial_value: number
+    target_value: number
+    unit: string
+    weight: number
+    linked_habit_id?: string
+  }>
+}) {
+  try {
+    await okrStore.createObjective(payload)
+    isCreateModalOpen.value = false
+    showToast('Objetivo e Resultados-Chave cadastrados com sucesso!')
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao criar objetivo', 'error')
+  }
+}
+
 onMounted(async () => {
   try {
     await Promise.allSettled([
@@ -129,7 +156,7 @@ onMounted(async () => {
       <span>{{ toastMessage.text }}</span>
     </div>
 
-    <!-- Header & Quarter Switcher -->
+    <!-- Header & Actions -->
     <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-extrabold tracking-tight text-white font-outfit">
@@ -140,21 +167,33 @@ onMounted(async () => {
         </p>
       </div>
 
-      <!-- Quarter Pills -->
-      <div class="flex items-center gap-1.5 p-1 bg-surface-card rounded-xl border border-surface-border">
+      <div class="flex items-center gap-3">
+        <!-- Quarter Pills -->
+        <div class="flex items-center gap-1.5 p-1 bg-surface-card rounded-xl border border-surface-border">
+          <button
+            v-for="q in quarters"
+            :key="q"
+            type="button"
+            @click="handleQuarterChange(q)"
+            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            :class="
+              selectedQuarter === q
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            "
+          >
+            {{ q }}
+          </button>
+        </div>
+
+        <!-- New Objective Button -->
         <button
-          v-for="q in quarters"
-          :key="q"
           type="button"
-          @click="handleQuarterChange(q)"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-          :class="
-            selectedQuarter === q
-              ? 'bg-brand-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
-          "
+          @click="isCreateModalOpen = true"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 transition-all shrink-0"
         >
-          {{ q }}
+          <Plus class="w-4 h-4" />
+          Novo Objetivo
         </button>
       </div>
     </header>
@@ -193,15 +232,28 @@ onMounted(async () => {
         <h2 class="text-lg font-bold text-white">Objetivos em {{ selectedQuarter }}</h2>
       </div>
 
+      <!-- Empty state with CTA button -->
       <div
         v-if="okrStore.objectives.length === 0"
-        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border"
+        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border space-y-4"
       >
-        <Target class="w-8 h-8 text-slate-500 mx-auto mb-2" />
-        <h3 class="text-sm font-semibold text-white">Nenhum objetivo cadastrado para este trimestre</h3>
-        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-          Defina seus objetivos estratégicos e adicione Resultados-Chave mensuráveis para impulsionar suas metas.
-        </p>
+        <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400">
+          <Target class="w-8 h-8 text-slate-400 mx-auto" />
+        </div>
+        <div class="max-w-sm mx-auto">
+          <h3 class="text-sm font-semibold text-white">Nenhum objetivo cadastrado para este trimestre</h3>
+          <p class="text-xs text-slate-400 mt-1">
+            Defina seus objetivos estratégicos e adicione Resultados-Chave mensuráveis para impulsionar suas metas.
+          </p>
+        </div>
+        <button
+          type="button"
+          @click="isCreateModalOpen = true"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 transition-all"
+        >
+          <Plus class="w-4 h-4" />
+          Cadastrar Primeiro Objetivo
+        </button>
       </div>
 
       <div v-else class="space-y-4">
@@ -223,6 +275,16 @@ onMounted(async () => {
       :habits="habitsList"
       @close="isLinkModalOpen = false"
       @link="handleLinkConfirm"
+    />
+
+    <!-- Create Objective Modal -->
+    <OkrManageModal
+      :is-open="isCreateModalOpen"
+      :default-quarter="selectedQuarter"
+      :habits="habitsList"
+      :loading="okrStore.loading"
+      @close="isCreateModalOpen = false"
+      @save="handleCreateObjective"
     />
   </div>
 </template>
