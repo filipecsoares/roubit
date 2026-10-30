@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { LayoutDashboard, CheckCircle2, Target, BookOpen, LogOut, Shield } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const isLoginPage = computed(() => route.name === 'login')
 
@@ -16,7 +18,7 @@ const navItems = [
 ]
 
 function handleLogout() {
-  localStorage.removeItem('roubit_token')
+  authStore.logout()
   router.push('/login')
 }
 </script>

@@ -112,9 +112,9 @@ flowchart TD
   - [x] Inicialização do projeto Vue 3 (Composition API, TypeScript, Vite, Vue Router, Pinia).
   - [x] Integração do TailwindCSS com design system minimalista, tipografia moderna e suporte a Dark Mode.
   - [x] Configuração do pipeline `.github/workflows/vue-ci.yml` (linting, checagem de tipos, build).
-- [ ] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
-  - [ ] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
-  - [ ] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
+- [x] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
+  - [x] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
+  - [x] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
 - [ ] **3.3 Módulo de Criptografia no Cliente (Web Crypto API / Argon2)**
   - [ ] Implementar fluxo de desbloqueio de chave: usuário insere senha mestre/passphrase no navegador.
   - [ ] Derivação de chave AES-256-GCM via Web Crypto API / WASM.

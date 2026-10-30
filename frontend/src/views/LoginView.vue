@@ -1,22 +1,36 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Lock, Mail, ArrowRight } from 'lucide-vue-next'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
 const email = ref('')
 const password = ref('')
 const isRegister = ref(false)
 const errorMessage = ref('')
 
-function handleSubmit() {
+async function handleSubmit() {
+  errorMessage.value = ''
   if (!email.value || !password.value) {
     errorMessage.value = 'Preencha todos os campos obrigatórios'
     return
   }
-  // Temporary auth token stub for onboarding
-  localStorage.setItem('roubit_token', 'demo-token-active')
-  router.push('/')
+
+  try {
+    if (isRegister.value) {
+      await authStore.register(email.value, password.value)
+    } else {
+      await authStore.login(email.value, password.value)
+    }
+    const redirect = (route.query.redirect as string) || '/'
+    router.push(redirect)
+  } catch (_err: any) {
+    errorMessage.value = authStore.error || 'Erro na autenticação'
+  }
 }
 </script>
 
@@ -70,10 +84,14 @@ function handleSubmit() {
 
         <button
           type="submit"
-          class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/25 transition-all"
+          :disabled="authStore.loading"
+          class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white shadow-lg shadow-brand-500/25 transition-all"
         >
-          <span>{{ isRegister ? 'Cadastrar' : 'Entrar' }}</span>
-          <ArrowRight class="w-4 h-4" />
+          <Loader2 v-if="authStore.loading" class="w-4 h-4 animate-spin" />
+          <template v-else>
+            <span>{{ isRegister ? 'Cadastrar' : 'Entrar' }}</span>
+            <ArrowRight class="w-4 h-4" />
+          </template>
         </button>
       </form>
 
