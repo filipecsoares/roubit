@@ -570,3 +570,86 @@ async fn test_tcp_zero_knowledge_journal_endpoints() {
         .expect("Clean shutdown")
         .expect("Server panic");
 }
+
+#[tokio::test]
+async fn test_tcp_sse_notification_stream() {
+    let pool = create_sqlite_pool("sqlite::memory:")
+        .await
+        .expect("Failed to create memory db");
+    roubit_core::run_migrations(&pool)
+        .await
+        .expect("Failed to apply migrations");
+    let config = AppConfig {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 0,
+        jwt_secret: "test_secret_32_characters_long_min!".to_string(),
+        ..Default::default()
+    };
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind ephemeral port");
+    let local_addr = listener.local_addr().expect("Failed to get local address");
+
+    let state = AppState::new(pool.clone(), config);
+    let app = build_router(state);
+
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .expect("Server exited with error");
+    });
+
+    let client = reqwest::Client::new();
+    let reg_url = format!("http://{local_addr}/api/v1/auth/register");
+    let reg_body = serde_json::json!({
+        "email": "sse_user@roubit.app",
+        "password": "Password123!"
+    });
+    let reg_res = client
+        .post(&reg_url)
+        .json(&reg_body)
+        .send()
+        .await
+        .expect("Register failed");
+    assert_eq!(reg_res.status(), reqwest::StatusCode::CREATED);
+    let auth: roubit_server::AuthResponse = reg_res.json().await.expect("Valid auth response");
+
+    // Test notification hydration
+    let hydrated =
+        roubit_server::hydrate_reminder(&pool, &auth.user.id.to_string(), "habit", "non_existent")
+            .await;
+    assert_eq!(hydrated.entity_type, "habit");
+    assert!(hydrated.title.contains("Hábito"));
+
+    // Connect to SSE stream
+    let sse_url = format!("http://{local_addr}/api/v1/notifications/stream");
+    let sse_res = client
+        .get(&sse_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("SSE request failed");
+
+    assert_eq!(sse_res.status(), reqwest::StatusCode::OK);
+    let content_type = sse_res
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .expect("Content-Type header")
+        .to_str()
+        .expect("Valid utf8");
+    assert!(content_type.contains("text/event-stream"));
+
+    drop(sse_res);
+
+    let _ = shutdown_tx.send(());
+    tokio::time::timeout(Duration::from_secs(3), server_handle)
+        .await
+        .expect("Clean shutdown")
+        .expect("Server panic");
+}

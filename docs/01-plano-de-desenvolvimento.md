@@ -145,10 +145,10 @@ flowchart TD
 - [ ] **4.1 Integração com Redis**
   - [x] Configuração do cliente assíncrono Redis no backend Rust (`redis-rs` / `deadpool-redis`).
   - [x] Migração do armazenamento de idempotência e locks distribuídos para o Redis com tempo de expiração configurável.
-  - [ ] Implementação de agendamento de lembretes e alertas de início de blocos de rotina utilizando Redis Keyspace Notifications e expiração por TTL.
-- [ ] **4.2 Mecanismo de Notificações e Lembretes**
-  - [ ] Serviço de background worker no Tokio para consumir eventos de disparo do Redis.
-  - [ ] Notificações no frontend via Server-Sent Events (SSE) ou Web Push / notificações no desktop CLI.
+  - [x] Implementação de agendamento de lembretes e alertas de início de blocos de rotina utilizando Redis Keyspace Notifications e expiração por TTL.
+- [x] **4.2 Mecanismo de Notificações e Lembretes**
+  - [x] Serviço de background worker no Tokio para consumir eventos de disparo do Redis.
+  - [x] Notificações no frontend via Server-Sent Events (SSE) ou Web Push / notificações no desktop CLI.
 - [ ] **4.3 Suporte Dual de Banco de Dados: SQLite & PostgreSQL**
   - [ ] Parametrização do SQLx para compatibilidade de dialetos SQL entre SQLite (desenvolvimento/CLI local) e PostgreSQL (servidor corporativo).
   - [ ] Migrations SQL versionadas compatíveis com PostgreSQL.

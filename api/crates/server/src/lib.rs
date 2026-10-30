@@ -6,6 +6,7 @@ pub mod errors;
 pub mod middleware;
 pub mod server;
 pub mod state;
+pub mod workers;
 
 pub use auth::{
     decode_jwt, encode_jwt, hash_password, verify_password, AuthResponse, AuthenticatedUser,
@@ -27,3 +28,7 @@ pub use server::{
     REQUEST_ID_HEADER,
 };
 pub use state::AppState;
+pub use workers::{
+    catch_up_missed_reminders, hydrate_reminder, notification_stream_handler, parse_reminder_key,
+    start_reminder_worker,
+};

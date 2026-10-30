@@ -23,7 +23,7 @@ pub use domain::{
     SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
     TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
-pub use redis::{RedisError, RedisService};
+pub use redis::{RedisError, RedisService, ReminderNotification, ReminderScheduler};
 
 /// Runs all embedded database migrations against the provided SQLite connection pool.
 ///

@@ -12,15 +12,20 @@ pub struct AppState {
     pub config: AppConfig,
     /// Optional Redis service for distributed locks and caching
     pub redis: Option<roubit_core::redis::RedisService>,
+    /// Broadcast channel for real-time reminder notifications
+    pub tx_notification: tokio::sync::broadcast::Sender<roubit_core::ReminderNotification>,
 }
 
 impl AppState {
     /// Creates a new [`AppState`] with the given database pool and configuration.
-    pub const fn new(db: SqlitePool, config: AppConfig) -> Self {
+    #[must_use]
+    pub fn new(db: SqlitePool, config: AppConfig) -> Self {
+        let (tx_notification, _) = tokio::sync::broadcast::channel(1024);
         Self {
             db,
             config,
             redis: None,
+            tx_notification,
         }
     }
 

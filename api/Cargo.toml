@@ -54,6 +54,7 @@ redis = { version = "0.29", features = ["tokio-comp", "connection-manager"] }
 
 # Async & Runtime
 tokio = { version = "1.43", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 
 # Tracing
 tracing = "0.1"

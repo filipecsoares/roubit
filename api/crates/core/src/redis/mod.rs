@@ -214,6 +214,101 @@ impl RedisService {
         let result: Option<Vec<u8>> = conn.get(&full_key).await?;
         Ok(result)
     }
+
+    /// Schedules a reminder key in Redis with exact TTL (`fire_in_seconds`).
+    /// Key format: `reminder:<user_id>:<entity_type>:<entity_id>`
+    ///
+    /// # Errors
+    /// Returns `RedisError` if the SETEX command fails.
+    pub async fn schedule_reminder(
+        &self,
+        user_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+        fire_in_seconds: usize,
+    ) -> Result<(), RedisError> {
+        let mut conn = self.get_connection().await?;
+        let full_key = format!("reminder:{user_id}:{entity_type}:{entity_id}");
+        conn.set_ex::<_, _, ()>(&full_key, "active", fire_in_seconds as u64)
+            .await?;
+        Ok(())
+    }
+
+    /// Cancels a pending reminder key from Redis.
+    ///
+    /// # Errors
+    /// Returns `RedisError` if the DEL command fails.
+    pub async fn cancel_reminder(
+        &self,
+        user_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> Result<bool, RedisError> {
+        let mut conn = self.get_connection().await?;
+        let full_key = format!("reminder:{user_id}:{entity_type}:{entity_id}");
+        let deleted: i64 = redis::cmd("DEL")
+            .arg(&full_key)
+            .query_async(&mut conn)
+            .await?;
+        Ok(deleted > 0)
+    }
+}
+
+/// Notification payload broadcast when a scheduled reminder key expires.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct ReminderNotification {
+    pub user_id: String,
+    /// Entity type triggering the reminder ("`time_block`", "`habit`", etc.)
+    pub entity_type: String,
+    pub entity_id: String,
+    pub title: String,
+    pub message: String,
+    pub scheduled_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Helper scheduler for managing expiring reminder keys in Redis.
+#[derive(Clone, Debug)]
+pub struct ReminderScheduler {
+    redis_service: std::sync::Arc<RedisService>,
+}
+
+impl ReminderScheduler {
+    /// Creates a new `ReminderScheduler` wrapping a shared `RedisService`.
+    #[must_use]
+    pub const fn new(redis_service: std::sync::Arc<RedisService>) -> Self {
+        Self { redis_service }
+    }
+
+    /// Schedules a reminder to fire after `fire_in_seconds`.
+    ///
+    /// # Errors
+    /// Returns `RedisError` if scheduling fails.
+    pub async fn schedule_reminder(
+        &self,
+        user_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+        fire_in_seconds: usize,
+    ) -> Result<(), RedisError> {
+        self.redis_service
+            .schedule_reminder(user_id, entity_type, entity_id, fire_in_seconds)
+            .await
+    }
+
+    /// Cancels a pending reminder.
+    ///
+    /// # Errors
+    /// Returns `RedisError` if cancellation fails.
+    pub async fn cancel_reminder(
+        &self,
+        user_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> Result<bool, RedisError> {
+        self.redis_service
+            .cancel_reminder(user_id, entity_type, entity_id)
+            .await
+    }
 }
 
 #[cfg(test)]

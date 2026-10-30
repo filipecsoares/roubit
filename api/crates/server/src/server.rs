@@ -83,6 +83,10 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/habits", crate::controllers::habit_routes())
         .nest("/okrs", crate::controllers::okr_routes())
         .nest("/journal", crate::controllers::journal_routes())
+        .route(
+            "/notifications/stream",
+            get(crate::workers::notification_stream_handler),
+        )
         .layer(from_fn_with_state(
             state.clone(),
             crate::middleware::idempotency_middleware,
@@ -161,6 +165,14 @@ pub async fn run_server(
     if let Some(redis) = redis_service {
         state = state.with_redis(redis);
     }
+
+    // Spawn background reminder worker for Redis keyspace events
+    let _worker_handle = crate::workers::start_reminder_worker(
+        state.config.redis_url.clone(),
+        state.db.clone(),
+        state.tx_notification.clone(),
+    );
+
     let app = build_router(state);
 
     axum::serve(listener, app)

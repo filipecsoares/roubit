@@ -20,8 +20,8 @@
 | **07. Aplicação CLI (Terminal)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **08. API REST & Idempotência** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
-| **10. Infraestrutura Redis & PostgreSQL** | 5 | 1 | 0 | 4 | 🟡 Em Progresso |
-| **TOTAL** | **48** | **44** | **0** | **4** | **91.7%** |
+| **10. Infraestrutura Redis & PostgreSQL** | 5 | 2 | 0 | 3 | 🟡 Em Progresso |
+| **TOTAL** | **48** | **45** | **0** | **3** | **93.8%** |
 
 ---
 
@@ -128,7 +128,7 @@
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
 | **10.1** | Redis Connection & Locks Distribuídos | [activity-01-redis-connection-distributed-locks.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-01-redis-connection-distributed-locks.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
-| **10.2** | Lembretes Agendados via Redis TTL | [activity-02-scheduled-reminders-ttl-keyspace.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-02-scheduled-reminders-ttl-keyspace.prompt) | ⚪ NÃO INICIADO | - |
+| **10.2** | Lembretes Agendados via Redis TTL | [activity-02-scheduled-reminders-ttl-keyspace.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-02-scheduled-reminders-ttl-keyspace.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **10.3** | Suporte Dual Database (SQLite / Postgres) | [activity-03-dual-database-postgresql-support.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-03-dual-database-postgresql-support.prompt) | ⚪ NÃO INICIADO | - |
 | **10.4** | Dockerfiles & Orquestração Docker Compose | [activity-04-docker-compose-production-orchestration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-04-docker-compose-production-orchestration.prompt) | ⚪ NÃO INICIADO | - |
 | **10.5** | Testes de Carga, P99 < 10ms & RAM < 25MB | [activity-05-load-testing-p99-benchmarks.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-05-load-testing-p99-benchmarks.prompt) | ⚪ NÃO INICIADO | - |
