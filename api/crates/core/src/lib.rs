@@ -4,6 +4,7 @@
 pub mod config;
 pub mod crypto;
 pub mod domain;
+pub mod redis;
 pub mod telemetry;
 
 pub use config::AppConfig;
@@ -22,6 +23,7 @@ pub use domain::{
     SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
     TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
+pub use redis::{RedisError, RedisService};
 
 /// Runs all embedded database migrations against the provided SQLite connection pool.
 ///

@@ -143,8 +143,8 @@ flowchart TD
 *Objetivo: Integrar cache distribuído, agendamento de lembretes em tempo real por TTL do Redis, suporte a PostgreSQL e orquestração Docker.*
 
 - [ ] **4.1 Integração com Redis**
-  - [ ] Configuração do cliente assíncrono Redis no backend Rust (`redis-rs` / `deadpool-redis`).
-  - [ ] Migração do armazenamento de idempotência e locks distribuídos para o Redis com tempo de expiração configurável.
+  - [x] Configuração do cliente assíncrono Redis no backend Rust (`redis-rs` / `deadpool-redis`).
+  - [x] Migração do armazenamento de idempotência e locks distribuídos para o Redis com tempo de expiração configurável.
   - [ ] Implementação de agendamento de lembretes e alertas de início de blocos de rotina utilizando Redis Keyspace Notifications e expiração por TTL.
 - [ ] **4.2 Mecanismo de Notificações e Lembretes**
   - [ ] Serviço de background worker no Tokio para consumir eventos de disparo do Redis.

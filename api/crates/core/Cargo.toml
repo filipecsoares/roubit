@@ -27,6 +27,8 @@ argon2.workspace = true
 rand_core.workspace = true
 zeroize.workspace = true
 sqlx.workspace = true
+deadpool-redis.workspace = true
+redis.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

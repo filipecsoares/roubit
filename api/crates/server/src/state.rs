@@ -10,11 +10,24 @@ pub struct AppState {
     pub db: SqlitePool,
     /// Application runtime configuration
     pub config: AppConfig,
+    /// Optional Redis service for distributed locks and caching
+    pub redis: Option<roubit_core::redis::RedisService>,
 }
 
 impl AppState {
     /// Creates a new [`AppState`] with the given database pool and configuration.
     pub const fn new(db: SqlitePool, config: AppConfig) -> Self {
-        Self { db, config }
+        Self {
+            db,
+            config,
+            redis: None,
+        }
+    }
+
+    /// Attaches a [`roubit_core::redis::RedisService`] instance to the application state.
+    #[must_use]
+    pub fn with_redis(mut self, redis: roubit_core::redis::RedisService) -> Self {
+        self.redis = Some(redis);
+        self
     }
 }
