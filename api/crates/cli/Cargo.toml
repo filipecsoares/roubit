@@ -32,3 +32,5 @@ sqlx.workspace = true
 comfy-table.workspace = true
 colored.workspace = true
 indicatif.workspace = true
+rpassword.workspace = true
+tempfile.workspace = true

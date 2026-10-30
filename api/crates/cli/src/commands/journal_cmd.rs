@@ -28,29 +28,35 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
             content,
         } => {
             let target_date = parse_date_or_today(date.as_deref())?;
-            let pass = resolve_passphrase();
+            let pass = resolve_passphrase()?;
 
-            let text = content.unwrap_or_else(|| {
-                "Daily personal reflection recorded via Roubit CLI.".to_string()
-            });
+            let reflection_secret = if let Some(c) = content {
+                SecretString::new(c)
+            } else if crate::ui::TerminalUi::is_stdout_terminal() {
+                let initial = format!("# Reflection for {target_date}\n\n");
+                crate::interactive::TerminalPrompt::compose_in_editor(Some(&initial))
+                    .context("failed to write reflection in external editor")?
+            } else {
+                SecretString::new("Daily personal reflection recorded via Roubit CLI.".to_string())
+            };
 
             let meta = service
-                .create_or_update_entry(target_date, mood, tags, SecretString::new(text), &pass)
+                .create_or_update_entry(target_date, mood, tags, reflection_secret, &pass)
                 .await
                 .context("failed to encrypt and persist journal entry")?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&meta)?);
             } else {
-                println!(
+                crate::ui::TerminalUi::print_success(&format!(
                     "Encrypted journal entry saved for date {} (ID: {}, Mood: {:?}, Payload: {} bytes)",
                     meta.entry_date, meta.id, meta.mood_score, meta.ciphertext_bytes_len
-                );
+                ));
             }
         }
 
         JournalSubcommands::Read { date, id } => {
-            let pass = resolve_passphrase();
+            let pass = resolve_passphrase()?;
 
             let decrypted = if let Some(id_str) = id {
                 let uuid = Uuid::parse_str(&id_str)
@@ -78,6 +84,10 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 });
                 println!("{json_repr}");
             } else {
+                crate::ui::TerminalUi::print_success(&format!(
+                    "Decrypted journal entry for {}:",
+                    decrypted.metadata.entry_date
+                ));
                 println!(
                     "--- Journal Entry: {} (Mood: {:?}) ---",
                     decrypted.metadata.entry_date, decrypted.metadata.mood_score
@@ -137,15 +147,21 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
     Ok(())
 }
 
-fn resolve_passphrase() -> SecretString {
+fn resolve_passphrase() -> Result<SecretString> {
     if let Ok(pass) = std::env::var("ROUBIT_PASSPHRASE") {
         if !pass.trim().is_empty() {
-            return SecretString::new(pass);
+            return Ok(SecretString::new(pass));
         }
     }
 
-    // Default fallback vault passphrase if not set in environment
-    SecretString::new("roubit-default-cli-vault-passphrase".to_string())
+    if crate::ui::TerminalUi::is_stdout_terminal() {
+        crate::interactive::TerminalPrompt::prompt_passphrase("Enter journal master passphrase: ")
+            .context("failed to prompt for passphrase")
+    } else {
+        Ok(SecretString::new(
+            "roubit-default-cli-vault-passphrase".to_string(),
+        ))
+    }
 }
 
 fn parse_date_or_today(date_str: Option<&str>) -> Result<NaiveDate> {

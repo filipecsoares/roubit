@@ -4,6 +4,7 @@
 
 pub mod args;
 pub mod commands;
+pub mod interactive;
 pub mod ui;
 
 use clap::Parser;

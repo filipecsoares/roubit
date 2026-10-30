@@ -4,6 +4,7 @@
 
 pub mod args;
 pub mod commands;
+pub mod interactive;
 pub mod ui;
 
 pub use roubit_core::domain;
