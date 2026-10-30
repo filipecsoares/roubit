@@ -44,25 +44,23 @@ flowchart TD
 ### Fase 1: Fundação do Domínio, Banco de Dados Local (SQLite) & CLI em Rust
 *Objetivo: Implementar as entidades centrais, regras de negócio puras, persistência relacional com SQLite e uma interface CLI funcional e autônoma.*
 
-- [ ] **1.1 Modelagem do Banco de Dados e Migrations (SQLx + SQLite WAL)**
+- [x] **1.1 Modelagem do Banco de Dados e Migrations (SQLx + SQLite WAL)**
   - [x] Configurar conexão SQLite com modo WAL (`PRAGMA journal_mode=WAL`) e `PRAGMA foreign_keys = ON`.
   - [x] Criar migrações SQL para **Rotinas** (`routines`, `time_blocks`, `routine_logs`).
   - [x] Criar migrações SQL para **Hábitos** (`habits`, `habit_logs`, suportando medição binária, numérica e timer).
-
   - [x] Criar migrações SQL para **OKRs** (`objectives`, `key_results`, vinculação com hábitos).
-  - [ ] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
+  - [x] Criar migrações SQL para **Journaling** (`journal_entries` com payload cifrado e metadados abertos).
 - [x] **1.2 Módulo de Criptografia em Rust (Field-Level Encryption)**
   - [x] Implementar derivação de chave a partir de senha mestre usando Argon2id.
   - [x] Implementar cifragem e decifragem autenticada usando AES-256-GCM (nonce aleatório + tag de autenticação).
   - [x] Desenvolver suíte de testes de vetores criptográficos e tratamento seguro de memória (zeroize para dados sensíveis).
-- [ ] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
+- [x] **1.3 Camada de Domínio e Casos de Uso (Core Business Logic)**
   - [x] **Gestão de Rotinas (RF01):** Criação, edição e acompanhamento de blocos de tempo; cálculo de aderência do dia.
-
   - [x] **Rastreamento de Hábitos (RF02):**
     - Lógica de registro para hábitos binários, contadores numéricos (ex: ml, páginas) e timer (minutos).
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
   - [x] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
-  - [ ] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
+  - [x] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
 - [ ] **1.4 Interface de Linha de Comando (CLI com Clap)**
   - [ ] Implementar subcomando `roubit routine` (listar rotina de hoje, iniciar bloco, finalizar bloco).
   - [ ] Implementar subcomando `roubit habit` (listar hábitos, check-in com valor/tempo, status dos streaks).

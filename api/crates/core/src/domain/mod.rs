@@ -4,8 +4,15 @@
 //! - [`routine`]: Routine management and time-blocking (RF01)
 
 pub mod habit;
+pub mod journal;
 pub mod okr;
 pub mod routine;
+
+pub use journal::{
+    deserialize_tags, serialize_tags, DecryptedJournalEntry, EncryptedJournalEntry,
+    JournalMetadata, JournalModelError, JournalRepository, JournalRepositoryError, JournalService,
+    JournalServiceError, SqliteJournalRepository,
+};
 
 pub use habit::{
     Habit, HabitAnalyticsService, HabitAnalyticsSummary, HabitLog, HabitRepository,
