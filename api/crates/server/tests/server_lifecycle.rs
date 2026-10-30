@@ -399,3 +399,174 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .expect("Clean shutdown")
         .expect("Server panic");
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn test_tcp_zero_knowledge_journal_endpoints() {
+    use base64::prelude::*;
+
+    let pool = create_sqlite_pool("sqlite::memory:")
+        .await
+        .expect("Failed to create memory db");
+    roubit_core::run_migrations(&pool)
+        .await
+        .expect("Failed to apply migrations");
+    let config = AppConfig {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 0,
+        ..Default::default()
+    };
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind ephemeral port");
+    let local_addr = listener.local_addr().expect("Failed to get local address");
+
+    let state = AppState::new(pool, config);
+    let app = build_router(state);
+
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .expect("Server exited with error");
+    });
+
+    let client = reqwest::Client::new();
+
+    // 1. Register user
+    let reg_url = format!("http://{local_addr}/api/v1/auth/register");
+    let reg_res = client
+        .post(&reg_url)
+        .json(&roubit_server::RegisterRequest {
+            email: "journal_user@roubit.app".to_string(),
+            password: "supersecurepassword123".to_string(),
+        })
+        .send()
+        .await
+        .expect("Register failed");
+    let auth: roubit_server::AuthResponse = reg_res.json().await.expect("Valid auth");
+
+    // 2. Reject zero-knowledge violation (plaintext content)
+    let journal_url = format!("http://{local_addr}/api/v1/journal");
+    let fake_salt = BASE64_STANDARD.encode([0x42u8; 16]);
+    let fake_nonce = BASE64_STANDARD.encode([0x24u8; 12]);
+    let fake_ciphertext = BASE64_STANDARD.encode([0xAAu8; 32]);
+
+    let violation_res = client
+        .post(&journal_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "entry_date": "2026-10-30",
+            "mood_score": 5,
+            "tags": ["focus"],
+            "salt_base64": fake_salt,
+            "nonce_base64": fake_nonce,
+            "ciphertext_base64": fake_ciphertext,
+            "content": "Plaintext secret reflection that must be rejected"
+        }))
+        .send()
+        .await
+        .expect("Violation request failed");
+    assert_eq!(violation_res.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    // 3. Reject invalid salt length (< 16 bytes)
+    let invalid_salt_res = client
+        .post(&journal_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "entry_date": "2026-10-30",
+            "mood_score": 5,
+            "tags": ["focus"],
+            "salt_base64": BASE64_STANDARD.encode([1u8; 8]),
+            "nonce_base64": fake_nonce,
+            "ciphertext_base64": fake_ciphertext
+        }))
+        .send()
+        .await
+        .expect("Invalid salt request failed");
+    assert_eq!(invalid_salt_res.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    // 4. Save valid encrypted journal entry
+    let save_res = client
+        .post(&journal_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "entry_date": "2026-10-30",
+            "mood_score": 5,
+            "tags": ["focus", "deep-work"],
+            "salt_base64": fake_salt,
+            "nonce_base64": fake_nonce,
+            "ciphertext_base64": fake_ciphertext
+        }))
+        .send()
+        .await
+        .expect("Save entry failed");
+    assert_eq!(save_res.status(), reqwest::StatusCode::CREATED);
+    let saved_entry: roubit_server::controllers::EncryptedJournalResponse =
+        save_res.json().await.expect("Parse encrypted entry");
+    assert_eq!(saved_entry.entry_date.to_string(), "2026-10-30");
+    assert_eq!(saved_entry.mood_score, Some(5));
+    assert_eq!(saved_entry.tags, vec!["focus", "deep-work"]);
+    assert_eq!(saved_entry.salt_base64, fake_salt);
+    assert_eq!(saved_entry.nonce_base64, fake_nonce);
+    assert_eq!(saved_entry.ciphertext_base64, fake_ciphertext);
+
+    // 5. Query metadata (omits ciphertext payload)
+    let metadata_url = format!("http://{local_addr}/api/v1/journal/metadata");
+    let meta_res = client
+        .get(&metadata_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Metadata request failed");
+    assert_eq!(meta_res.status(), reqwest::StatusCode::OK);
+    let meta_list: Vec<roubit_core::JournalMetadata> =
+        meta_res.json().await.expect("Parse metadata list");
+    assert_eq!(meta_list.len(), 1);
+    assert_eq!(meta_list[0].id, saved_entry.id);
+    assert_eq!(meta_list[0].ciphertext_bytes_len, 32);
+    assert_eq!(meta_list[0].mood_score, Some(5));
+
+    // 6. Fetch complete entry by ID
+    let get_entry_url = format!("http://{local_addr}/api/v1/journal/{}", saved_entry.id);
+    let get_res = client
+        .get(&get_entry_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get entry failed");
+    assert_eq!(get_res.status(), reqwest::StatusCode::OK);
+    let fetched_entry: roubit_server::controllers::EncryptedJournalResponse =
+        get_res.json().await.expect("Parse fetched entry");
+    assert_eq!(fetched_entry.id, saved_entry.id);
+    assert_eq!(fetched_entry.ciphertext_base64, fake_ciphertext);
+
+    // 7. Delete entry
+    let del_res = client
+        .delete(&get_entry_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Delete entry failed");
+    assert_eq!(del_res.status(), reqwest::StatusCode::OK);
+
+    // Fetch again -> 404
+    let not_found_res = client
+        .get(&get_entry_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get deleted entry failed");
+    assert_eq!(not_found_res.status(), reqwest::StatusCode::NOT_FOUND);
+
+    let _ = shutdown_tx.send(());
+    tokio::time::timeout(Duration::from_secs(3), server_handle)
+        .await
+        .expect("Clean shutdown")
+        .expect("Server panic");
+}

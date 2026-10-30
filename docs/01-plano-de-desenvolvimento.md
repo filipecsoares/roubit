@@ -91,11 +91,11 @@ flowchart TD
   - [x] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
   - [x] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).
   - [x] Garantia de bloqueio para requisições concorrentes idênticas e retorno de resposta cacheada para reenvios.
-- [ ] **2.4 Endpoints da API REST (Rotas e Controladores)**
+- [x] **2.4 Endpoints da API REST (Rotas e Controladores)**
   - [x] **Rotinas:** `GET /api/v1/routines`, `POST /api/v1/routines`, `POST /api/v1/routines/blocks/:id/complete`.
   - [x] **Hábitos:** `GET /api/v1/habits`, `POST /api/v1/habits`, `POST /api/v1/habits/:id/checkin` (com suporte a Idempotency-Key).
   - [x] **OKRs:** `GET /api/v1/okrs`, `POST /api/v1/okrs`.
-  - [ ] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
+  - [x] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
 - [ ] **2.5 Adaptação da CLI para Modo Híbrido**
   - [ ] Permitir que a CLI opere conectando-se à API HTTP REST via flag/configuração (`--remote` / `ROUBIT_API_URL`), além do modo local SQLite.
 - [ ] **2.6 Validação de Segurança & CI da Fase 2**

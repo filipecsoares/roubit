@@ -82,6 +82,7 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/routines", crate::controllers::routine_routes())
         .nest("/habits", crate::controllers::habit_routes())
         .nest("/okrs", crate::controllers::okr_routes())
+        .nest("/journal", crate::controllers::journal_routes())
         .layer(from_fn_with_state(
             state.clone(),
             crate::middleware::idempotency_middleware,

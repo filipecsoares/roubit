@@ -32,6 +32,7 @@ rpassword = "7.3"
 tempfile = "3.17"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 validator = { version = "0.20", features = ["derive"] }
+base64 = "0.22"
 
 # Cryptography & Memory Security
 aes-gcm = "0.10"
