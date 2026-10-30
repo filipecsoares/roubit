@@ -77,16 +77,16 @@ flowchart TD
 ### Fase 2: Backend HTTP REST, Autenticação & Idempotência (Axum + Tokio)
 *Objetivo: Expor os casos de uso do domínio através de uma API HTTP assíncrona, robusta, protegida e com garantia de idempotência.*
 
-- [ ] **2.1 Fundação da API Web com Axum**
+- [x] **2.1 Fundação da API Web com Axum**
   - [x] Configuração do servidor HTTP Tokio/Axum, graceful shutdown e injeção de estado (`AppState`).
   - [x] Middleware estruturado de Tracing/Logs (`tracing`, `tracing-subscriber`).
   - [x] Middleware global de tratamento de erros com respostas JSON padronizadas (RFC 7807 Problem Details).
-  - [ ] Configuração de CORS restrito e headers de segurança (OWASP: HSTS, Content-Security-Policy, X-Frame-Options).
-- [ ] **2.2 Autenticação, Sessão e Criptografia de Usuário**
-  - [ ] Tabela e endpoints de Usuários (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`).
-  - [ ] Hash de senha via Argon2id.
-  - [ ] Emissão e validação de tokens JWT / Cookies seguros (`HttpOnly`, `Secure`, `SameSite=Strict`).
-  - [ ] Extractor personalizado do Axum para autenticação e injeção do usuário autenticado no contexto dos handlers.
+  - [x] Configuração de CORS restrito e headers de segurança (OWASP: HSTS, Content-Security-Policy, X-Frame-Options).
+- [x] **2.2 Autenticação, Sessão e Criptografia de Usuário**
+  - [x] Tabela e endpoints de Usuários (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`).
+  - [x] Hash de senha via Argon2id.
+  - [x] Emissão e validação de tokens JWT / Cookies seguros (`HttpOnly`, `Secure`, `SameSite=Strict`).
+  - [x] Extractor personalizado do Axum para autenticação e injeção do usuário autenticado no contexto dos handlers.
 - [ ] **2.3 Middleware de Idempotência Transacional (RF05)**
   - [ ] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
   - [ ] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).

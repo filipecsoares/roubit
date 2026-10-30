@@ -31,6 +31,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 sqlx.workspace = true
+jsonwebtoken.workspace = true
+argon2.workspace = true
+zeroize.workspace = true
+chrono.workspace = true
 
 [dev-dependencies]
 reqwest.workspace = true

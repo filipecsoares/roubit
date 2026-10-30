@@ -4,8 +4,9 @@ use std::time::Duration;
 
 use axum::{
     http::{HeaderName, StatusCode, Uri},
+    middleware::from_fn,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -68,9 +69,22 @@ pub fn build_router(state: AppState) -> Router {
             Duration::from_secs(30),
         ));
 
+    let allowed_origins = state.config.parsed_allowed_origins();
+    let cors_layer = crate::middleware::build_cors_layer(&allowed_origins);
+
+    let auth_routes = Router::new()
+        .route("/register", post(crate::auth::register))
+        .route("/login", post(crate::auth::login))
+        .route("/me", get(crate::auth::me));
+
+    let api_v1 = Router::new().nest("/auth", auth_routes);
+
     Router::new()
         .route("/health", get(health_check))
+        .nest("/api/v1", api_v1)
         .fallback(fallback_handler)
+        .layer(from_fn(crate::middleware::security_headers_middleware))
+        .layer(cors_layer)
         .layer(middleware_stack)
         .with_state(state)
 }
@@ -133,7 +147,12 @@ pub async fn run_server(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::similar_names
+)]
 mod tests {
     use super::*;
     use axum::{
@@ -147,6 +166,9 @@ mod tests {
         let pool = create_sqlite_pool("sqlite::memory:")
             .await
             .expect("Failed to create memory db");
+        roubit_core::run_migrations(&pool)
+            .await
+            .expect("Failed to apply migrations");
         let config = AppConfig::default();
         let state = AppState::new(pool, config);
         build_router(state)
@@ -245,5 +267,226 @@ mod tests {
             "No resource found at /non-existent-endpoint"
         );
         assert_eq!(problem.r#type, "https://roubit.app/errors/404");
+    }
+
+    #[tokio::test]
+    async fn test_owasp_security_headers_present() {
+        let app = setup_test_app().await;
+
+        let request = Request::builder()
+            .uri("/health")
+            .method("GET")
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        let headers = response.headers();
+        assert_eq!(
+            headers
+                .get("x-content-type-options")
+                .and_then(|v| v.to_str().ok()),
+            Some("nosniff")
+        );
+        assert_eq!(
+            headers.get("x-frame-options").and_then(|v| v.to_str().ok()),
+            Some("DENY")
+        );
+        assert_eq!(
+            headers
+                .get("strict-transport-security")
+                .and_then(|v| v.to_str().ok()),
+            Some("max-age=63072000; includeSubDomains")
+        );
+        assert_eq!(
+            headers
+                .get("content-security-policy")
+                .and_then(|v| v.to_str().ok()),
+            Some("default-src 'self'")
+        );
+        assert_eq!(
+            headers.get("referrer-policy").and_then(|v| v.to_str().ok()),
+            Some("strict-origin-when-cross-origin")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_auth_register_validation_failures() {
+        let app = setup_test_app().await;
+
+        // Invalid email
+        let req_invalid_email = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "notanemail", "password": "securepassword123"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let res = app
+            .clone()
+            .oneshot(req_invalid_email)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Short password (< 8 chars)
+        let req_short_pw = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "test@roubit.app", "password": "short"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let res = app.oneshot(req_short_pw).await.expect("Failed to execute");
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_auth_register_login_and_me_full_flow() {
+        let pool = create_sqlite_pool("sqlite::memory:")
+            .await
+            .expect("Failed to create memory db");
+        roubit_core::run_migrations(&pool)
+            .await
+            .expect("Failed to apply migrations");
+        let config = AppConfig::default();
+        let state = AppState::new(pool, config);
+
+        // 1. Register new user
+        let reg_payload = serde_json::to_string(&crate::auth::RegisterRequest {
+            email: "alice@roubit.app".to_string(),
+            password: "supersecurepassword123".to_string(),
+        })
+        .expect("Valid JSON");
+
+        let reg_req = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(reg_payload.clone()))
+            .expect("Failed to build request");
+
+        let reg_res = build_router(state.clone())
+            .oneshot(reg_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(reg_res.status(), StatusCode::CREATED);
+
+        let cookie_header = reg_res.headers().get("set-cookie");
+        assert!(cookie_header.is_some());
+        let cookie_str = cookie_header.unwrap().to_str().expect("Valid UTF-8");
+        assert!(cookie_str.contains("roubit_token="));
+        assert!(cookie_str.contains("HttpOnly"));
+        assert!(cookie_str.contains("SameSite=Strict"));
+
+        let reg_body = to_bytes(reg_res.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let auth_res: crate::auth::AuthResponse =
+            serde_json::from_slice(&reg_body).expect("Valid AuthResponse JSON");
+        assert_eq!(auth_res.user.email, "alice@roubit.app");
+        assert_ne!(auth_res.token, "");
+
+        // 2. Duplicate registration -> 409 Conflict
+        let dup_req = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(reg_payload))
+            .expect("Failed to build request");
+
+        let dup_res = build_router(state.clone())
+            .oneshot(dup_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(dup_res.status(), StatusCode::CONFLICT);
+
+        // 3. Login with incorrect password -> 401 Unauthorized
+        let wrong_login_req = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "alice@roubit.app", "password": "wrongpassword!"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let wrong_login_res = build_router(state.clone())
+            .oneshot(wrong_login_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(wrong_login_res.status(), StatusCode::UNAUTHORIZED);
+
+        // 4. Login with correct password -> 200 OK
+        let login_req = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "alice@roubit.app", "password": "supersecurepassword123"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let login_res = build_router(state.clone())
+            .oneshot(login_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(login_res.status(), StatusCode::OK);
+
+        // 5. Access /api/v1/auth/me without token -> 401 Unauthorized
+        let me_unauth_req = Request::builder()
+            .uri("/api/v1/auth/me")
+            .method("GET")
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let me_unauth_res = build_router(state.clone())
+            .oneshot(me_unauth_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(me_unauth_res.status(), StatusCode::UNAUTHORIZED);
+
+        // 6. Access /api/v1/auth/me with Bearer token -> 200 OK
+        let me_auth_req = Request::builder()
+            .uri("/api/v1/auth/me")
+            .method("GET")
+            .header("authorization", format!("Bearer {}", auth_res.token))
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let me_auth_res = build_router(state.clone())
+            .oneshot(me_auth_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(me_auth_res.status(), StatusCode::OK);
+
+        let me_body = to_bytes(me_auth_res.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let me_user: crate::auth::UserDto =
+            serde_json::from_slice(&me_body).expect("Valid UserDto JSON");
+        assert_eq!(me_user.email, "alice@roubit.app");
+        assert_eq!(me_user.id, auth_res.user.id);
+
+        // 7. Access /api/v1/auth/me with Cookie -> 200 OK
+        let me_cookie_req = Request::builder()
+            .uri("/api/v1/auth/me")
+            .method("GET")
+            .header("cookie", format!("roubit_token={}", auth_res.token))
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let me_cookie_res = build_router(state)
+            .oneshot(me_cookie_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(me_cookie_res.status(), StatusCode::OK);
     }
 }

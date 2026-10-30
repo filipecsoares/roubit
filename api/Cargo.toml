@@ -57,7 +57,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 # HTTP & Server
 axum = "0.8"
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["trace", "request-id", "cors", "timeout", "util", "uuid"] }
+tower-http = { version = "0.6", features = ["trace", "request-id", "cors", "timeout", "util", "uuid", "set-header"] }
+jsonwebtoken = "9.3"
 
 # Internal workspace crates
 roubit-core = { path = "crates/core" }
