@@ -4,11 +4,11 @@ import AppNavbar from '@/components/common/AppNavbar.vue'
 
 <template>
   <div class="min-h-screen bg-surface-dark flex flex-col selection:bg-brand-500 selection:text-white">
-    <!-- Top Navigation Bar -->
+    <!-- Top Header and Bottom Bar -->
     <AppNavbar />
 
-    <!-- Main Views Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Main Content View Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-24 md:pb-10">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />

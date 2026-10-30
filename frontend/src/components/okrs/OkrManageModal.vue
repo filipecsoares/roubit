@@ -135,38 +135,38 @@ function handleSave() {
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
       @click="emit('close')"
     >
       <div
-        class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto"
+        class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
-              <Target class="w-5 h-5" />
+            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <Target class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-lg font-bold text-white">Novo Objetivo Estratégico (OKR)</h3>
+              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Novo Objetivo Estratégico (OKR)</h3>
               <p class="text-xs text-slate-400">Defina o objetivo e seus Resultados-Chave mensuráveis</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="handleSave" class="space-y-5">
+        <form @submit.prevent="handleSave" class="space-y-4 sm:space-y-5">
           <!-- Title & Quarter -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="md:col-span-2 space-y-1.5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div class="sm:col-span-2 space-y-1.5">
               <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 Título do Objetivo *
               </label>
@@ -208,19 +208,19 @@ function handleSave() {
 
           <!-- Key Results Section -->
           <div class="space-y-3 pt-2 border-t border-surface-border/60">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h4 class="text-sm font-bold text-white">Resultados-Chave (Key Results)</h4>
-                <p class="text-xs text-slate-400">Métricas específicas e mensuráveis para atingir o objetivo</p>
+                <h4 class="text-xs sm:text-sm font-bold text-white font-outfit">Resultados-Chave (Key Results)</h4>
+                <p class="text-[11px] sm:text-xs text-slate-400">Métricas específicas e mensuráveis para atingir o objetivo</p>
               </div>
 
               <button
                 type="button"
                 @click="addKeyResult"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 transition-colors"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-colors touch-target sm:min-h-0 sm:min-w-0"
               >
                 <Plus class="w-3.5 h-3.5" />
-                Adicionar KR
+                <span>Adicionar KR</span>
               </button>
             </div>
 
@@ -229,7 +229,7 @@ function handleSave() {
               <div
                 v-for="(kr, idx) in keyResults"
                 :key="kr.id"
-                class="p-4 rounded-xl bg-surface-dark/70 border border-surface-border space-y-3 relative group"
+                class="p-3 sm:p-4 rounded-xl bg-surface-dark/70 border border-surface-border space-y-3 relative group"
               >
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-xs font-bold text-slate-400 font-mono">KR #{{ idx + 1 }}</span>
@@ -237,16 +237,16 @@ function handleSave() {
                     v-if="keyResults.length > 1"
                     type="button"
                     @click="removeKeyResult(idx)"
-                    class="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
+                    class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
                     title="Remover KR"
                   >
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-12 gap-2.5 sm:gap-3">
                   <!-- Title -->
-                  <div class="md:col-span-6">
+                  <div class="col-span-2 sm:col-span-6">
                     <input
                       v-model="kr.title"
                       type="text"
@@ -256,18 +256,18 @@ function handleSave() {
                   </div>
 
                   <!-- Target Value -->
-                  <div class="md:col-span-3">
+                  <div class="col-span-1 sm:col-span-3">
                     <input
                       v-model.number="kr.target_value"
                       type="number"
                       min="1"
                       placeholder="Meta (ex: 12)"
-                      class="w-full px-3 py-2 rounded-lg bg-surface-card border border-surface-border focus:border-brand-500 text-xs text-white outline-none"
+                      class="w-full px-3 py-2 rounded-lg bg-surface-card border border-surface-border focus:border-brand-500 text-xs text-white font-mono outline-none"
                     />
                   </div>
 
                   <!-- Unit -->
-                  <div class="md:col-span-3">
+                  <div class="col-span-1 sm:col-span-3">
                     <input
                       v-model="kr.unit"
                       type="text"
@@ -278,12 +278,14 @@ function handleSave() {
                 </div>
 
                 <!-- Link to habit option -->
-                <div class="flex items-center gap-2 pt-1 text-xs">
-                  <Link2 class="w-3.5 h-3.5 text-slate-500" />
-                  <span class="text-slate-400">Vincular a hábito:</span>
+                <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <div class="flex items-center gap-1.5 text-slate-400">
+                    <Link2 class="w-3.5 h-3.5 text-slate-500" />
+                    <span>Vincular a hábito:</span>
+                  </div>
                   <select
                     v-model="kr.linked_habit_id"
-                    class="px-2.5 py-1 rounded-lg bg-surface-card border border-surface-border text-xs text-slate-200 outline-none"
+                    class="px-2.5 py-1.5 rounded-lg bg-surface-card border border-surface-border text-xs text-slate-200 outline-none flex-1 min-w-[140px]"
                   >
                     <option :value="undefined">Nenhum (progresso manual)</option>
                     <option v-for="h in habits" :key="h.id" :value="h.id">
@@ -296,18 +298,18 @@ function handleSave() {
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center justify-end gap-3 pt-4 border-t border-surface-border/60">
+          <div class="flex items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-surface-border/60">
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
             >
               Cancelar
             </button>
             <button
               type="submit"
               :disabled="loading || !title.trim()"
-              class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all"
+              class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
             >
               {{ loading ? 'Salvando...' : 'Criar Objetivo' }}
             </button>

@@ -25,11 +25,11 @@ const barColor = computed(() => {
 </script>
 
 <template>
-  <div class="p-3.5 rounded-xl bg-surface-dark/50 border border-surface-border/60 space-y-2">
+  <div class="p-3 sm:p-3.5 rounded-xl bg-surface-dark/60 border border-surface-border/60 space-y-2">
     <!-- Header: Title & Value -->
-    <div class="flex items-start justify-between gap-2">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div class="space-y-0.5 min-w-0">
-        <h4 class="text-xs font-semibold text-slate-200 truncate">
+        <h4 class="text-xs sm:text-sm font-semibold text-slate-200 truncate">
           {{ kr.title }}
         </h4>
         <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
@@ -38,25 +38,25 @@ const barColor = computed(() => {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0">
         <!-- Linked Habit Badge or Link Action -->
         <span
           v-if="linkedHabitName"
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 truncate max-w-[160px]"
           :title="`Vinculado ao hábito: ${linkedHabitName}`"
         >
-          <Link2 class="w-3 h-3" />
-          {{ linkedHabitName }}
+          <Link2 class="w-3 h-3 shrink-0" />
+          <span class="truncate">{{ linkedHabitName }}</span>
         </span>
         <button
           v-else
           type="button"
           @click="emit('linkHabit', kr.id)"
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-border/40 hover:bg-brand-600/20 text-slate-400 hover:text-brand-300 transition-colors"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-border/50 hover:bg-brand-600/20 text-slate-400 hover:text-brand-300 border border-surface-border transition-colors touch-target sm:min-h-0 sm:min-w-0"
           title="Vincular a um hábito diário"
         >
           <Link2 class="w-3 h-3" />
-          Vincular Hábito
+          <span>Vincular Hábito</span>
         </button>
 
         <span class="text-xs font-bold text-white font-mono w-10 text-right">

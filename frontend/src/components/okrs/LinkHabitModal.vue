@@ -27,32 +27,33 @@ function handleLink() {
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+      @click="emit('close')"
     >
       <div
-        class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-6 space-y-5"
+        class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
-          <div class="flex items-center gap-2">
-            <div class="p-2 rounded-xl bg-brand-500/10 text-brand-400">
-              <Link2 class="w-5 h-5" />
+          <div class="flex items-center gap-2.5">
+            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <Link2 class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h3 class="text-lg font-bold text-white">Vincular Hábito ao KR</h3>
+            <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Vincular Hábito ao KR</h3>
           </div>
           <button
             type="button"
             @click="emit('close')"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
         </div>
 
-        <p class="text-xs text-slate-400">
+        <p class="text-xs text-slate-400 leading-relaxed">
           Vincule o progresso diário de um hábito para atualizar automaticamente o Resultado-Chave:
-          <strong class="text-white block mt-1">"{{ krTitle }}"</strong>
+          <strong class="text-white block mt-1.5 p-2 rounded-xl bg-surface-dark border border-surface-border">"{{ krTitle }}"</strong>
         </p>
 
         <!-- Habit Select -->
@@ -72,11 +73,11 @@ function handleLink() {
         </div>
 
         <!-- Modal Actions -->
-        <div class="flex items-center justify-end gap-3 pt-3 border-t border-surface-border/60">
+        <div class="flex items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-surface-border/60">
           <button
             type="button"
             @click="emit('close')"
-            class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors"
+            class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             Cancelar
           </button>
@@ -84,7 +85,7 @@ function handleLink() {
             type="button"
             :disabled="!selectedHabitId || loading"
             @click="handleLink"
-            class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all"
+            class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
           >
             Confirmar Vínculo
           </button>

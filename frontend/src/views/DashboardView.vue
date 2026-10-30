@@ -184,15 +184,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+  <div class="space-y-6 sm:space-y-8 animate-fade-in">
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
-      class="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
+      class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'
-          ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
-          : 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+          ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200'
+          : 'bg-rose-950/95 border-rose-500/50 text-rose-200'
       "
     >
       <AlertCircle v-if="toastMessage.type === 'error'" class="w-4 h-4 shrink-0" />
@@ -201,17 +201,17 @@ onUnmounted(() => {
     </div>
 
     <!-- Header & Gauge Banner -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <header class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
       <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-3xl font-extrabold tracking-tight text-white font-outfit">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-outfit">
             Daily Focus
           </h1>
           <button
             type="button"
             @click="loadData"
             :disabled="routineStore.loading || habitStore.loading"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 border border-transparent hover:border-surface-border transition-colors touch-target"
             title="Atualizar dados"
           >
             <RefreshCw
@@ -220,7 +220,7 @@ onUnmounted(() => {
             />
           </button>
         </div>
-        <p class="text-sm text-slate-400 capitalize mt-1">{{ currentDateFormatted }}</p>
+        <p class="text-xs sm:text-sm text-slate-400 capitalize mt-1">{{ currentDateFormatted }}</p>
       </div>
 
       <DailyProgressGauge
@@ -231,58 +231,64 @@ onUnmounted(() => {
     </header>
 
     <!-- Main Grid: Routines (Left) & Habits (Right) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
       <!-- Left Column: Routine Timeline -->
-      <section class="lg:col-span-7 bg-surface-card border border-surface-border rounded-2xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-5">
-          <div class="flex items-center gap-2">
-            <Clock class="w-5 h-5 text-brand-400" />
-            <h2 class="text-lg font-bold text-white">Cronograma de Rotina</h2>
+      <section class="lg:col-span-7 bg-surface-card border border-surface-border rounded-2xl p-4 sm:p-6 shadow-sm glow-card flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-5 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <div class="p-1.5 rounded-lg bg-brand-500/10 text-brand-400">
+                <Clock class="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <h2 class="text-base sm:text-lg font-bold text-white font-outfit">Cronograma de Rotina</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                v-if="activeBlock"
+                class="text-xs font-medium text-brand-300 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full hidden sm:inline"
+              >
+                Em andamento: {{ activeBlock.name }}
+              </span>
+              <button
+                type="button"
+                @click="isRoutineModalOpen = true"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all touch-target sm:min-h-0 sm:min-w-0"
+                title="Criar ou reconfigurar rotina"
+              >
+                <Plus class="w-3.5 h-3.5" />
+                <span>Configurar Rotina</span>
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span
-              v-if="activeBlock"
-              class="text-xs font-medium text-brand-300 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full hidden sm:inline"
-            >
-              Em andamento: {{ activeBlock.name }}
-            </span>
-            <button
-              type="button"
-              @click="isRoutineModalOpen = true"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 transition-colors"
-              title="Criar ou reconfigurar rotina"
-            >
-              <Plus class="w-3.5 h-3.5" />
-              Configurar Rotina
-            </button>
-          </div>
-        </div>
 
-        <RoutineTimeline
-          :blocks="routineStore.blocks"
-          :active-block-id="activeBlock?.id"
-          :completed-block-ids="completedBlockIds"
-          :skipped-block-ids="skippedBlockIds"
-          :loading="routineStore.loading"
-          @complete="handleCompleteBlock"
-          @open-create="isRoutineModalOpen = true"
-        />
+          <RoutineTimeline
+            :blocks="routineStore.blocks"
+            :active-block-id="activeBlock?.id"
+            :completed-block-ids="completedBlockIds"
+            :skipped-block-ids="skippedBlockIds"
+            :loading="routineStore.loading"
+            @complete="handleCompleteBlock"
+            @open-create="isRoutineModalOpen = true"
+          />
+        </div>
       </section>
 
       <!-- Right Column: Today's Habits -->
-      <section class="lg:col-span-5 bg-surface-card border border-surface-border rounded-2xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-5">
-          <h2 class="text-lg font-bold text-white">Hábitos de Hoje</h2>
-          <span class="text-xs text-slate-400">
-            {{ habitStore.habits.filter((h) => h.streak.is_active_today).length }} de {{ habitStore.habits.length }} concluídos
-          </span>
-        </div>
+      <section class="lg:col-span-5 bg-surface-card border border-surface-border rounded-2xl p-4 sm:p-6 shadow-sm glow-card flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-base sm:text-lg font-bold text-white font-outfit">Hábitos de Hoje</h2>
+            <span class="text-xs text-slate-400 font-mono bg-surface-dark px-2.5 py-1 rounded-full border border-surface-border">
+              {{ habitStore.habits.filter((h) => h.streak.is_active_today).length }}/{{ habitStore.habits.length }} feitos
+            </span>
+          </div>
 
-        <HabitChecklist
-          :habits="habitStore.habits"
-          :loading="habitStore.loading"
-          @checkin="handleHabitCheckin"
-        />
+          <HabitChecklist
+            :habits="habitStore.habits"
+            :loading="habitStore.loading"
+            @checkin="handleHabitCheckin"
+          />
+        </div>
       </section>
     </div>
 

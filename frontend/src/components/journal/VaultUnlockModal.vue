@@ -37,28 +37,28 @@ function handleClose() {
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
       @click="handleClose"
     >
       <div
-        class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-6 space-y-5"
+        class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
-              <Lock class="w-5 h-5" />
+            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <Lock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-lg font-bold text-white">Desbloquear Diário</h3>
+              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Desbloquear Diário</h3>
               <p class="text-xs text-slate-400">Criptografia de Conhecimento Zero</p>
             </div>
           </div>
           <button
             type="button"
             @click="handleClose"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
@@ -95,7 +95,7 @@ function handleClose() {
             <button
               type="button"
               @click="showPassword = !showPassword"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
             >
               <EyeOff v-if="showPassword" class="w-4 h-4" />
               <Eye v-else class="w-4 h-4" />
@@ -109,7 +109,7 @@ function handleClose() {
             type="button"
             :disabled="!passphrase.trim() || loading"
             @click="handleUnlock"
-            class="w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2"
+            class="w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 touch-target sm:min-h-0 sm:min-w-0"
           >
             <KeyRound class="w-4 h-4" :class="{ 'animate-spin': loading }" />
             <span>{{ loading ? 'Derivando Chaves (Argon2id)...' : 'Desbloquear Reflexões' }}</span>
@@ -117,7 +117,7 @@ function handleClose() {
           <button
             type="button"
             @click="handleClose"
-            class="w-full py-2 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+            class="w-full py-2.5 text-xs font-medium text-slate-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             Cancelar
           </button>
