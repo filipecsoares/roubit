@@ -115,11 +115,11 @@ flowchart TD
 - [x] **3.2 Camada de Serviços, HTTP e Gerenciamento de Estado**
   - [x] Cliente HTTP (Axios / Fetch) configurado com interceptors (injeção de credenciais e geração automática de `Idempotency-Key` UUIDv4 para mutações).
   - [x] Stores Pinia: `useAuthStore`, `useRoutineStore`, `useHabitStore`, `useOkrStore`, `useJournalStore`.
-- [ ] **3.3 Módulo de Criptografia no Cliente (Web Crypto API / Argon2)**
-  - [ ] Implementar fluxo de desbloqueio de chave: usuário insere senha mestre/passphrase no navegador.
-  - [ ] Derivação de chave AES-256-GCM via Web Crypto API / WASM.
-  - [ ] Cifragem de reflexões do Journaling antes do envio HTTP e decifragem local após o recebimento.
-  - [ ] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
+- [x] **3.3 Módulo de Criptografia no Cliente (Web Crypto API / Argon2)**
+  - [x] Implementar fluxo de desbloqueio de chave: usuário insere senha mestre/passphrase no navegador.
+  - [x] Derivação de chave AES-256-GCM via Web Crypto API / WASM.
+  - [x] Cifragem de reflexões do Journaling antes do envio HTTP e decifragem local após o recebimento.
+  - [x] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
 - [ ] **3.4 Telas e Componentes da Interface**
   - [ ] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
   - [ ] **Dashboard Unificado Diário:**
