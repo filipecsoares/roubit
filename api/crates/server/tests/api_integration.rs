@@ -201,7 +201,7 @@ async fn test_unauthenticated_and_malformed_requests() {
         .method("GET")
         .header(
             "authorization",
-            "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.bad.signature",
+            "Bearer invalid-signature-token",
         )
         .body(Body::empty())
         .expect("Build bad JWT request");
