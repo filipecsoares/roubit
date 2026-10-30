@@ -3,6 +3,7 @@
 //! Provides an ergonomic terminal interface for routines, habits, OKRs, and encrypted journaling.
 
 pub mod args;
+pub mod client;
 pub mod commands;
 pub mod interactive;
 pub mod ui;

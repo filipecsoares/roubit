@@ -34,3 +34,6 @@ colored.workspace = true
 indicatif.workspace = true
 rpassword.workspace = true
 tempfile.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true

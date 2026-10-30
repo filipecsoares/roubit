@@ -3,6 +3,7 @@
 //! Exposes argument parsers, command handlers, and terminal UI visualization.
 
 pub mod args;
+pub mod client;
 pub mod commands;
 pub mod interactive;
 pub mod ui;

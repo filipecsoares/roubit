@@ -21,6 +21,16 @@ pub struct CliArgs {
     )]
     pub db: Option<String>,
 
+    /// Remote HTTP API base URL (e.g., <https://api.roubit.local>).
+    #[arg(
+        global = true,
+        short = 'r',
+        long,
+        env = "ROUBIT_REMOTE_URL",
+        help = "Remote API base URL"
+    )]
+    pub remote: Option<String>,
+
     /// Output responses in machine-readable raw JSON format.
     #[arg(global = true, long, help = "Output response in raw JSON format")]
     pub json: bool,
