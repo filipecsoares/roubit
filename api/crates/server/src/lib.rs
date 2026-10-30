@@ -11,6 +11,12 @@ pub use auth::{
     decode_jwt, encode_jwt, hash_password, verify_password, AuthResponse, AuthenticatedUser,
     Claims, LoginRequest, RegisterRequest, UserDto,
 };
+pub use controllers::{
+    habit_routes, journal_routes, okr_routes, routine_routes, CheckinResponse, CreateHabitRequest,
+    CreateKeyResultRequest, CreateObjectiveRequest, CreateRoutineRequest, CreateTimeBlockRequest,
+    EncryptedJournalResponse, HabitCheckinRequest, JournalMetadataQuery, ListOkrsQuery,
+    LogBlockStatusRequest, RoutineWithProgressResponse, SaveEncryptedJournalRequest,
+};
 pub use errors::{ApiError, ProblemDetails};
 pub use middleware::{
     build_cors_layer, idempotency_middleware, purge_expired_keys, security_headers_middleware,

@@ -98,10 +98,10 @@ flowchart TD
   - [x] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
 - [ ] **2.5 Adaptação da CLI para Modo Híbrido**
   - [ ] Permitir que a CLI opere conectando-se à API HTTP REST via flag/configuração (`--remote` / `ROUBIT_API_URL`), além do modo local SQLite.
-- [ ] **2.6 Validação de Segurança & CI da Fase 2**
-  - [ ] Testes E2E dos endpoints HTTP REST.
-  - [ ] Testes de concorrência e teste de validação do header de idempotência.
-  - [ ] Integração de análise estática de segurança (SAST) com `cargo audit` no pipeline.
+- [x] **2.6 Validação de Segurança & CI da Fase 2**
+  - [x] Testes E2E dos endpoints HTTP REST.
+  - [x] Testes de concorrência e teste de validação do header de idempotência.
+  - [x] Integração de análise estática de segurança (SAST) com `cargo audit` no pipeline.
 
 ---
 
