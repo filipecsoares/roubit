@@ -1,6 +1,6 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 3: Frontend SPA - Vue 3 / Vite)  
+> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 4: Infraestrutura Redis & PostgreSQL)  
 > **Última Atualização:** 2026-10-30  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
@@ -19,9 +19,9 @@
 | **06. Journaling Criptografado** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **07. Aplicação CLI (Terminal)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **08. API REST & Idempotência** | 6 | 6 | 0 | 0 | 🟢 Concluído |
-| **09. Frontend SPA (Vue 3)** | 6 | 5 | 0 | 1 | 🟡 Em Progresso |
+| **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **42** | **0** | **6** | **87.5%** |
+| **TOTAL** | **48** | **43** | **0** | **5** | **89.6%** |
 
 ---
 
@@ -120,7 +120,7 @@
 | **09.3** | Criptografia no Cliente via Web Crypto API | [activity-03-web-crypto-selective-encryption.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-03-web-crypto-selective-encryption.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **09.4** | Dashboard Unificado (Rotinas & Hábitos) | [activity-04-daily-dashboard-routines-habits.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-04-daily-dashboard-routines-habits.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **09.5** | Visualização de Heatmap & Árvore de OKRs | [activity-05-habits-heatmap-okrs-views.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-05-habits-heatmap-okrs-views.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
-| **09.6** | UI do Diário Criptografado & Testes Vitest | [activity-06-encrypted-journal-component-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-06-encrypted-journal-component-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **09.6** | UI do Diário Criptografado & Testes Vitest | [activity-06-encrypted-journal-component-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/09-frontend-spa/activity-06-encrypted-journal-component-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 
 ---
 

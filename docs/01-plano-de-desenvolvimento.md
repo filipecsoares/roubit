@@ -120,8 +120,8 @@ flowchart TD
   - [x] Derivação de chave AES-256-GCM via Web Crypto API / WASM.
   - [x] Cifragem de reflexões do Journaling antes do envio HTTP e decifragem local após o recebimento.
   - [x] Política de retenção de chave exclusivamente em memória de sessão (sem persistir senha ou chave privada em texto claro no LocalStorage).
-- [ ] **3.4 Telas e Componentes da Interface**
-  - [ ] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
+- [x] **3.4 Telas e Componentes da Interface**
+  - [x] **Painel de Autenticação:** Login, Registro e Modal de Desbloqueio do Diário.
   - [x] **Dashboard Unificado Diário:**
     - [x] Visualização da linha do tempo dos Blocos de Rotina com status em tempo real.
     - [x] Lista de Hábitos do dia com ações de check-in rápido em um clique (ou input numérico/timer).
@@ -130,12 +130,12 @@ flowchart TD
     - [x] Visualização gráfica de sequências (*streaks*), calendário estilo mapa de calor (estilo GitHub contributions).
   - [x] **Módulo de OKRs:**
     - [x] Árvore de visualização de Objetivos e Resultados-Chave com medidores de progresso interativos.
-  - [ ] **Módulo de Journaling Criptografado:**
-    - Editor minimalista com foco em escrita reflexiva (intenções do dia e retrospectiva noturna).
-    - Indicador visual de criptografia ativa (cadeado fechado e status da chave).
-- [ ] **3.5 Testes de Frontend e Acessibilidade**
-  - [ ] Testes unitários de componentes e stores com Vitest.
-  - [ ] Validação de responsividade (Desktop e Mobile) e ergonomia visual.
+  - [x] **Módulo de Journaling Criptografado:**
+    - [x] Editor minimalista com foco em escrita reflexiva (intenções do dia e retrospectiva noturna).
+    - [x] Indicador visual de criptografia ativa (cadeado fechado e status da chave).
+- [x] **3.5 Testes de Frontend e Acessibilidade**
+  - [x] Testes unitários de componentes e stores com Vitest.
+  - [x] Validação de responsividade (Desktop e Mobile) e ergonomia visual.
 
 ---
 
