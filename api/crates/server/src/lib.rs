@@ -1,6 +1,7 @@
 //! Roubit REST API Server Library
 
 pub mod auth;
+pub mod controllers;
 pub mod errors;
 pub mod middleware;
 pub mod server;

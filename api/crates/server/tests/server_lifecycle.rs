@@ -169,3 +169,233 @@ async fn test_tcp_auth_register_and_protected_me_endpoint() {
         .expect("Clean shutdown")
         .expect("Server panic");
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
+    let pool = create_sqlite_pool("sqlite::memory:")
+        .await
+        .expect("Failed to create memory db");
+    roubit_core::run_migrations(&pool)
+        .await
+        .expect("Failed to apply migrations");
+    let config = AppConfig {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 0,
+        ..Default::default()
+    };
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind ephemeral port");
+    let local_addr = listener.local_addr().expect("Failed to get local address");
+
+    let state = AppState::new(pool, config);
+    let app = build_router(state);
+
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .expect("Server exited with error");
+    });
+
+    let client = reqwest::Client::new();
+
+    // 1. Register user
+    let reg_url = format!("http://{local_addr}/api/v1/auth/register");
+    let reg_res = client
+        .post(&reg_url)
+        .json(&roubit_server::RegisterRequest {
+            email: "domain_user@roubit.app".to_string(),
+            password: "supersecurepassword123".to_string(),
+        })
+        .send()
+        .await
+        .expect("Register failed");
+    let auth: roubit_server::AuthResponse = reg_res.json().await.expect("Valid auth");
+
+    // 2. Routines CRUD
+    let routines_url = format!("http://{local_addr}/api/v1/routines");
+    let create_routine_res = client
+        .post(&routines_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Morning Productivity",
+            "description": "Deep work routine",
+            "is_active": true,
+            "blocks": [
+                {
+                    "name": "Meditation",
+                    "start_time": "08:00:00",
+                    "end_time": "08:30:00",
+                    "category": "Mindfulness",
+                    "color_hex": "#10B981"
+                },
+                {
+                    "name": "Deep Coding",
+                    "start_time": "08:30:00",
+                    "end_time": "10:30:00",
+                    "category": "Deep Work",
+                    "color_hex": "#6366F1"
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Create routine failed");
+    assert_eq!(create_routine_res.status(), reqwest::StatusCode::CREATED);
+    let created_routine: roubit_core::Routine =
+        create_routine_res.json().await.expect("Parse routine");
+    assert_eq!(created_routine.name, "Morning Productivity");
+
+    // Fetch active routine
+    let get_routine_res = client
+        .get(&routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get routine failed");
+    assert_eq!(get_routine_res.status(), reqwest::StatusCode::OK);
+    let routine_prog: roubit_server::controllers::RoutineWithProgressResponse = get_routine_res
+        .json()
+        .await
+        .expect("Parse routine with progress");
+    assert_eq!(routine_prog.blocks.len(), 2);
+    let block1_id = routine_prog.blocks[0].id;
+
+    // Complete time block
+    let complete_url = format!("http://{local_addr}/api/v1/routines/blocks/{block1_id}/complete");
+    let complete_res = client
+        .post(&complete_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "status": "completed",
+            "notes": "Done effortlessly"
+        }))
+        .send()
+        .await
+        .expect("Complete block failed");
+    assert_eq!(complete_res.status(), reqwest::StatusCode::OK);
+
+    // 3. Habits CRUD & Idempotent check-in
+    let habits_url = format!("http://{local_addr}/api/v1/habits");
+    let create_habit_res = client
+        .post(&habits_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Drink Water",
+            "habit_type": "numeric",
+            "target_value": 2.5,
+            "unit": "Liters",
+            "frequency_days": 127
+        }))
+        .send()
+        .await
+        .expect("Create habit failed");
+    assert_eq!(create_habit_res.status(), reqwest::StatusCode::CREATED);
+    let habit: roubit_core::Habit = create_habit_res.json().await.expect("Parse habit");
+
+    // Checkin with Idempotency-Key
+    let checkin_url = format!("http://{local_addr}/api/v1/habits/{}/checkin", habit.id);
+    let checkin_key = "habit-checkin-uuid-key-1";
+    let checkin_res1 = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .header("idempotency-key", checkin_key)
+        .json(&serde_json::json!({
+            "date": "2026-10-30",
+            "value": 1.5,
+            "is_increment": false
+        }))
+        .send()
+        .await
+        .expect("Checkin 1 failed");
+    assert_eq!(checkin_res1.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        checkin_res1
+            .headers()
+            .get("x-cache")
+            .and_then(|v| v.to_str().ok()),
+        Some("MISS")
+    );
+
+    // Replay checkin with same Idempotency-Key
+    let checkin_res2 = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .header("idempotency-key", checkin_key)
+        .json(&serde_json::json!({
+            "date": "2026-10-30",
+            "value": 1.5,
+            "is_increment": false
+        }))
+        .send()
+        .await
+        .expect("Checkin 2 failed");
+    assert_eq!(checkin_res2.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        checkin_res2
+            .headers()
+            .get("x-cache")
+            .and_then(|v| v.to_str().ok()),
+        Some("HIT")
+    );
+
+    // List habits
+    let list_habits_res = client
+        .get(&habits_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List habits failed");
+    assert_eq!(list_habits_res.status(), reqwest::StatusCode::OK);
+
+    // 4. OKRs CRUD
+    let okrs_url = format!("http://{local_addr}/api/v1/okrs");
+    let create_okr_res = client
+        .post(&okrs_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "title": "Master Rust Web Architecture",
+            "description": "High performance APIs with Axum",
+            "quarter": "Q4-2026",
+            "key_results": [
+                {
+                    "title": "Drink water for cognitive stamina",
+                    "initial_value": 0.0,
+                    "target_value": 100.0,
+                    "unit": "%",
+                    "linked_habit_id": habit.id
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Create OKR failed");
+    assert_eq!(create_okr_res.status(), reqwest::StatusCode::CREATED);
+
+    // List OKRs
+    let list_okrs_res = client
+        .get(&okrs_url)
+        .query(&[("quarter", "Q4-2026")])
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List OKRs failed");
+    assert_eq!(list_okrs_res.status(), reqwest::StatusCode::OK);
+    let okrs: Vec<roubit_core::ObjectiveWithKeyResults> =
+        list_okrs_res.json().await.expect("Parse OKRs");
+    assert_eq!(okrs.len(), 1);
+    assert_eq!(okrs[0].key_results.len(), 1);
+
+    let _ = shutdown_tx.send(());
+    tokio::time::timeout(Duration::from_secs(3), server_handle)
+        .await
+        .expect("Clean shutdown")
+        .expect("Server panic");
+}
