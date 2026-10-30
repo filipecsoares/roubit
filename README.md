@@ -1,179 +1,292 @@
-# Roubit (Routine + Habit)
+# Roubit
 
-> **O seu sistema integrado de rotina diária, hábitos, metas e reflexão privada.**  
-> Planeje o seu dia com blocos de tempo, construa consistência com hábitos inteligentes, alinhe suas ações diárias aos seus objetivos de longo prazo e registre suas reflexões em um diário com privacidade absoluta.
+> **Routine + Habit** — A high-performance personal operating system that integrates daily time-blocking, habit tracking, OKR goal alignment, and zero-knowledge encrypted journaling.
 
-[![Progresso](https://img.shields.io/badge/Progresso-48%2F48%20Atividades%20(100%25)-brightgreen)](docs/02-status-atividades.md)
-[![Privacidade](https://img.shields.io/badge/Privacidade-Zero--Knowledge%20(Criptografado)-blueviolet)](docs/00-especificacao-tecnica.md#5-segurança--criptografia)
-[![Docker Ready](https://img.shields.io/badge/Docker-Pronto%20para%20Uso-2496ED?logo=docker)](docker-compose.yml)
-[![Licença: MIT/Apache-2.0](https://img.shields.io/badge/Licen%C3%A7a-MIT%20ou%20Apache--2.0-blue.svg)](LICENSE-MIT)
-
----
-
-## 🎯 Por que o Roubit?
-
-Muitas ferramentas de produtividade funcionam isoladas: você tem um aplicativo para tarefas diárias, outro para rastrear hábitos, uma planilha corporativa para metas e um bloco de notas para pensamentos pessoais. O resultado é dispersão, perda de tempo e falta de conexão entre o que você faz hoje e onde quer chegar no futuro.
-
-O **Roubit** resolve isso unindo os quatro pilares fundamentais da vida pessoal em uma experiência única, rápida e sem distrações:
-
-1. **Rotinas Claras:** Menos ansiedade sabendo exatamente o que fazer em cada momento do dia.
-2. **Hábitos Conectados:** Seus hábitos diários alimentam diretamente seus grandes objetivos de vida.
-3. **Privacidade Absoluta:** Suas anotações íntimas são criptografadas no seu dispositivo antes de serem salvas. Ninguém além de você consegue ler.
-4. **Agilidade Instantânea:** Interface web moderna ou comandos diretos no terminal para quem prefere o teclado.
+[![Progress](https://img.shields.io/badge/Progress-48%2F48%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
+[![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust)](https://www.rust-lang.org/)
+[![Vue 3](https://img.shields.io/badge/Vue.js-3.5%2B-4FC08D?logo=vuedotjs)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Security](https://img.shields.io/badge/Security-Zero--Knowledge%20(AES--256--GCM)-blueviolet)](docs/00-especificacao-tecnica.md#5-segurança--criptografia)
+[![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?logo=docker)](docker-compose.yml)
+[![P99 Latency](https://img.shields.io/badge/P99%20Latency-4.875ms-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
+[![Memory RSS](https://img.shields.io/badge/Memory%20RSS-13.11MB-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
+[![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 ---
 
-## ✨ Funcionalidades Principais
+## 🎯 Why Roubit?
 
-### ⏱️ 1. Planejamento Diário por Blocos de Tempo (Time Blocking)
-- **Organização Cronológica:** Monte seu dia definindo blocos de foco (ex.: *Trabalho Profundo*, *Treino*, *Almoço*, *Estudos*, *Descanso*).
-- **Sem Conflitos de Horário:** O sistema valida automaticamente sua grade e impede agendamentos sobrepostos.
-- **Linha do Tempo em Tempo Real:** Acompanhe qual atividade está acontecendo agora e atualize o status com um clique (`Pendente` $\to$ `Em Andamento` $\to$ `Concluído` ou `Pulado`).
-- **Aderência Diária:** Veja no final do dia a sua porcentagem real de cumprimento da rotina planejada.
+Most productivity setups are fragmented: a to-do list in one app, habit tracking in another, quarterly goals buried in spreadsheets, and private thoughts scattered across text files. This fragmentation creates friction, context-switching, and a disconnect between what you do each day and what you want to achieve long-term.
 
-### ⚡ 2. Rastreador de Hábitos com Streaks Inteligentes
-- **3 Tipos de Hábitos Flexíveis:**
-  - **Sim/Não (Binário):** Tarefas simples de marcar (ex.: *Tomar suplementos*, *Arrumar a cama*).
-  - **Quantitativo (Numérico):** Atingimento de metas diárias acumuladas (ex.: *Beber 2.500 ml de água*, *Ler 20 páginas*).
-  - **Cronômetro (Timer):** Medição de tempo dedicado com cronômetro integrado (ex.: *30 min de meditação*, *45 min de estudo*).
-- **Streaks Resilientes:** Configure dias específicos da semana para cada hábito. Se um hábito é apenas de segunda a sexta, seus dias de descanso no fim de semana não quebram sua sequência de dias seguidos (*streak*)!
-- **Mapa de Calor Anual:** Visualize seu histórico de consistência em um gráfico de calor anual de 52 semanas no estilo GitHub.
+**Roubit** brings these four essential pillars together into a cohesive, distraction-free environment:
 
-### 🎯 3. Alinhamento de Objetivos & OKRs
-- **Metas Trimestrais Claras:** Crie seus grandes objetivos para o trimestre (ex.: *Conquistar Fluência em Espanhol*, *Melhorar Condicionamento Físico*).
-- **Resultados-Chave Mensuráveis (KRs):** Divida o objetivo em métricas tangíveis (ex.: *Fazer 60 lições*, *Correr 100 km*).
-- **Evolução Automática:** Conecte seus hábitos diários aos seus objetivos. Conforme você registra seus hábitos no dia a dia, a barra de progresso do seu objetivo trimestral sobe automaticamente, sem retrabalho!
-
-### 🔒 4. Diário Pessoal Criptografado (Zero-Knowledge)
-- **Privacidade Inviolável:** Suas reflexões e pensamentos são cifrados diretamente no seu navegador ou terminal usando uma senha mestra pessoal (algoritmo AES-256-GCM).
-- **Nem o Servidor Consegue Ler:** O texto descriptografado nunca transita pela rede e nunca é salvo em texto puro no banco de dados. Mesmo se o servidor for invadido, suas anotações continuam ilegíveis.
-- **Acompanhamento de Humor e Tags:** Registre sua nota de humor do dia (1 a 5) e tags temáticas para identificar padrões de bem-estar ao longo dos meses.
-
-### 🖥️ 5. Duas Formas de Usar: Web Moderna ou Terminal (CLI)
-- **Interface Web Completa:** Desenvolvida em Vue 3, com visual moderno, modo escuro e gráficos intuitivos.
-- **CLI Rápida de Terminal:** Para desenvolvedores e usuários avançados que preferem gerenciar o dia sem tirar as mãos do teclado.
+1. **Daily Focus:** Structure your day into clear time blocks, avoiding overbooking and decision fatigue.
+2. **Habits with Purpose:** Your daily habits directly feed into and advance your long-term quarterly goals.
+3. **Uncompromising Privacy:** Your journal entries are encrypted on your device using client-side zero-knowledge encryption before reaching storage.
+4. **Blazing Speed & Safety:** Powered by a Rust backend with sub-5ms tail latency, minimal memory usage, and zero cloud lock-in.
 
 ---
 
-## 🚀 Como Executar o Roubit
+## ✨ Core Features
 
-Você pode executar o Roubit de forma imediata via **Docker** (recomendado para uso) ou em modo de **desenvolvimento local**.
+### ⏱️ 1. Time-Blocked Daily Routines (RF01)
+- **Chronological Day Planning:** Build daily schedules with distinct focus blocks (*Deep Work*, *Workout*, *Study*, *Rest*).
+- **Conflict Prevention Engine:** Mathematical non-overlap validation running in $O(N \log N)$ prevents scheduling collisions.
+- **Real-Time Day Tracker:** Follow the active block in real time and log state transitions (`Pending` $\to$ `In Progress` $\to$ `Completed` / `Skipped`).
+- **Adherence Score:** Automatically calculates your scheduled vs. completed duration percentage at the end of each day.
 
-### Pré-requisitos Básicos
-- **Para rodar com Docker:** Docker 24+ e Docker Compose v2+.
-- **Para rodar o código-fonte:** Rust 1.85+ e Node.js 20+.
+### ⚡ 2. Smart Habit Tracker & Resilient Streaks (RF02)
+- **Three Flexible Habit Types:**
+  - **Binary Habits:** Simple completion toggles (e.g., *Take vitamins*, *Make bed*).
+  - **Numeric Habits:** Incremental daily targets (e.g., *Drink 2500 ml water*, *Read 25 pages*).
+  - **Timer Habits:** Integrated stopwatch for duration-based habits (e.g., *Meditate 20 min*, *Practice guitar*).
+- **Smart Streaks:** Rest days and custom schedules (e.g., weekday-only habits) do not break your streaks on scheduled off-days.
+- **52-Week Contribution Heatmap:** GitHub-style visual consistency grid tracking your momentum across the entire year.
+
+### 🎯 3. Goal Alignment & OKRs Engine (RF03)
+- **Quarterly Objectives & Key Results:** Structure large strategic ambitions into quantifiable, measurable targets.
+- **Habit-to-KR Linking:** Connect daily habits directly to quarterly key results.
+- **Automated Progress Roll-Up:** Whenever you record a habit check-in, your linked OKR progress bars advance automatically.
+
+### 🔒 4. Zero-Knowledge Encrypted Journal (RF04)
+- **Client-Side Encryption:** Personal reflections are encrypted in your browser or terminal using **AES-256-GCM** with keys derived via **Argon2id**.
+- **Zero Plaintext on Disk/Server:** The server only stores ciphertext envelopes. Even if the database is exposed, your private thoughts remain completely unreadable.
+- **Indexed Search Metadata:** Mood ratings (1–5) and categorical tags remain open for trend analysis without compromising reflection text.
+- **Volatile Memory Scrubbing:** Derived keys and sensitive buffers are zeroed out in memory upon use using Rust's `zeroize` trait.
+
+### 🖥️ 5. Dual Interface: Web SPA & Terminal CLI
+- **Modern Web App:** Responsive Vue 3 Single Page Application with clean aesthetics, dark mode, and interactive modals.
+- **Fast Terminal CLI:** Full-featured command-line interface (`roubit`) for keyboard-centric and offline workflows.
 
 ---
 
-### Opção 1: Inicialização em 1 Comando (Docker Compose — Recomendado)
+## 🏗️ Architecture & Technology Stack
 
-Esta opção inicializa todo o ecossistema pronto para uso (Interface Web, Servidor API, Banco de Dados e Cache):
+```mermaid
+flowchart TD
+    subgraph Clients["Clients (End-to-End Encryption)"]
+        Web["Vue 3 SPA<br/>(Web Crypto API / Pinia / Tailwind)"]
+        CLI["Terminal CLI<br/>(Clap / Ratatui UI / Zeroize)"]
+    end
+
+    subgraph Server["Backend Engine (Rust / Axum)"]
+        API["REST API & SSE Stream<br/>(Axum 0.8 / Tokio / Tracing)"]
+        Idempotency["Idempotency Interceptor<br/>(24h Key Guard)"]
+        Domain["Domain Services<br/>(Routines, Habits, OKRs, Journal)"]
+    end
+
+    subgraph Storage["Data & Infrastructure Layer"]
+        Redis[("Redis 7<br/>Locks, TTL Keyspace, Cache")]
+        DB[("Dual Database Engine<br/>SQLite WAL & PostgreSQL 16")]
+    end
+
+    Web -->|HTTP / REST + SSE| API
+    CLI -->|In-Process or HTTP| Domain
+    API --> Idempotency --> Domain
+    Domain --> DB
+    Domain --> Redis
+    Redis -.->|Expired TTL Events| API
+```
+
+| Layer | Technologies | Key Highlights |
+| :--- | :--- | :--- |
+| **Backend** | Rust 1.85+, Axum 0.8, Tokio, SQLx | Non-blocking asynchronous I/O, compile-time SQL checks, OWASP headers. |
+| **Frontend** | Vue 3.5, TypeScript 5, Vite, Pinia, TailwindCSS | Composition API, responsive layout, Web Crypto API for client encryption. |
+| **Storage** | SQLite (WAL mode) / PostgreSQL 16 | Zero-setup local SQLite for single-user; native PostgreSQL for distributed stack. |
+| **Cache & Queue** | Redis 7 | Distributed mutual exclusion locks, keyspace expiration notifications for SSE reminders. |
+| **Security** | Argon2id & AES-256-GCM, Zeroize | Memory-hard KDF, authenticated ciphertext envelopes, memory wiping on drop. |
+
+---
+
+## 🚀 Quick Start & Execution
+
+Roubit can be launched in one command via **Docker Compose** or run natively for **local development**.
+
+### Prerequisites
+- **For Docker Deployment:** Docker Engine 24.0+ and Docker Compose v2.20+.
+- **For Native Development:** Rust 1.85.0+ and Node.js 20.x+ (with npm 10.x+).
+
+---
+
+### Option A: 1-Command Stack via Docker Compose (Recommended)
+
+Spins up PostgreSQL 16, Redis 7, Axum REST API, and the Vue 3 SPA behind an Nginx reverse proxy:
 
 ```bash
-# 1. Clone o repositório
+# 1. Clone the repository
 git clone https://github.com/filipecsoares/roubit.git
 cd roubit
 
-# 2. Inicie todos os serviços em segundo plano
+# 2. Start all services in the background
 docker compose up -d
+
+# 3. Check running status
+docker compose ps
 ```
 
-Pronto! Acesse no seu navegador:
-- 🌐 **Interface Web (Aplicação):** [http://localhost](http://localhost)
-- 🔌 **API REST de Apoio:** [http://localhost:8080](http://localhost:8080)
+#### Access Points:
+- 🌐 **Web Application:** [http://localhost](http://localhost) (Port 80)
+- 🔌 **REST API Service:** [http://localhost:8080](http://localhost:8080)
+- 📊 **Health Check:** `curl http://localhost:8080/health`
 
-Para parar os serviços quando terminar:
+To stop all services:
 ```bash
 docker compose down
 ```
 
 ---
 
-### Opção 2: Desenvolvimento Local (Nativo)
+### Option B: Local Native Development
 
-Se você deseja alterar o código ou rodar diretamente na sua máquina:
-
-#### 1. Iniciar o Servidor (Backend em Rust)
-Por padrão, o servidor utiliza um banco local SQLite automático que não requer configuração adicional:
+#### 1. Start the Backend API (Rust)
+By default, the server runs against an embedded local SQLite database (`roubit.db`) with zero setup needed:
 ```bash
 cargo run --bin roubit-server
 ```
-*O servidor estará ativo em `http://127.0.0.1:8080`.*
+*The server starts listening on `http://127.0.0.1:8080`.*
 
-#### 2. Iniciar a Interface Web (Frontend em Vue 3)
-Em outro terminal:
+#### 2. Start the Frontend App (Vue 3)
+In a separate terminal:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*Abra [http://localhost:5173](http://localhost:5173) no navegador.*
+*Open [http://localhost:5173](http://localhost:5173) in your browser. API requests are automatically proxied to the backend.*
 
 ---
 
-### Opção 3: Usando Diretamente no Terminal (CLI)
+### Option C: Terminal CLI Standalone Mode
 
-O Roubit conta com uma ferramenta de linha de comando (`roubit`) que gerencia suas rotinas e hábitos localmente:
+The command-line interface (`roubit`) can run directly against your local SQLite database without needing the web server:
 
 ```bash
-# Compilar o executável
+# Compile optimized release binary
 cargo build --release --bin roubit
 
-# Adicionar aos comandos do sistema (opcional)
+# (Optional) Install to system PATH
 sudo cp target/release/roubit /usr/local/bin/
 ```
 
-#### Comandos Rápidos do Dia a Dia:
+#### Daily CLI Commands:
 ```bash
-# 📅 Ver os blocos da rotina de hoje
+# 📅 View today's scheduled routine blocks
 roubit routine list
 
-# Iniciar ou concluir um bloco
-roubit routine start <ID_DO_BLOCO>
-roubit routine complete <ID_DO_BLOCO>
+# Mark time blocks in-progress or completed
+roubit routine start <BLOCK_ID>
+roubit routine complete <BLOCK_ID>
 
-# ⚡ Registrar cumprimento de um hábito
-roubit habit checkin <ID_DO_HABITO>
+# ⚡ Record a habit check-in
+roubit habit checkin <HABIT_ID> --value 1.0
 
-# Ver suas sequências de hábitos (streaks)
+# View current streaks and consistency
 roubit habit streaks
 
-# 🎯 Ver seus objetivos e metas trimestrais
+# 🎯 Inspect quarterly OKRs and progress
 roubit okr list
 
-# 🔒 Escrever no seu diário com criptografia (solicita sua senha mestra)
-roubit journal write --mood 5 --tags "foco,produtividade"
+# 🔒 Write an encrypted journal entry (prompts securely for passphrase)
+roubit journal write --mood 5 --tags "focus,shipping"
 
-# Ler o diário de hoje
+# Read today's decrypted journal entry
 roubit journal read
+
+# ⚙️ Migrate SQLite data to PostgreSQL
+roubit admin migrate-to-postgres \
+  --from sqlite://roubit.db \
+  --to postgres://user:password@localhost:5432/roubit
 ```
 
 ---
 
-## 🛡️ Como Funciona a Criptografia do Diário?
+## 🔒 Zero-Knowledge Security Model
 
-1. Ao abrir o diário, você define uma **senha mestra pessoal**.
-2. Essa senha é processada no seu próprio dispositivo para gerar uma chave criptográfica temporária.
-3. Quando você clica em salvar, seu texto é transformado em um código ilegível (*ciphertext*) antes de ser enviado.
-4. Ao fechar a aba ou bloquear o cofre, a chave é imediatamente apagada da memória volátil. Nem você nem ninguém conseguirá ler o texto sem informar a senha novamente.
+Roubit ensures confidentiality using a **zero-knowledge cryptographic pipeline**:
 
----
-
-## 📚 Documentação Técnica para Desenvolvedores
-
-Se você é desenvolvedor e quer explorar a arquitetura interna, os benchmarks de performance ou as especificações das rotas, consulte os documentos detalhados na pasta [`docs/`](docs/):
-
-- 📐 **[Especificação Técnica Completa](docs/00-especificacao-tecnica.md):** Decisões de arquitetura, padrões e diagramas.
-- 📋 **[Plano de Desenvolvimento & WBS](docs/01-plano-de-desenvolvimento.md):** Estrutura analítica das 10 features do projeto.
-- 🚦 **[Painel de Estado das Atividades](docs/02-status-atividades.md):** Detalhamento das 48 tarefas concluídas.
-- ⚡ **[Relatório Oficial de Carga e Benchmark](docs/benchmarks/01-load-test-p99-memory-report.md):** Validação de P99 < 5ms e consumo de memória < 14MB.
+1. **Client-Side Key Derivation:** Passphrases are never transmitted over the network. Keys are derived on-device using **Argon2id** (RFC 9106) with $m=64\,\text{MB}$, $t=3$ iterations, and a unique 16-byte random salt.
+2. **Authenticated Encryption:** Plaintext notes are encrypted using **AES-256-GCM** (NIST SP 800-38D) with a fresh 12-byte random IV and a 16-byte authentication tag per entry.
+3. **Dual Storage Isolation:** Searchable metadata (mood score 1–5, tags, dates) is indexed for fast timeline navigation, while reflection contents remain strictly ciphertext.
+4. **Memory Hygiene:** Ephemeral key buffers implement Rust's `Zeroize` trait, wiping sensitive bytes from RAM immediately after encryption or decryption.
 
 ---
 
-## 📄 Licença
+## 📊 Performance Benchmarks (RNF04)
 
-O Roubit é disponibilizado sob licença dupla:
+Under concurrent load testing on Linux x86_64 (`release` profile, LTO enabled):
+
+| Metric | Target (RNF04) | Official Result | Verdict |
+| :--- | :---: | :---: | :---: |
+| **Throughput** | $> 1,000\text{ req/s}$ | **10,491.17 req/s** | 🟢 **10x above requirement** |
+| **P50 Latency (Median)** | — | **1.770 ms** | 🟢 Sub-2ms response |
+| **P95 Latency** | $< 5.0\text{ ms}$ | **2.625 ms** | 🟢 Exceeded |
+| **P99 Tail Latency** | **$< 10.0\text{ ms}$** | **4.875 ms** | 🟢 **Approved (48.7% of budget)** |
+| **Resident Memory (RSS)** | **$< 25.0\text{ MB}$** | **13.11 MB** | 🟢 **Approved (52.4% of budget)** |
+| **Success Rate (HTTP 200)** | $> 99.9\%$ | **100.0% (1,000 / 1,000)** | 🟢 0 errors |
+
+*Detailed benchmark methodology and K6 scripts are available in [docs/benchmarks/01-load-test-p99-memory-report.md](docs/benchmarks/01-load-test-p99-memory-report.md).*
+
+---
+
+## 🧪 Testing & Quality Suite
+
+Roubit enforces zero warnings (`-D warnings`), Clippy linter hygiene, and full test coverage:
+
+```bash
+# Run all Rust workspace unit and integration tests (158 tests)
+cargo test --workspace --manifest-path api/Cargo.toml
+
+# Run NIST SP 800-38D and RFC 9106 crypto vectors
+cargo test --test crypto_vectors --manifest-path api/Cargo.toml
+
+# Run in-process P99 load benchmark
+cargo test --test load_p99_benchmark --manifest-path api/Cargo.toml --release -- --nocapture
+
+# Run frontend Vitest suite (45 tests) & TypeScript build
+npm test --prefix frontend
+npm run build --prefix frontend
+
+# Run complete pre-commit quality gate (fmt, clippy, tests, build)
+./scripts/pre-commit.sh
+```
+
+---
+
+## 📁 Repository Structure
+
+```text
+roubit/
+├── api/                     # Rust Multi-Crate Workspace
+│   ├── crates/core/         # Domain engines, SQLite/PostgreSQL repositories & crypto
+│   ├── crates/cli/          # Terminal interface (Clap, Ratatui UI, Prompts)
+│   └── crates/server/       # REST API (Axum 0.8), JWT auth, Idempotency & SSE workers
+├── frontend/                # Vue 3 SPA (Composition API, Pinia, TailwindCSS, Web Crypto)
+├── docs/                    # Technical specifications, development plans & benchmarks
+│   ├── 00-especificacao-tecnica.md
+│   ├── 01-plano-de-desenvolvimento.md
+│   ├── 02-status-atividades.md
+│   └── benchmarks/01-load-test-p99-memory-report.md
+├── scripts/                 # Quality assurance scripts (pre-commit.sh)
+├── tests/load/              # K6 distributed load testing scenarios
+└── docker-compose.yml       # Production stack orchestration (PostgreSQL + Redis + API + SPA)
+```
+
+---
+
+## 📚 Technical Documentation
+
+For in-depth architectural blueprints and activity tracking:
+- 📐 **[Technical Specification & Architecture](docs/00-especificacao-tecnica.md)**
+- 📋 **[Development Plan & WBS (10 Features)](docs/01-plano-de-desenvolvimento.md)**
+- 🚦 **[Activity Status Tracker (48/48 Tasks Completed)](docs/02-status-atividades.md)**
+- 📈 **[Official Benchmark & Load Test Report](docs/benchmarks/01-load-test-p99-memory-report.md)**
+
+---
+
+## 📄 License
+
+Dual-licensed under either of:
+- [Apache License, Version 2.0](LICENSE-APACHE)
 - [MIT License](LICENSE-MIT)
-- [Apache License 2.0](LICENSE-APACHE)
 
-Escolha a que melhor atende às suas necessidades.
+at your option.
