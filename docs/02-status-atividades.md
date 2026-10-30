@@ -1,6 +1,6 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 1: CLI & Core)  
+> **Status Geral do Projeto:** 🟡 Em Desenvolvimento (Fase 2: API REST & Idempotência)  
 > **Última Atualização:** 2026-10-30  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
@@ -18,10 +18,10 @@
 | **05. Objetivos & OKRs** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **06. Journaling Criptografado** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **07. Aplicação CLI (Terminal)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
-| **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
+| **08. API REST & Idempotência** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **31** | **0** | **17** | **64.6%** |
+| **TOTAL** | **48** | **37** | **0** | **11** | **77.1%** |
 
 ---
 
@@ -103,12 +103,12 @@
 ### Feature 08: API REST & Idempotência (Axum)
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **08.1** | Arquitetura do Servidor Axum & Tracing | [activity-01-axum-server-architecture-tracing.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-01-axum-server-architecture-tracing.prompt) | ⚪ NÃO INICIADO | - |
-| **08.2** | Autenticação, JWT & Headers OWASP | [activity-02-authentication-jwt-security-headers.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-02-authentication-jwt-security-headers.prompt) | ⚪ NÃO INICIADO | - |
-| **08.3** | Middleware de Idempotência (RF05) | [activity-03-idempotency-middleware-rf05.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-03-idempotency-middleware-rf05.prompt) | ⚪ NÃO INICIADO | - |
-| **08.4** | Controladores REST de Rotinas, Hábitos e OKRs | [activity-04-domain-endpoints-routines-habits-okrs.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-04-domain-endpoints-routines-habits-okrs.prompt) | ⚪ NÃO INICIADO | - |
-| **08.5** | Controladores do Diário Zero-Knowledge | [activity-05-journal-encrypted-payload-endpoints.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-05-journal-encrypted-payload-endpoints.prompt) | ⚪ NÃO INICIADO | - |
-| **08.6** | Testes de Integração de API & SAST | [activity-06-api-integration-sast-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-06-api-integration-sast-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **08.1** | Arquitetura do Servidor Axum & Tracing | [activity-01-axum-server-architecture-tracing.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-01-axum-server-architecture-tracing.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **08.2** | Autenticação, JWT & Headers OWASP | [activity-02-authentication-jwt-security-headers.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-02-authentication-jwt-security-headers.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **08.3** | Middleware de Idempotência (RF05) | [activity-03-idempotency-middleware-rf05.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-03-idempotency-middleware-rf05.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **08.4** | Controladores REST de Rotinas, Hábitos e OKRs | [activity-04-domain-endpoints-routines-habits-okrs.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-04-domain-endpoints-routines-habits-okrs.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **08.5** | Controladores do Diário Zero-Knowledge | [activity-05-journal-encrypted-payload-endpoints.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-05-journal-encrypted-payload-endpoints.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **08.6** | Testes de Integração de API & SAST | [activity-06-api-integration-sast-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/08-api-rest/activity-06-api-integration-sast-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 
 ---
 

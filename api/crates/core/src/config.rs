@@ -16,6 +16,12 @@ pub struct AppConfig {
 
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    #[serde(default = "default_jwt_secret")]
+    pub jwt_secret: String,
+
+    #[serde(default = "default_allowed_origins")]
+    pub allowed_origins: String,
 }
 
 fn default_database_url() -> String {
@@ -34,6 +40,14 @@ fn default_log_level() -> String {
     "roubit=info,tower_http=info".to_string()
 }
 
+fn default_jwt_secret() -> String {
+    "roubit-development-secret-key-32-bytes-minimum!".to_string()
+}
+
+fn default_allowed_origins() -> String {
+    "http://localhost:5173,http://127.0.0.1:5173".to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -41,6 +55,8 @@ impl Default for AppConfig {
             server_port: default_server_port(),
             server_host: default_server_host(),
             log_level: default_log_level(),
+            jwt_secret: default_jwt_secret(),
+            allowed_origins: default_allowed_origins(),
         }
     }
 }
@@ -53,6 +69,16 @@ impl AppConfig {
     pub fn from_env() -> Result<Self, envy::Error> {
         let _ = dotenvy::dotenv(); // Load optional .env file; silently ignore if not present
         envy::from_env::<Self>()
+    }
+
+    /// Returns the parsed allowed origins as a vector of origin strings.
+    pub fn parsed_allowed_origins(&self) -> Vec<String> {
+        self.allowed_origins
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(ToString::to_string)
+            .collect()
     }
 }
 

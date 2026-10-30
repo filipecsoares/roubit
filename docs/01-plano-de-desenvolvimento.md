@@ -77,31 +77,31 @@ flowchart TD
 ### Fase 2: Backend HTTP REST, Autenticação & Idempotência (Axum + Tokio)
 *Objetivo: Expor os casos de uso do domínio através de uma API HTTP assíncrona, robusta, protegida e com garantia de idempotência.*
 
-- [ ] **2.1 Fundação da API Web com Axum**
-  - [ ] Configuração do servidor HTTP Tokio/Axum, graceful shutdown e injeção de estado (`AppState`).
-  - [ ] Middleware estruturado de Tracing/Logs (`tracing`, `tracing-subscriber`).
-  - [ ] Middleware global de tratamento de erros com respostas JSON padronizadas (RFC 7807 Problem Details).
-  - [ ] Configuração de CORS restrito e headers de segurança (OWASP: HSTS, Content-Security-Policy, X-Frame-Options).
-- [ ] **2.2 Autenticação, Sessão e Criptografia de Usuário**
-  - [ ] Tabela e endpoints de Usuários (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`).
-  - [ ] Hash de senha via Argon2id.
-  - [ ] Emissão e validação de tokens JWT / Cookies seguros (`HttpOnly`, `Secure`, `SameSite=Strict`).
-  - [ ] Extractor personalizado do Axum para autenticação e injeção do usuário autenticado no contexto dos handlers.
-- [ ] **2.3 Middleware de Idempotência Transacional (RF05)**
-  - [ ] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
-  - [ ] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).
-  - [ ] Garantia de bloqueio para requisições concorrentes idênticas e retorno de resposta cacheada para reenvios.
-- [ ] **2.4 Endpoints da API REST (Rotas e Controladores)**
-  - [ ] **Rotinas:** `GET /api/v1/routines`, `POST /api/v1/routines`, `POST /api/v1/routines/blocks/:id/complete`.
-  - [ ] **Hábitos:** `GET /api/v1/habits`, `POST /api/v1/habits`, `POST /api/v1/habits/:id/checkin` (com suporte a Idempotency-Key).
-  - [ ] **OKRs:** `GET /api/v1/objectives`, `POST /api/v1/objectives`, `POST /api/v1/key-results`.
-  - [ ] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
+- [x] **2.1 Fundação da API Web com Axum**
+  - [x] Configuração do servidor HTTP Tokio/Axum, graceful shutdown e injeção de estado (`AppState`).
+  - [x] Middleware estruturado de Tracing/Logs (`tracing`, `tracing-subscriber`).
+  - [x] Middleware global de tratamento de erros com respostas JSON padronizadas (RFC 7807 Problem Details).
+  - [x] Configuração de CORS restrito e headers de segurança (OWASP: HSTS, Content-Security-Policy, X-Frame-Options).
+- [x] **2.2 Autenticação, Sessão e Criptografia de Usuário**
+  - [x] Tabela e endpoints de Usuários (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`).
+  - [x] Hash de senha via Argon2id.
+  - [x] Emissão e validação de tokens JWT / Cookies seguros (`HttpOnly`, `Secure`, `SameSite=Strict`).
+  - [x] Extractor personalizado do Axum para autenticação e injeção do usuário autenticado no contexto dos handlers.
+- [x] **2.3 Middleware de Idempotência Transacional (RF05)**
+  - [x] Criação do interceptor de requisição para leitura do header `Idempotency-Key`.
+  - [x] Tabela de armazenamento de requisições idempotentes (hash da requisição, status, payload de resposta).
+  - [x] Garantia de bloqueio para requisições concorrentes idênticas e retorno de resposta cacheada para reenvios.
+- [x] **2.4 Endpoints da API REST (Rotas e Controladores)**
+  - [x] **Rotinas:** `GET /api/v1/routines`, `POST /api/v1/routines`, `POST /api/v1/routines/blocks/:id/complete`.
+  - [x] **Hábitos:** `GET /api/v1/habits`, `POST /api/v1/habits`, `POST /api/v1/habits/:id/checkin` (com suporte a Idempotency-Key).
+  - [x] **OKRs:** `GET /api/v1/okrs`, `POST /api/v1/okrs`.
+  - [x] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
 - [ ] **2.5 Adaptação da CLI para Modo Híbrido**
   - [ ] Permitir que a CLI opere conectando-se à API HTTP REST via flag/configuração (`--remote` / `ROUBIT_API_URL`), além do modo local SQLite.
-- [ ] **2.6 Validação de Segurança & CI da Fase 2**
-  - [ ] Testes E2E dos endpoints HTTP REST.
-  - [ ] Testes de concorrência e teste de validação do header de idempotência.
-  - [ ] Integração de análise estática de segurança (SAST) com `cargo audit` no pipeline.
+- [x] **2.6 Validação de Segurança & CI da Fase 2**
+  - [x] Testes E2E dos endpoints HTTP REST.
+  - [x] Testes de concorrência e teste de validação do header de idempotência.
+  - [x] Integração de análise estática de segurança (SAST) com `cargo audit` no pipeline.
 
 ---
 
