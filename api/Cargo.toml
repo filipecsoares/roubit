@@ -41,6 +41,8 @@ hex-literal = "0.4"
 
 # Benchmarking & Testing
 criterion = { version = "0.5", features = ["html_reports"] }
+assert_cmd = "2.0"
+predicates = "3.1"
 
 # Database & Persistence
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate", "macros"] }

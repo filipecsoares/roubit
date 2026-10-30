@@ -67,10 +67,10 @@ flowchart TD
   - [x] Implementar subcomando `roubit okr` (resumo de objetivos e progresso).
   - [x] Implementar subcomando `roubit journal` (escrever reflexão diária com prompt de senha, listar entradas decifradas).
   - [x] Formatação visual da CLI (tabelas limpas, cores semânticas e barra de progresso no terminal).
-- [ ] **1.5 Testes Unitários e de Integração da Fase 1**
-  - [ ] Testes de repositório SQLx com banco de dados em memória/arquivo temporário.
-  - [ ] Testes de casos de uso (streaks, quebra de sequência, time blocks sobrepostos).
-  - [ ] Validação do pipeline no GitHub Actions.
+- [x] **1.5 Testes Unitários e de Integração da Fase 1**
+  - [x] Testes de repositório SQLx com banco de dados em memória/arquivo temporário.
+  - [x] Testes de casos de uso (streaks, quebra de sequência, time blocks sobrepostos).
+  - [x] Validação do pipeline no GitHub Actions.
 
 ---
 

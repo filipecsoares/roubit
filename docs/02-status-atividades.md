@@ -17,11 +17,11 @@
 | **04. Rastreamento de Hábitos (Streaks)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **05. Objetivos & OKRs** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **06. Journaling Criptografado** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **07. Aplicação CLI (Terminal)** | 5 | 4 | 0 | 1 | 🟡 Em Progresso |
+| **07. Aplicação CLI (Terminal)** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **08. API REST & Idempotência** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **09. Frontend SPA (Vue 3)** | 6 | 0 | 0 | 6 | ⚪ Não Iniciado |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 0 | 0 | 5 | ⚪ Não Iniciado |
-| **TOTAL** | **48** | **30** | **0** | **18** | **62.5%** |
+| **TOTAL** | **48** | **31** | **0** | **17** | **64.6%** |
 
 ---
 
@@ -96,7 +96,7 @@
 | **07.2** | UI de Terminal (Tabelas, Cores e Barras) | [activity-02-terminal-ui-tables-colors.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/07-cli/activity-02-terminal-ui-tables-colors.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **07.3** | Prompts Seguros & Editor de Terminal | [activity-03-interactive-prompts-journal-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/07-cli/activity-03-interactive-prompts-journal-editor.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **07.4** | Adaptador de Modo Híbrido (Local vs HTTP) | [activity-04-hybrid-mode-local-http-adapter.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/07-cli/activity-04-hybrid-mode-local-http-adapter.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
-| **07.5** | Testes E2E Automatizados da CLI | [activity-05-cli-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/07-cli/activity-05-cli-e2e-automated-tests.prompt) | ⚪ NÃO INICIADO | - |
+| **07.5** | Testes E2E Automatizados da CLI | [activity-05-cli-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/07-cli/activity-05-cli-e2e-automated-tests.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 
 ---
 
