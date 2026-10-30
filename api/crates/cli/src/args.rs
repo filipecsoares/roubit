@@ -67,6 +67,9 @@ pub enum Commands {
 
     /// Local settings and storage configuration.
     Config(ConfigArgs),
+
+    /// Administrative utilities (database migrations).
+    Admin(AdminArgs),
 }
 
 // ---------------------------------------------------------------------------
@@ -277,5 +280,32 @@ pub enum ConfigSubcommands {
         /// Set remote API base URL.
         #[arg(long, help = "Remote API base URL")]
         api_url: Option<String>,
+    },
+}
+
+// ---------------------------------------------------------------------------
+// 6. Admin Subcommands
+// ---------------------------------------------------------------------------
+
+/// Arguments for administrative utilities.
+#[derive(Args, Debug, Clone, PartialEq, Eq)]
+pub struct AdminArgs {
+    /// Administrative action.
+    #[command(subcommand)]
+    pub action: AdminAction,
+}
+
+/// Supported administrative actions.
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum AdminAction {
+    /// Migrates an existing SQLite database to PostgreSQL.
+    MigrateToPostgres {
+        /// Path to source SQLite database file or URL.
+        #[arg(long, help = "Path to source SQLite database")]
+        from: String,
+
+        /// Target PostgreSQL connection URL.
+        #[arg(long, help = "Target PostgreSQL connection URL")]
+        to: String,
     },
 }

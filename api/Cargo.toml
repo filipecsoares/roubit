@@ -48,7 +48,7 @@ assert_cmd = "2.0"
 predicates = "3.1"
 
 # Database & Persistence
-sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate", "macros"] }
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "postgres", "runtime-tokio", "chrono", "uuid", "migrate", "macros"] }
 deadpool-redis = "0.20"
 redis = { version = "0.29", features = ["tokio-comp", "connection-manager"] }
 

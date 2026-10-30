@@ -52,6 +52,12 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Admin commands handle their own connection endpoints
+    if let Commands::Admin(admin_args) = command {
+        commands::admin_cmd::execute(&admin_args.action, args.json).await?;
+        return Ok(());
+    }
+
     // Determine database URL override or default
     let db_url = args.db.as_deref().unwrap_or(config.database_url.as_str());
 
@@ -71,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Journal(journal_args) => {
             commands::journal_cmd::handle(journal_args, args.json, &pool).await?;
         }
-        Commands::Config(_) => unreachable!(),
+        Commands::Config(_) | Commands::Admin(_) => unreachable!(),
     }
 
     Ok(())
@@ -215,6 +221,30 @@ mod tests {
                 _ => panic!("Expected Write variant"),
             },
             _ => panic!("Expected Journal command"),
+        }
+    }
+
+    #[test]
+    fn test_clap_parse_admin_migrate_to_postgres() {
+        let args = CliArgs::try_parse_from([
+            "roubit",
+            "admin",
+            "migrate-to-postgres",
+            "--from",
+            "sqlite://roubit.db",
+            "--to",
+            "postgres://user:pass@localhost:5432/roubit",
+        ])
+        .unwrap();
+
+        match args.command {
+            Some(Commands::Admin(admin_args)) => match admin_args.action {
+                args::AdminAction::MigrateToPostgres { from, to } => {
+                    assert_eq!(from, "sqlite://roubit.db");
+                    assert_eq!(to, "postgres://user:pass@localhost:5432/roubit");
+                }
+            },
+            _ => panic!("Expected Admin command"),
         }
     }
 }
