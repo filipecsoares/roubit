@@ -61,12 +61,12 @@ flowchart TD
     - Algoritmo de cálculo de *streaks* (dias consecutivos) e cálculo de percentual de consistência.
   - [x] **Gestão de OKRs (RF03):** Lógica de cálculo de progresso de Resultados-Chave (KRs) com atualização automática a partir dos hábitos vinculados.
   - [x] **Journaling (RF04):** Gravação e leitura de reflexões, garantindo que o texto bruto nunca seja persistido em texto claro.
-- [ ] **1.4 Interface de Linha de Comando (CLI com Clap)**
+- [x] **1.4 Interface de Linha de Comando (CLI com Clap)**
   - [x] Implementar subcomando `roubit routine` (listar rotina de hoje, iniciar bloco, finalizar bloco).
   - [x] Implementar subcomando `roubit habit` (listar hábitos, check-in com valor/tempo, status dos streaks).
   - [x] Implementar subcomando `roubit okr` (resumo de objetivos e progresso).
   - [x] Implementar subcomando `roubit journal` (escrever reflexão diária com prompt de senha, listar entradas decifradas).
-  - [ ] Formatação visual da CLI (tabelas limpas, cores semânticas e barra de progresso no terminal).
+  - [x] Formatação visual da CLI (tabelas limpas, cores semânticas e barra de progresso no terminal).
 - [ ] **1.5 Testes Unitários e de Integração da Fase 1**
   - [ ] Testes de repositório SQLx com banco de dados em memória/arquivo temporário.
   - [ ] Testes de casos de uso (streaks, quebra de sequência, time blocks sobrepostos).

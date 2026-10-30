@@ -25,6 +25,9 @@ async-trait = "0.1"
 dotenvy = "0.15"
 envy = "0.4"
 clap = { version = "~4.5.30", features = ["derive", "env", "cargo"] }
+comfy-table = "7.1"
+colored = "2.2"
+indicatif = "0.17"
 
 # Cryptography & Memory Security
 aes-gcm = "0.10"

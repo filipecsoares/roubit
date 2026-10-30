@@ -4,14 +4,17 @@
 
 pub mod args;
 pub mod commands;
+pub mod ui;
 
 use clap::Parser;
 use roubit_core::{create_sqlite_pool, init_telemetry, run_migrations, AppConfig};
 
 use crate::args::{CliArgs, Commands};
+use crate::ui::TerminalUi;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    TerminalUi::init();
     let args = CliArgs::parse();
     let config = AppConfig::from_env().unwrap_or_default();
 

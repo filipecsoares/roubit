@@ -32,27 +32,27 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
             } else {
                 println!("Objectives & Key Results ({}):", objectives.len());
                 for item in objectives {
+                    let status_badge = if item.objective.is_completed {
+                        " [COMPLETED]"
+                    } else {
+                        ""
+                    };
                     println!(
-                        "\n🎯 [{}] {} ({}) - {:.1}% {}",
-                        item.objective.quarter,
-                        item.objective.title,
-                        item.objective.id,
+                        "\n🎯 [{}] {}{}",
+                        item.objective.quarter, item.objective.title, status_badge
+                    );
+                    crate::ui::TerminalUi::render_okr_progress(
+                        "  Objective Progress",
                         item.objective.progress_percentage,
-                        if item.objective.is_completed {
-                            "[COMPLETED]"
-                        } else {
-                            ""
-                        }
                     );
                     for kr in item.key_results {
-                        println!(
-                            "   └─ 🔑 {} | {:.1} / {:.1} {} (Weight: {:.1}, Progress: {:.1}%)",
-                            kr.title,
-                            kr.current_value,
-                            kr.target_value,
-                            kr.unit,
-                            kr.weight,
-                            kr.progress_percentage
+                        let kr_label = format!(
+                            "  🔑 {} ({:.1}/{:.1} {})",
+                            kr.title, kr.current_value, kr.target_value, kr.unit
+                        );
+                        crate::ui::TerminalUi::render_okr_progress(
+                            &kr_label,
+                            kr.progress_percentage,
                         );
                     }
                 }
@@ -85,12 +85,10 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
             } else {
                 println!("OKR Progress Summary:");
                 for o in objectives {
-                    println!(
-                        "  [{}] {:<35} | Progress: {:>5.1}% | KRs: {}",
-                        o.objective.quarter,
-                        o.objective.title,
+                    let title = format!("[{}] {}", o.objective.quarter, o.objective.title);
+                    crate::ui::TerminalUi::render_okr_progress(
+                        &title,
                         o.objective.progress_percentage,
-                        o.key_results.len()
                     );
                 }
             }

@@ -35,18 +35,15 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 println!("No habits found.");
             } else {
                 println!("Found {} habit(s):", habits.len());
-                for h in habits {
-                    let unit_str = h.unit.as_deref().unwrap_or("");
-                    println!(
-                        "  [{}] {} ({}) - Target: {:.1} {} (ID: {})",
-                        if h.is_archived { "ARCHIVED" } else { "ACTIVE" },
-                        h.name,
-                        h.habit_type.as_str(),
-                        h.target_value,
-                        unit_str,
-                        h.id
-                    );
-                }
+                let rows: Vec<_> = habits
+                    .iter()
+                    .map(|h| {
+                        let unit_str = h.unit.as_deref().unwrap_or("");
+                        let target_desc = format!("{:.1} {unit_str}", h.target_value);
+                        (h.name.clone(), target_desc, 0, !h.is_archived)
+                    })
+                    .collect();
+                crate::ui::TerminalUi::render_habits_table(&rows);
             }
         }
 
@@ -69,10 +66,10 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 let serialized = serde_json::to_string_pretty(&log)?;
                 println!("{serialized}");
             } else {
-                println!(
+                crate::ui::TerminalUi::print_success(&format!(
                     "Check-in recorded for habit {} on {}: value = {:.1} (completed: {})",
                     habit_uuid, log.log_date, log.actual_value, log.is_completed
-                );
+                ));
             }
         }
 
@@ -114,15 +111,20 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 println!("No active habits found to compute streaks.");
             } else {
                 println!("Habit Streak Metrics (as of {today}):");
-                for (h, m) in results {
-                    println!(
-                        "  {} | Current: {}d | Longest: {}d | Active Today: {}",
-                        h.name,
-                        m.current_streak,
-                        m.longest_streak,
-                        if m.is_active_today { "Yes" } else { "No" }
-                    );
-                }
+                let rows: Vec<_> = results
+                    .into_iter()
+                    .map(|(h, m)| {
+                        let unit_str = h.unit.as_deref().unwrap_or("");
+                        let target_desc = format!("{:.1} {unit_str}", h.target_value);
+                        (
+                            h.name.clone(),
+                            target_desc,
+                            m.current_streak,
+                            m.is_active_today,
+                        )
+                    })
+                    .collect();
+                crate::ui::TerminalUi::render_habits_table(&rows);
             }
         }
     }

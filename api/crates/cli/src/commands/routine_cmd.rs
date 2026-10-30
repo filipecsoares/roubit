@@ -1,7 +1,7 @@
 //! Routine command handler.
 
 use anyhow::{Context, Result};
-use chrono::{Local, NaiveDate, Timelike};
+use chrono::{Local, NaiveDate};
 use roubit_core::domain::{
     BlockStatus, RoutineProgressTracker, RoutineRepository, SqliteRoutineRepository,
 };
@@ -62,18 +62,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                     "Routine: {} | Date: {} | Adherence: {:.1}%",
                     routine.name, target_date, progress.adherence_percentage
                 );
-                for (block, status) in &block_statuses {
-                    println!(
-                        "  [{}] {:02}:{:02} - {:02}:{:02} | {} (ID: {})",
-                        status.as_str(),
-                        block.start_time.hour(),
-                        block.start_time.minute(),
-                        block.end_time.hour(),
-                        block.end_time.minute(),
-                        block.name,
-                        block.id
-                    );
-                }
+                crate::ui::TerminalUi::render_routine_table_with_statuses(&block_statuses);
             }
         }
 
@@ -138,12 +127,12 @@ async fn update_block_status(
         });
         println!("{response}");
     } else {
-        println!(
+        crate::ui::TerminalUi::print_success(&format!(
             "Time block {} marked as [{}] for date {}.",
             block_uuid,
             status.as_str(),
             target_date
-        );
+        ));
     }
 
     Ok(())
