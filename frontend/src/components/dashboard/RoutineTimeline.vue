@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar } from 'lucide-vue-next'
+import { Calendar, Plus } from 'lucide-vue-next'
 import TimeBlockCard from './TimeBlockCard.vue'
 import type { TimeBlock, BlockStatusType } from '@/types'
 
@@ -22,6 +22,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'complete', blockId: string, status: BlockStatusType): void
+  (e: 'openCreate'): void
 }>()
 
 const sortedBlocks = computed(() => {
@@ -34,15 +35,27 @@ const sortedBlocks = computed(() => {
     <!-- Empty state -->
     <div
       v-if="blocks.length === 0"
-      class="text-center py-12 px-4 rounded-xl border border-dashed border-surface-border"
+      class="text-center py-12 px-4 rounded-xl border border-dashed border-surface-border space-y-3"
     >
-      <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400 mb-3">
+      <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400">
         <Calendar class="w-6 h-6" />
       </div>
-      <h3 class="text-sm font-medium text-white">Nenhum bloco de rotina ativo</h3>
-      <p class="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-        Estruture seus blocos de foco e hábitos ao longo do dia para manter sua produtividade.
-      </p>
+      <div class="max-w-xs mx-auto">
+        <h3 class="text-sm font-medium text-white">Nenhum bloco de rotina ativo</h3>
+        <p class="text-xs text-slate-400 mt-1">
+          Estruture seus blocos de foco e rotina diária para manter sua produtividade.
+        </p>
+      </div>
+      <div>
+        <button
+          type="button"
+          @click="emit('openCreate')"
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/20 transition-all"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          Configurar Primeira Rotina
+        </button>
+      </div>
     </div>
 
     <!-- Vertical Timeline -->
