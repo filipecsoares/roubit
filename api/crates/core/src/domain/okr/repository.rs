@@ -172,6 +172,22 @@ impl OkrRepository for SqliteOkrRepository {
 
         let mut obj = objective.ok_or(OkrRepositoryError::ObjectiveNotFound(kr.objective_id))?;
 
+        // 1b. If linked to a habit, verify the habit exists and belongs to user_id
+        if let Some(habit_id) = kr.linked_habit_id {
+            let habit_exists: Option<(Uuid,)> =
+                sqlx::query_as("SELECT id FROM habits WHERE id = ? AND user_id = ?")
+                    .bind(habit_id)
+                    .bind(user_id)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+
+            if habit_exists.is_none() {
+                return Err(OkrRepositoryError::Habit(format!(
+                    "Habit {habit_id} not found"
+                )));
+            }
+        }
+
         // 2. Insert Key Result
         sqlx::query(
             r"
