@@ -14,7 +14,7 @@ use validator::Validate;
 
 use roubit_core::{
     BlockStatus, CurrentRoutineProgress, Routine, RoutineProgressTracker, RoutineRepository,
-    SqliteRoutineRepository, TimeBlock, TimeBlockValidator,
+    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock, TimeBlockValidator,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -174,10 +174,27 @@ pub async fn create_routine(
     Ok((StatusCode::CREATED, Json(routine)))
 }
 
+/// Handler for `GET /api/v1/routines/all`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if database queries fail.
+pub async fn list_routines(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<Vec<Routine>>, ApiError> {
+    let repo = SqliteRoutineRepository::new(state.db);
+    let routines = repo
+        .list_routines(user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(routines))
+}
+
 /// Handler for `POST /api/v1/routines/blocks/:id/complete`
 ///
 /// # Errors
-/// Returns [`ApiError::BadRequest`] on invalid status or [`ApiError::Internal`] on db error.
+/// Returns [`ApiError::NotFound`] if block not found or not owned by user, [`ApiError::BadRequest`] on invalid status, or [`ApiError::Internal`] on db error.
 pub async fn complete_block(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -204,41 +221,49 @@ pub async fn complete_block(
     };
 
     let repo = SqliteRoutineRepository::new(state.db);
-    repo.log_block_status(block_id, user.id, target_date, status, req.notes)
+    match repo
+        .log_block_status(block_id, user.id, target_date, status, req.notes)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "time_block_id": block_id,
-            "date": target_date,
-            "status": status.as_str()
-        })),
-    ))
+    {
+        Ok(()) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "time_block_id": block_id,
+                "date": target_date,
+                "status": status.as_str()
+            })),
+        )),
+        Err(RoutineRepositoryError::NotFound(_) | RoutineRepositoryError::BlockNotFound(_)) => Err(
+            ApiError::NotFound(format!("Time block {block_id} not found")),
+        ),
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
 }
 
 /// Handler for `DELETE /api/v1/routines/:id`
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] on db error.
+/// Returns [`ApiError::NotFound`] if routine not found or not owned by user, or [`ApiError::Internal`] on db error.
 pub async fn delete_routine(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteRoutineRepository::new(state.db);
-    repo.delete_routine(id, user.id)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+    match repo.delete_routine(id, user.id).await {
+        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+        Err(RoutineRepositoryError::NotFound(_)) => {
+            Err(ApiError::NotFound(format!("Routine {id} not found")))
+        }
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
 }
 
 /// Constructs router for routine endpoints
 pub fn routine_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_routine).post(create_routine))
+        .route("/all", get(list_routines))
         .route("/{id}", axum::routing::delete(delete_routine))
         .route("/blocks/{id}/complete", post(complete_block))
 }

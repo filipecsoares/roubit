@@ -13,8 +13,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    Habit, HabitLog, HabitRepository, HabitType, OkrSyncService, SqliteHabitRepository,
-    SqliteOkrRepository, StreakCalculator, StreakMetrics,
+    Habit, HabitLog, HabitRepository, HabitRepositoryError, HabitType, OkrSyncService,
+    SqliteHabitRepository, SqliteOkrRepository, StreakCalculator, StreakMetrics,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -160,17 +160,25 @@ pub async fn record_checkin(
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let repo = SqliteHabitRepository::new(state.db.clone());
-    let habit = repo
-        .get_habit_by_id(habit_id, user.id)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?
-        .ok_or_else(|| ApiError::NotFound(format!("Habit {habit_id} not found")))?;
+    let habit = match repo.get_habit_by_id(habit_id, user.id).await {
+        Ok(Some(h)) => h,
+        Ok(None) | Err(HabitRepositoryError::NotFound(_)) => {
+            return Err(ApiError::NotFound(format!("Habit {habit_id} not found")));
+        }
+        Err(e) => return Err(ApiError::Internal(e.into())),
+    };
 
     let is_increment = payload.is_increment.unwrap_or(false);
-    let log = repo
+    let log = match repo
         .record_check_in(habit_id, user.id, payload.date, payload.value, is_increment)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    {
+        Ok(l) => l,
+        Err(HabitRepositoryError::NotFound(_)) => {
+            return Err(ApiError::NotFound(format!("Habit {habit_id} not found")));
+        }
+        Err(e) => return Err(ApiError::Internal(e.into())),
+    };
 
     // Synchronize linked Key Results progress
     let okr_repo = SqliteOkrRepository::new(state.db);
@@ -204,18 +212,20 @@ pub async fn record_checkin(
 /// Handler for `DELETE /api/v1/habits/:id`
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] on db error.
+/// Returns [`ApiError::NotFound`] if habit not found or not owned by user, or [`ApiError::Internal`] on db error.
 pub async fn delete_habit(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(habit_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteHabitRepository::new(state.db);
-    repo.delete_habit(habit_id, user.id)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+    match repo.delete_habit(habit_id, user.id).await {
+        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+        Err(HabitRepositoryError::NotFound(_)) => {
+            Err(ApiError::NotFound(format!("Habit {habit_id} not found")))
+        }
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
 }
 
 /// Constructs router for habit endpoints
