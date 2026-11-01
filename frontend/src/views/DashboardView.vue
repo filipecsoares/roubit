@@ -247,23 +247,23 @@ onUnmounted(() => {
             <div class="flex items-center gap-2">
               <span
                 v-if="activeBlock"
-                class="text-xs font-medium text-brand-300 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full hidden sm:inline"
+                class="text-xs font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full hidden sm:inline"
               >
                 Em andamento: {{ activeBlock.name }}
               </span>
               <button
                 type="button"
                 @click="focusStore.openFocusModal()"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all touch-target sm:min-h-0 sm:min-w-0"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-all touch-target sm:min-h-0 sm:min-w-0"
                 title="Abrir Modo Foco & Timer Pomodoro"
               >
-                <Timer class="w-3.5 h-3.5 text-brand-400" />
+                <Timer class="w-3.5 h-3.5 text-zinc-400" />
                 <span>Modo Foco</span>
               </button>
               <button
                 type="button"
                 @click="isRoutineModalOpen = true"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all touch-target sm:min-h-0 sm:min-w-0"
                 title="Criar ou reconfigurar rotina"
               >
                 <Plus class="w-3.5 h-3.5" />

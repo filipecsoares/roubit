@@ -224,12 +224,12 @@ onMounted(async () => {
       v-if="!vaultStore.isUnlocked"
       class="p-6 sm:p-10 rounded-2xl bg-surface-card border border-surface-border text-center space-y-5 shadow-lg glow-card"
     >
-      <div class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-brand-500/10 flex items-center justify-center border border-brand-500/20 text-brand-400 shadow-inner">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-100 shadow-sm">
         <Lock class="w-6 h-6 sm:w-7 sm:h-7" />
       </div>
       <div class="max-w-md mx-auto space-y-2">
         <h2 class="text-lg sm:text-xl font-bold text-white font-outfit">Cofre de Reflexões Protegido</h2>
-        <p class="text-xs text-slate-400 leading-relaxed">
+        <p class="text-xs text-zinc-400 leading-relaxed">
           Suas anotações são armazenadas cifradas no servidor. Para escrever ou ler reflexões, desbloqueie seu cofre fornecendo a senha mestre para derivação da chave em memória.
         </p>
       </div>
@@ -237,7 +237,7 @@ onMounted(async () => {
         <button
           type="button"
           @click="isUnlockModalOpen = true"
-          class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all touch-target"
+          class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-zinc-100 hover:bg-white text-sm font-semibold text-zinc-950 shadow-sm transition-all touch-target"
         >
           <KeyRound class="w-4 h-4" />
           <span>Desbloquear Diário</span>

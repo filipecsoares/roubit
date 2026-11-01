@@ -190,8 +190,8 @@ onMounted(async () => {
             class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 font-mono"
             :class="
               selectedQuarter === q
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white'
             "
           >
             {{ q }}
@@ -202,7 +202,7 @@ onMounted(async () => {
         <button
           type="button"
           @click="isCreateModalOpen = true"
-          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/25 transition-all shrink-0 touch-target sm:min-h-0 sm:min-w-0"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all shrink-0 touch-target sm:min-h-0 sm:min-w-0"
         >
           <Plus class="w-4 h-4" />
           <span>Novo Objetivo</span>
@@ -262,7 +262,7 @@ onMounted(async () => {
         <button
           type="button"
           @click="isCreateModalOpen = true"
-          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 transition-all touch-target"
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all touch-target"
         >
           <Plus class="w-4 h-4" />
           <span>Cadastrar Primeiro Objetivo</span>

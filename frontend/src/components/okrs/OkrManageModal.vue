@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { X, Target, Plus, Trash2, Link2 } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
 
 const props = withDefaults(
   defineProps<{
@@ -33,6 +34,8 @@ const emit = defineEmits<{
     }>
   }): void
 }>()
+
+useModal(() => props.isOpen, () => emit('close'))
 
 const title = ref('')
 const description = ref('')
@@ -145,18 +148,18 @@ function handleSave() {
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-3">
-            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+            <div class="p-2 sm:p-2.5 rounded-xl bg-zinc-800 text-zinc-100 border border-zinc-700">
               <Target class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Novo Objetivo Estratégico (OKR)</h3>
-              <p class="text-xs text-slate-400">Defina o objetivo e seus Resultados-Chave mensuráveis</p>
+              <p class="text-xs text-zinc-400">Defina o objetivo e seus Resultados-Chave mensuráveis</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
-            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
+            class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
@@ -167,7 +170,7 @@ function handleSave() {
           <!-- Title & Quarter -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div class="sm:col-span-2 space-y-1.5">
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                 Título do Objetivo *
               </label>
               <input
@@ -175,12 +178,12 @@ function handleSave() {
                 type="text"
                 required
                 placeholder="Ex: Conquistar Alta Produtividade e Foco"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white placeholder-slate-500 outline-none transition-all"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-zinc-500 text-sm text-white placeholder-zinc-500 outline-none transition-all"
               />
             </div>
 
             <div class="space-y-1.5">
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                 Trimestre *
               </label>
               <input
@@ -188,21 +191,21 @@ function handleSave() {
                 type="text"
                 required
                 placeholder="2026-Q4"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white font-mono outline-none"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-zinc-500 text-sm text-white font-mono outline-none"
               />
             </div>
           </div>
 
           <!-- Description -->
           <div class="space-y-1.5">
-            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
               Descrição do Objetivo (opcional)
             </label>
             <textarea
               v-model="description"
               rows="2"
               placeholder="Explique o propósito e o impacto esperado deste objetivo..."
-              class="w-full px-3.5 py-2 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white placeholder-slate-500 outline-none"
+              class="w-full px-3.5 py-2 rounded-xl bg-surface-dark border border-surface-border focus:border-zinc-500 text-sm text-white placeholder-zinc-500 outline-none"
             ></textarea>
           </div>
 
@@ -211,13 +214,13 @@ function handleSave() {
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h4 class="text-xs sm:text-sm font-bold text-white font-outfit">Resultados-Chave (Key Results)</h4>
-                <p class="text-[11px] sm:text-xs text-slate-400">Métricas específicas e mensuráveis para atingir o objetivo</p>
+                <p class="text-[11px] sm:text-xs text-zinc-400">Métricas específicas e mensuráveis para atingir o objetivo</p>
               </div>
 
               <button
                 type="button"
                 @click="addKeyResult"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-colors touch-target sm:min-h-0 sm:min-w-0"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors touch-target sm:min-h-0 sm:min-w-0"
               >
                 <Plus class="w-3.5 h-3.5" />
                 <span>Adicionar KR</span>
@@ -302,14 +305,14 @@ function handleSave() {
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
+              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-zinc-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
             >
               Cancelar
             </button>
             <button
               type="submit"
               :disabled="loading || !title.trim()"
-              class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
+              class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white disabled:opacity-50 text-sm font-semibold text-zinc-950 shadow-sm transition-all touch-target sm:min-h-0 sm:min-w-0"
             >
               {{ loading ? 'Salvando...' : 'Criar Objetivo' }}
             </button>

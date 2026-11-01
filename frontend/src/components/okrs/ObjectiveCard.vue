@@ -50,7 +50,7 @@ const badgeStatusClasses = computed(() => {
       <div class="space-y-1.5 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
           <!-- Quarter Badge -->
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20 font-mono">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
             <Target class="w-3 h-3" />
             {{ objective.quarter }}
           </span>
@@ -65,7 +65,7 @@ const badgeStatusClasses = computed(() => {
           {{ objective.title }}
         </h3>
 
-        <p v-if="objective.description" class="text-xs text-slate-400 line-clamp-2">
+        <p v-if="objective.description" class="text-xs text-zinc-400 line-clamp-2">
           {{ objective.description }}
         </p>
       </div>
@@ -73,10 +73,10 @@ const badgeStatusClasses = computed(() => {
       <!-- Right: Toggle & Overall Progress Bar -->
       <div class="flex items-center gap-1.5 sm:gap-4 shrink-0">
         <div class="hidden sm:flex flex-col items-end gap-1">
-          <span class="text-xs text-slate-400 font-mono">{{ keyResults.length }} Resultados-Chave</span>
+          <span class="text-xs text-zinc-400 font-mono">{{ keyResults.length }} Resultados-Chave</span>
           <div class="w-24 h-2 rounded-full bg-surface-border/40 overflow-hidden">
             <div
-              class="h-full rounded-full bg-brand-500 transition-all duration-500"
+              class="h-full rounded-full bg-zinc-200 transition-all duration-500"
               :style="{ width: `${progressClamped}%` }"
             />
           </div>

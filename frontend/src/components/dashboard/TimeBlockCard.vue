@@ -34,15 +34,15 @@ const formattedTime = computed(() => {
 
 const cardClasses = computed(() => {
   if (props.isActive) {
-    return 'border-brand-500/80 bg-brand-950/20 shadow-lg shadow-brand-500/10 ring-1 ring-brand-500/30'
+    return 'border-zinc-500 bg-zinc-800/60 shadow-md ring-1 ring-zinc-600/50'
   }
   if (props.isCompleted) {
     return 'border-emerald-500/30 bg-emerald-950/10 opacity-80'
   }
   if (props.isSkipped) {
-    return 'border-slate-800 bg-surface-card/40 opacity-50'
+    return 'border-zinc-800 bg-surface-card/40 opacity-50'
   }
-  return 'border-surface-border bg-surface-card hover:border-slate-700'
+  return 'border-surface-border bg-surface-card hover:border-zinc-700'
 })
 </script>
 
@@ -51,10 +51,10 @@ const cardClasses = computed(() => {
     class="relative p-3.5 sm:p-4 rounded-xl border transition-all duration-200 group"
     :class="cardClasses"
   >
-    <!-- Glowing pulse bar for active block -->
+    <!-- Sleek accent bar for active block -->
     <div
       v-if="isActive"
-      class="absolute -left-1 top-3 bottom-3 w-1.5 rounded-full bg-brand-500 shadow-[0_0_12px_#6366f1] animate-pulse"
+      class="absolute -left-1 top-3 bottom-3 w-1 rounded-full bg-zinc-200"
     ></div>
 
     <div class="flex items-start justify-between gap-3">
@@ -63,7 +63,7 @@ const cardClasses = computed(() => {
           <!-- Time range badge -->
           <span
             class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium"
-            :class="isActive ? 'bg-brand-500/20 text-brand-300' : 'bg-surface-border/60 text-slate-400'"
+            :class="isActive ? 'bg-zinc-700 text-zinc-100' : 'bg-surface-border/60 text-zinc-400'"
           >
             <Clock class="w-3 h-3" />
             {{ formattedTime }}
@@ -72,7 +72,7 @@ const cardClasses = computed(() => {
           <!-- Active now badge -->
           <span
             v-if="isActive"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white animate-bounce-short"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-200 text-zinc-950 shadow-sm"
           >
             <Sparkles class="w-3 h-3" />
             Agora
@@ -81,7 +81,7 @@ const cardClasses = computed(() => {
           <!-- Category tag -->
           <span
             v-if="block.category"
-            class="px-2 py-0.5 rounded text-xs font-medium bg-surface-border/40 text-slate-400"
+            class="px-2 py-0.5 rounded text-xs font-medium bg-surface-border/40 text-zinc-400"
           >
             {{ block.category }}
           </span>
@@ -92,8 +92,8 @@ const cardClasses = computed(() => {
           :class="{
             'text-white': isActive,
             'text-emerald-300 line-through': isCompleted,
-            'text-slate-400 line-through': isSkipped,
-            'text-slate-200': !isActive && !isCompleted && !isSkipped,
+            'text-zinc-500 line-through': isSkipped,
+            'text-zinc-200': !isActive && !isCompleted && !isSkipped,
           }"
         >
           {{ block.name }}
@@ -108,7 +108,7 @@ const cardClasses = computed(() => {
           :disabled="loading"
           @click="emit('complete', block.id, 'completed')"
           title="Marcar como concluído"
-          class="p-2 rounded-xl bg-surface-border/40 hover:bg-emerald-500/20 hover:text-emerald-400 text-slate-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
+          class="p-2 rounded-xl bg-surface-border/40 hover:bg-emerald-500/20 hover:text-emerald-400 text-zinc-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <Check class="w-4 h-4" />
         </button>
@@ -119,7 +119,7 @@ const cardClasses = computed(() => {
           :disabled="loading"
           @click="emit('complete', block.id, 'skipped')"
           title="Pular bloco"
-          class="p-2 rounded-xl bg-surface-border/40 hover:bg-slate-700 text-slate-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
+          class="p-2 rounded-xl bg-surface-border/40 hover:bg-zinc-700 text-zinc-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <SkipForward class="w-4 h-4" />
         </button>
@@ -130,7 +130,7 @@ const cardClasses = computed(() => {
           type="button"
           @click="emit('openFocus', block)"
           title="Iniciar Modo Foco neste bloco"
-          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/25 transition-all active:scale-95 touch-target sm:min-h-0 sm:min-w-0"
+          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all active:scale-95 touch-target sm:min-h-0 sm:min-w-0"
         >
           <Timer class="w-3.5 h-3.5" />
           <span class="hidden sm:inline">Focar</span>

@@ -27,19 +27,19 @@ const strokeDashoffset = computed(() => {
 
 const progressColor = computed(() => {
   if (props.percentage >= 100) return '#10b981' // emerald-500
-  if (props.percentage >= 60) return '#6366f1'  // brand-500
-  if (props.percentage >= 30) return '#f59e0b'  // amber-500
-  return '#64748b' // slate-500
+  if (props.percentage >= 60) return '#e4e4e7'  // zinc-200
+  if (props.percentage >= 30) return '#a1a1aa'  // zinc-400
+  return '#71717a' // zinc-500
 })
 </script>
 
 <template>
-  <div class="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 sm:gap-6 p-4 rounded-2xl bg-surface-card border border-surface-border/80 shadow-lg shadow-black/20 glow-card">
+  <div class="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 sm:gap-6 p-4 rounded-2xl bg-surface-card border border-surface-border shadow-md glow-card">
     <div class="relative flex items-center justify-center shrink-0" :style="{ width: `${size}px`, height: `${size}px` }">
       <svg class="transform -rotate-90" :width="size" :height="size">
         <!-- Background track -->
         <circle
-          class="text-surface-border/50"
+          class="text-zinc-800"
           :stroke-width="strokeWidth"
           stroke="currentColor"
           fill="transparent"
@@ -47,7 +47,7 @@ const progressColor = computed(() => {
           :cx="size / 2"
           :cy="size / 2"
         />
-        <!-- Progress track with gradient glow -->
+        <!-- Progress track -->
         <circle
           class="transition-all duration-700 ease-out"
           :stroke="progressColor"
@@ -60,7 +60,6 @@ const progressColor = computed(() => {
           :style="{
             strokeDasharray: circumference,
             strokeDashoffset: strokeDashoffset,
-            filter: 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.4))'
           }"
         />
       </svg>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Lock, X, Eye, EyeOff, KeyRound, AlertCircle } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
 
 const props = withDefaults(
   defineProps<{
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'unlock', passphrase: string): void
 }>()
+
+useModal(() => props.isOpen, handleClose)
 
 const passphrase = ref('')
 const showPassword = ref(false)
@@ -47,18 +50,18 @@ function handleClose() {
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-3">
-            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+            <div class="p-2 sm:p-2.5 rounded-xl bg-zinc-800 text-zinc-100 border border-zinc-700">
               <Lock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Desbloquear Diário</h3>
-              <p class="text-xs text-slate-400">Criptografia de Conhecimento Zero</p>
+              <p class="text-xs text-zinc-400">Criptografia de Conhecimento Zero</p>
             </div>
           </div>
           <button
             type="button"
             @click="handleClose"
-            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
+            class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
@@ -109,7 +112,7 @@ function handleClose() {
             type="button"
             :disabled="!passphrase.trim() || loading"
             @click="handleUnlock"
-            class="w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 touch-target sm:min-h-0 sm:min-w-0"
+            class="w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-sm transition-all flex items-center justify-center gap-2 touch-target sm:min-h-0 sm:min-w-0"
           >
             <KeyRound class="w-4 h-4" :class="{ 'animate-spin': loading }" />
             <span>{{ loading ? 'Derivando Chaves (Argon2id)...' : 'Desbloquear Reflexões' }}</span>
@@ -117,7 +120,7 @@ function handleClose() {
           <button
             type="button"
             @click="handleClose"
-            class="w-full py-2.5 text-xs font-medium text-slate-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
+            class="w-full py-2.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             Cancelar
           </button>

@@ -90,7 +90,7 @@ const charCount = computed(() => props.plaintextReflection.length)
           type="button"
           :disabled="isSaving || isReadOnly || !plaintextReflection.trim()"
           @click="emit('save')"
-          class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all active:scale-95 touch-target sm:min-h-0 sm:min-w-0"
+          class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-sm transition-all active:scale-95 touch-target sm:min-h-0 sm:min-w-0"
         >
           <Lock class="w-4 h-4" />
           <span>{{ isSaving ? 'Cifrando & Salvando...' : 'Salvar & Criptografar' }}</span>

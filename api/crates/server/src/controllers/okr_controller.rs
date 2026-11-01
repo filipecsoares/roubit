@@ -101,6 +101,15 @@ pub async fn create_objective(
         end_date,
     );
 
+    // Validate all nested key results upfront to prevent orphaned objectives on validation error
+    if let Some(ref krs) = payload.key_results {
+        for kr_req in krs {
+            kr_req
+                .validate()
+                .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+        }
+    }
+
     repo.create_objective(&objective)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -108,10 +117,6 @@ pub async fn create_objective(
     let mut created_krs = Vec::new();
     if let Some(krs) = payload.key_results {
         for kr_req in krs {
-            kr_req
-                .validate()
-                .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
             let kr = if let Some(linked_habit_id) = kr_req.linked_habit_id {
                 KeyResult::new_habit_linked(
                     objective.id,

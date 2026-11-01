@@ -22,11 +22,11 @@ export default {
           950: '#1e1b4b',
         },
         surface: {
-          dark: '#0B0F19',
-          card: '#111827',
-          cardAlt: '#1F2937',
-          border: '#1F2937',
-          borderLight: '#374151',
+          dark: '#09090b',
+          card: '#121215',
+          cardAlt: '#18181c',
+          border: '#27272a',
+          borderLight: '#3f3f46',
         },
       },
       fontFamily: {

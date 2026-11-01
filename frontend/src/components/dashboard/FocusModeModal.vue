@@ -196,8 +196,8 @@ onUnmounted(() => {
             class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
             :class="
               focusStore.mode === 'pomodoro' && focusStore.durationSeconds === POMODORO_FOCUS_SECONDS
-                ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
-                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+                ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
+                : 'bg-surface-dark text-zinc-400 hover:text-white border border-surface-border'
             "
           >
             Pomodoro (25m)
@@ -209,8 +209,8 @@ onUnmounted(() => {
             class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
             :class="
               focusStore.mode === 'pomodoro' && focusStore.durationSeconds === POMODORO_LONG_FOCUS_SECONDS
-                ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
-                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+                ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
+                : 'bg-surface-dark text-zinc-400 hover:text-white border border-surface-border'
             "
           >
             Foco Profundo (50m)
@@ -222,8 +222,8 @@ onUnmounted(() => {
             class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
             :class="
               focusStore.mode === 'short_break'
-                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
-                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+                ? 'bg-emerald-500 text-white font-semibold shadow-sm'
+                : 'bg-surface-dark text-zinc-400 hover:text-white border border-surface-border'
             "
           >
             Pausa (5m)
@@ -235,8 +235,8 @@ onUnmounted(() => {
             class="px-2.5 sm:px-3 py-1 rounded-xl text-xs font-medium transition-all"
             :class="
               focusStore.mode === 'long_break'
-                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
-                : 'bg-surface-dark text-slate-400 hover:text-white border border-surface-border/60 hover:bg-surface-border/40'
+                ? 'bg-emerald-500 text-white font-semibold shadow-sm'
+                : 'bg-surface-dark text-zinc-400 hover:text-white border border-surface-border'
             "
           >
             Pausa Longa (15m)
@@ -325,15 +325,15 @@ onUnmounted(() => {
             type="button"
             @click="focusStore.togglePlayPause"
             :title="focusStore.isRunning ? 'Pausar (Espaço)' : 'Iniciar (Espaço)'"
-            class="px-8 py-3.5 rounded-2xl text-base font-semibold text-white shadow-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 touch-target min-w-[140px]"
+            class="px-8 py-3.5 rounded-2xl text-base font-semibold shadow-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 touch-target min-w-[140px]"
             :class="
               focusStore.isBreak
-                ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/25'
-                : 'bg-brand-600 hover:bg-brand-500 shadow-brand-500/25'
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
+                : 'bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm'
             "
           >
             <Pause v-if="focusStore.isRunning" class="w-5 h-5" />
-            <Play v-else class="w-5 h-5 fill-white" />
+            <Play v-else class="w-5 h-5" :class="focusStore.isBreak ? 'fill-white' : 'fill-zinc-950'" />
             <span>{{ focusStore.isRunning ? 'Pausar' : 'Iniciar' }}</span>
           </button>
 

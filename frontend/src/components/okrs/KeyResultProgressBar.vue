@@ -18,23 +18,23 @@ const progressClamped = computed(() => {
 
 const barColor = computed(() => {
   if (progressClamped.value >= 100) return 'bg-emerald-500'
-  if (progressClamped.value >= 70) return 'bg-brand-500'
-  if (progressClamped.value >= 30) return 'bg-amber-500'
-  return 'bg-slate-500'
+  if (progressClamped.value >= 70) return 'bg-zinc-200'
+  if (progressClamped.value >= 30) return 'bg-zinc-400'
+  return 'bg-zinc-600'
 })
 </script>
 
 <template>
-  <div class="p-3 sm:p-3.5 rounded-xl bg-surface-dark/60 border border-surface-border/60 space-y-2">
+  <div class="p-3 sm:p-3.5 rounded-xl bg-surface-dark/60 border border-surface-border space-y-2">
     <!-- Header: Title & Value -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div class="space-y-0.5 min-w-0">
-        <h4 class="text-xs sm:text-sm font-semibold text-slate-200 truncate">
+        <h4 class="text-xs sm:text-sm font-semibold text-zinc-200 truncate">
           {{ kr.title }}
         </h4>
-        <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+        <div class="flex items-center gap-2 text-[11px] text-zinc-400 font-mono">
           <span>{{ kr.current_value }} / {{ kr.target_value }} {{ kr.unit }}</span>
-          <span v-if="kr.weight" class="text-slate-500">• Peso: {{ kr.weight }}</span>
+          <span v-if="kr.weight" class="text-zinc-500">• Peso: {{ kr.weight }}</span>
         </div>
       </div>
 
@@ -52,7 +52,7 @@ const barColor = computed(() => {
           v-else
           type="button"
           @click="emit('linkHabit', kr.id)"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-border/50 hover:bg-brand-600/20 text-slate-400 hover:text-brand-300 border border-surface-border transition-colors touch-target sm:min-h-0 sm:min-w-0"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           title="Vincular a um hábito diário"
         >
           <Link2 class="w-3 h-3" />

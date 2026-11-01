@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { X, Link2 } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
 
 const props = defineProps<{
   isOpen: boolean
@@ -13,6 +14,8 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'link', habitId: string): void
 }>()
+
+useModal(() => props.isOpen, () => emit('close'))
 
 const selectedHabitId = ref('')
 
@@ -37,7 +40,7 @@ function handleLink() {
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-2.5">
-            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+            <div class="p-2 sm:p-2.5 rounded-xl bg-zinc-800 text-zinc-100 border border-zinc-700">
               <Link2 class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Vincular Hábito ao KR</h3>
@@ -77,7 +80,7 @@ function handleLink() {
           <button
             type="button"
             @click="emit('close')"
-            class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
+            class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-zinc-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             Cancelar
           </button>
@@ -85,7 +88,7 @@ function handleLink() {
             type="button"
             :disabled="!selectedHabitId || loading"
             @click="handleLink"
-            class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
+            class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white disabled:opacity-50 text-sm font-semibold text-zinc-950 shadow-sm transition-all touch-target sm:min-h-0 sm:min-w-0"
           >
             Confirmar Vínculo
           </button>

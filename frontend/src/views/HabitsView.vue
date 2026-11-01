@@ -138,7 +138,7 @@ onMounted(() => {
       <button
         type="button"
         @click="isModalOpen = true"
-        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/25 transition-all touch-target sm:min-h-0 sm:min-w-0"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all touch-target sm:min-h-0 sm:min-w-0"
       >
         <Plus class="w-4 h-4" />
         <span>Novo Hábito</span>

@@ -169,7 +169,9 @@ pub async fn record_checkin(
     // Synchronize linked Key Results progress
     let okr_repo = SqliteOkrRepository::new(state.db);
     let sync_svc = OkrSyncService::new(okr_repo, repo.clone());
-    let _ = sync_svc.sync_linked_krs_for_habit(habit_id).await;
+    if let Err(err) = sync_svc.sync_linked_krs_for_habit(habit_id).await {
+        tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
+    }
 
     // Recalculate streak
     let logs = repo

@@ -19,7 +19,7 @@
   }
 
   body {
-    @apply bg-surface-dark text-slate-100 font-sans;
+    @apply bg-surface-dark text-zinc-100 font-sans;
     min-height: 100vh;
     overflow-x: hidden;
   }
@@ -34,7 +34,7 @@
 
 /* Glassmorphism and Custom Surface Utilities */
 .glass-panel {
-  background: rgba(17, 24, 39, 0.75);
+  background: rgba(18, 18, 21, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -45,20 +45,20 @@
 }
 
 .glass-panel-hover:hover {
-  background: rgba(31, 41, 55, 0.85);
-  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(24, 24, 28, 0.95);
+  border-color: rgba(255, 255, 255, 0.16);
   transform: translateY(-1px);
 }
 
-/* Subtle glowing accent borders */
+/* Subtle sleek neutral card */
 .glow-card {
   position: relative;
-  transition: all 0.25s ease-out;
+  transition: all 0.2s ease-out;
 }
 
 .glow-card:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.12);
+  border-color: #3f3f46;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
 }
 
 /* Custom Sleek Scrollbar */
