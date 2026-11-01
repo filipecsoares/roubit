@@ -634,4 +634,113 @@ mod tests {
         };
         assert_eq!(report.total_records(), 56);
     }
+
+    #[tokio::test]
+    async fn test_migration_0007_multi_tenancy_columns_and_fk_cascade() {
+        let pool = crate::domain::create_sqlite_pool("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::run_migrations(&pool).await.unwrap();
+
+        let user_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO users (id, email, password_hash, created_at) VALUES (?, 'user@test.com', 'hash', '2026-11-01T00:00:00Z')")
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let habit_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO habits (id, user_id, name, habit_type, target_value, frequency_days, color_hex, is_archived, created_at, updated_at) VALUES (?, ?, 'Reading', 'binary', 1.0, 127, '#10B981', 0, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')")
+            .bind(&habit_id)
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let routine_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO routines (id, user_id, name, is_active, created_at, updated_at) VALUES (?, ?, 'Morning', 1, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')")
+            .bind(&routine_id)
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let objective_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO objectives (id, user_id, title, quarter, start_date, end_date, progress_percentage, is_completed, created_at, updated_at) VALUES (?, ?, 'Q4 Goals', '2026-Q4', '2026-10-01', '2026-12-31', 0.0, 0, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')")
+            .bind(&objective_id)
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let journal_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO journal_entries (id, user_id, entry_date, tags, salt, nonce, encrypted_payload, created_at, updated_at) VALUES (?, ?, '2026-11-01', '[]', X'01020304', X'05060708', X'090A0B0C', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')")
+            .bind(&journal_id)
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Foreign key violation check with invalid user_id
+        let invalid_habit_id = uuid::Uuid::new_v4().to_string();
+        let invalid_user_id = uuid::Uuid::new_v4().to_string();
+        let fk_err = sqlx::query("INSERT INTO habits (id, user_id, name, habit_type, target_value, frequency_days, color_hex, is_archived, created_at, updated_at) VALUES (?, ?, 'Fail Habit', 'binary', 1.0, 127, '#10B981', 0, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')")
+            .bind(&invalid_habit_id)
+            .bind(&invalid_user_id)
+            .execute(&pool)
+            .await;
+        assert!(
+            fk_err.is_err(),
+            "Expected FK violation with invalid user_id"
+        );
+
+        // Verify Cascade deletion
+        sqlx::query("DELETE FROM users WHERE id = ?")
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let count_habits: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM habits WHERE id = ?")
+            .bind(&habit_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count_habits.0, 0,
+            "Habit should have been cascaded on user delete"
+        );
+
+        let count_routines: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM routines WHERE id = ?")
+            .bind(&routine_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count_routines.0, 0,
+            "Routine should have been cascaded on user delete"
+        );
+
+        let count_objectives: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM objectives WHERE id = ?")
+                .bind(&objective_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            count_objectives.0, 0,
+            "Objective should have been cascaded on user delete"
+        );
+
+        let count_journal: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM journal_entries WHERE id = ?")
+                .bind(&journal_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            count_journal.0, 0,
+            "Journal entry should have been cascaded on user delete"
+        );
+    }
 }
