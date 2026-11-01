@@ -55,16 +55,16 @@ pub struct CreateObjectiveRequest {
 /// Returns [`ApiError::Internal`] if database queries fail.
 pub async fn list_okrs(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Query(query): Query<ListOkrsQuery>,
 ) -> Result<Json<Vec<ObjectiveWithKeyResults>>, ApiError> {
     let repo = SqliteOkrRepository::new(state.db);
     let objectives = if let Some(quarter) = query.quarter {
-        repo.list_objectives_by_quarter(&quarter)
+        repo.list_objectives_by_quarter(user.id, &quarter)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     } else {
-        repo.list_all_objectives()
+        repo.list_all_objectives(user.id)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     };
@@ -78,7 +78,7 @@ pub async fn list_okrs(
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
 pub async fn create_objective(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Json(payload): Json<CreateObjectiveRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
@@ -99,7 +99,8 @@ pub async fn create_objective(
         quarter,
         start_date,
         end_date,
-    );
+    )
+    .with_user_id(user.id);
 
     // Validate all nested key results upfront to prevent orphaned objectives on validation error
     if let Some(ref krs) = payload.key_results {
@@ -110,7 +111,7 @@ pub async fn create_objective(
         }
     }
 
-    repo.create_objective(&objective)
+    repo.create_objective(user.id, &objective)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -137,7 +138,7 @@ pub async fn create_objective(
                 )
             };
 
-            repo.create_key_result(&kr)
+            repo.create_key_result(user.id, &kr)
                 .await
                 .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -160,11 +161,11 @@ pub async fn create_objective(
 /// Returns [`ApiError::Internal`] on db error.
 pub async fn delete_objective(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteOkrRepository::new(state.db);
-    repo.delete_objective(id)
+    repo.delete_objective(id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 

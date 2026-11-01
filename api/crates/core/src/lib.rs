@@ -15,7 +15,7 @@ pub use crypto::{
 };
 pub use db::{migrate_sqlite_to_postgres, DatabaseError, DatabasePool, MigrationReport};
 pub use domain::{
-    create_sqlite_pool, BlockStatus, CurrentRoutineProgress, DailyRoutineLog,
+    create_sqlite_pool, seed_test_user, BlockStatus, CurrentRoutineProgress, DailyRoutineLog,
     DecryptedJournalEntry, EncryptedJournalEntry, Habit, HabitAnalyticsService,
     HabitAnalyticsSummary, HabitLog, HabitRepository, HabitRepositoryError, HabitType, HeatmapCell,
     JournalMetadata, JournalModelError, JournalRepository, JournalRepositoryError, JournalService,
@@ -23,7 +23,7 @@ pub use domain::{
     OkrRepository, OkrRepositoryError, OkrSyncService, Routine, RoutineProgressTracker,
     RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteJournalRepository,
     SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
-    TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
+    TimeBlockValidationError, TimeBlockValidator, LOCAL_USER_ID, MINIMUM_BLOCK_DURATION_MINUTES,
 };
 pub use redis::{RedisError, RedisService, ReminderNotification, ReminderScheduler};
 

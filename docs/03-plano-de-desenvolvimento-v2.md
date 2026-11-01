@@ -37,10 +37,10 @@ flowchart TD
     - `idx_objectives_user_quarter ON objectives(user_id, quarter)`
     - `idx_journal_user_date ON journal_entries(user_id, entry_date DESC)`
   - [x] Garantir compatibilidade com o dialeto PostgreSQL em `api/crates/core/migrations_pg/`.
-- [ ] **6.2 Scoping de Usuário na Camada de Repositórios (`roubit-core`)**
-  - [ ] Atualizar as traits de repositório (`HabitRepository`, `RoutineRepository`, `OkrRepository`, `JournalRepository`) para exigir `user_id: Uuid` em todas as operações de leitura, criação e exclusão.
-  - [ ] Modificar implementações `SqliteHabitRepository`, `SqliteRoutineRepository`, `SqliteOkrRepository` e `SqliteJournalRepository` garantindo que queries `SELECT`, `UPDATE` e `DELETE` incluam cláusula `WHERE user_id = ?`.
-  - [ ] Assegurar integridade relacional ao vincular Key Results a Hábitos apenas se pertencerem ao mesmo `user_id`.
+- [x] **6.2 Scoping de Usuário na Camada de Repositórios (`roubit-core`)**
+  - [x] Atualizar as traits de repositório (`HabitRepository`, `RoutineRepository`, `OkrRepository`, `JournalRepository`) para exigir `user_id: Uuid` em todas as operações de leitura, criação e exclusão.
+  - [x] Modificar implementações `SqliteHabitRepository`, `SqliteRoutineRepository`, `SqliteOkrRepository` e `SqliteJournalRepository` garantindo que queries `SELECT`, `UPDATE` e `DELETE` incluam cláusula `WHERE user_id = ?`.
+  - [x] Assegurar integridade relacional ao vincular Key Results a Hábitos apenas se pertencerem ao mesmo `user_id`.
 - [ ] **6.3 Extração e Injeção do Usuário Autenticado nos Controladores Axum (`roubit-server`)**
   - [ ] Conectar o extractor `user: AuthenticatedUser` em todos os handlers das rotas protegidas em `api/crates/server/src/controllers/`.
   - [ ] Propagar `user.id` para serviços de aplicação (`OkrSyncService`, `JournalService`).

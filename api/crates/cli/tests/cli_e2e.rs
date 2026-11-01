@@ -14,7 +14,7 @@ use roubit_core::{
         HabitRepository, OkrRepository, RoutineRepository, SqliteHabitRepository,
         SqliteOkrRepository, SqliteRoutineRepository,
     },
-    run_migrations,
+    run_migrations, LOCAL_USER_ID,
 };
 use tempfile::NamedTempFile;
 use uuid::Uuid;
@@ -65,6 +65,7 @@ async fn test_cli_habit_workflow_in_temp_db() {
     let habit_repo = SqliteHabitRepository::new(pool);
     let habit = Habit {
         id: Uuid::new_v4(),
+        user_id: Some(LOCAL_USER_ID),
         name: "Hydration".to_string(),
         description: Some("Drink 2000 ml water".to_string()),
         habit_type: HabitType::Numeric,
@@ -76,7 +77,10 @@ async fn test_cli_habit_workflow_in_temp_db() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    habit_repo.create_habit(&habit).await.unwrap();
+    habit_repo
+        .create_habit(LOCAL_USER_ID, &habit)
+        .await
+        .unwrap();
 
     // 2. Perform check-in via CLI binary
     let mut checkin_cmd = Command::cargo_bin("roubit").unwrap();
@@ -124,7 +128,8 @@ async fn test_cli_routine_workflow_in_temp_db() {
     run_migrations(&pool).await.unwrap();
 
     let routine_repo = SqliteRoutineRepository::new(pool);
-    let routine = Routine::new("Focus Flow", Some("Deep work schedule".to_string()));
+    let routine = Routine::new("Focus Flow", Some("Deep work schedule".to_string()))
+        .with_user_id(LOCAL_USER_ID);
     let block = TimeBlock {
         id: Uuid::new_v4(),
         routine_id: routine.id,
@@ -137,7 +142,7 @@ async fn test_cli_routine_workflow_in_temp_db() {
         created_at: Utc::now(),
     };
     routine_repo
-        .create_routine_with_blocks(&routine, std::slice::from_ref(&block))
+        .create_routine_with_blocks(LOCAL_USER_ID, &routine, std::slice::from_ref(&block))
         .await
         .unwrap();
 
@@ -193,7 +198,8 @@ async fn test_cli_okr_workflow_in_temp_db() {
     let okr_repo = SqliteOkrRepository::new(pool);
     let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
     let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-    let objective = Objective::new("Ship Roubit v1.0", None, "2026-Q4", start, end);
+    let objective =
+        Objective::new("Ship Roubit v1.0", None, "2026-Q4", start, end).with_user_id(LOCAL_USER_ID);
     let kr = KeyResult::new_numeric(
         objective.id,
         "Implement CLI Features",
@@ -202,8 +208,14 @@ async fn test_cli_okr_workflow_in_temp_db() {
         "features",
         1.0,
     );
-    okr_repo.create_objective(&objective).await.unwrap();
-    okr_repo.create_key_result(&kr).await.unwrap();
+    okr_repo
+        .create_objective(LOCAL_USER_ID, &objective)
+        .await
+        .unwrap();
+    okr_repo
+        .create_key_result(LOCAL_USER_ID, &kr)
+        .await
+        .unwrap();
 
     // 1. OKR Summary via CLI
     let mut summary_cmd = Command::cargo_bin("roubit").unwrap();

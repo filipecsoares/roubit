@@ -17,11 +17,11 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
     match args.action {
         OkrSubcommands::List { quarter } => {
             let objectives = if let Some(q) = quarter {
-                repo.list_objectives_by_quarter(&q)
+                repo.list_objectives_by_quarter(roubit_core::LOCAL_USER_ID, &q)
                     .await
                     .with_context(|| format!("failed to list objectives for quarter '{q}'"))?
             } else {
-                repo.list_all_objectives()
+                repo.list_all_objectives(roubit_core::LOCAL_USER_ID)
                     .await
                     .context("failed to list all objectives")?
             };
@@ -68,9 +68,10 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
             let today = chrono::Local::now().date_naive();
             let quarter_end = today + chrono::Duration::days(90);
             let objective =
-                roubit_core::Objective::new(title, description, quarter, today, quarter_end);
+                roubit_core::Objective::new(title, description, quarter, today, quarter_end)
+                    .with_user_id(roubit_core::LOCAL_USER_ID);
 
-            repo.create_objective(&objective)
+            repo.create_objective(roubit_core::LOCAL_USER_ID, &objective)
                 .await
                 .context("failed to create objective")?;
 
@@ -116,7 +117,7 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
                 )
             };
 
-            repo.create_key_result(&kr)
+            repo.create_key_result(roubit_core::LOCAL_USER_ID, &kr)
                 .await
                 .context("failed to create key result")?;
 
@@ -133,7 +134,7 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
         OkrSubcommands::Delete { objective_id } => {
             let id = uuid::Uuid::parse_str(&objective_id)
                 .with_context(|| format!("Invalid UUID: '{objective_id}'"))?;
-            repo.delete_objective(id)
+            repo.delete_objective(id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to delete objective")?;
             if json {
@@ -148,7 +149,7 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
 
         OkrSubcommands::Summary => {
             let objectives = repo
-                .list_all_objectives()
+                .list_all_objectives(roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to list objectives for summary")?;
 

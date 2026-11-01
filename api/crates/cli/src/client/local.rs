@@ -2,18 +2,21 @@
 
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use roubit_core::domain::{
-    habit::{
-        models::{Habit, HabitLog},
-        HabitRepository, SqliteHabitRepository,
+use roubit_core::{
+    domain::{
+        habit::{
+            models::{Habit, HabitLog},
+            HabitRepository, SqliteHabitRepository,
+        },
+        journal::{models::JournalMetadata, JournalRepository, SqliteJournalRepository},
+        okr::{OkrRepository, SqliteOkrRepository},
+        routine::{
+            models::{Routine, TimeBlock},
+            RoutineRepository, SqliteRoutineRepository,
+        },
+        BlockStatus, ObjectiveWithKeyResults,
     },
-    journal::{models::JournalMetadata, JournalRepository, SqliteJournalRepository},
-    okr::{OkrRepository, SqliteOkrRepository},
-    routine::{
-        models::{Routine, TimeBlock},
-        RoutineRepository, SqliteRoutineRepository,
-    },
-    BlockStatus, ObjectiveWithKeyResults,
+    LOCAL_USER_ID,
 };
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -44,14 +47,14 @@ impl LocalClient {
 impl RoubitClient for LocalClient {
     async fn list_habits(&self) -> Result<Vec<Habit>, ClientError> {
         let repo = SqliteHabitRepository::new(self.pool.clone());
-        repo.list_all_habits()
+        repo.list_all_habits(LOCAL_USER_ID)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
     async fn list_active_habits(&self) -> Result<Vec<Habit>, ClientError> {
         let repo = SqliteHabitRepository::new(self.pool.clone());
-        repo.list_active_habits()
+        repo.list_active_habits(LOCAL_USER_ID)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
@@ -63,21 +66,21 @@ impl RoubitClient for LocalClient {
         value: f64,
     ) -> Result<HabitLog, ClientError> {
         let repo = SqliteHabitRepository::new(self.pool.clone());
-        repo.record_check_in(habit_id, date, value, false)
+        repo.record_check_in(habit_id, LOCAL_USER_ID, date, value, false)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError> {
         let repo = SqliteRoutineRepository::new(self.pool.clone());
-        repo.get_active_routine()
+        repo.get_active_routine(LOCAL_USER_ID)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
     async fn list_routine_blocks(&self, routine_id: Uuid) -> Result<Vec<TimeBlock>, ClientError> {
         let repo = SqliteRoutineRepository::new(self.pool.clone());
-        repo.list_blocks_for_routine(routine_id)
+        repo.list_blocks_for_routine(routine_id, LOCAL_USER_ID)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
@@ -89,14 +92,14 @@ impl RoubitClient for LocalClient {
         status: BlockStatus,
     ) -> Result<(), ClientError> {
         let repo = SqliteRoutineRepository::new(self.pool.clone());
-        repo.log_block_status(block_id, date, status, None)
+        repo.log_block_status(block_id, LOCAL_USER_ID, date, status, None)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
     async fn list_all_objectives(&self) -> Result<Vec<ObjectiveWithKeyResults>, ClientError> {
         let repo = SqliteOkrRepository::new(self.pool.clone());
-        repo.list_all_objectives()
+        repo.list_all_objectives(LOCAL_USER_ID)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
@@ -106,7 +109,7 @@ impl RoubitClient for LocalClient {
         quarter: &str,
     ) -> Result<Vec<ObjectiveWithKeyResults>, ClientError> {
         let repo = SqliteOkrRepository::new(self.pool.clone());
-        repo.list_objectives_by_quarter(quarter)
+        repo.list_objectives_by_quarter(LOCAL_USER_ID, quarter)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
@@ -117,7 +120,7 @@ impl RoubitClient for LocalClient {
         to: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, ClientError> {
         let repo = SqliteJournalRepository::new(self.pool.clone());
-        repo.list_metadata_in_range(from, to)
+        repo.list_metadata_in_range(LOCAL_USER_ID, from, to)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
     }
