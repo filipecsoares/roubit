@@ -13,6 +13,9 @@ pub struct Routine {
     /// Unique identifier for the routine template.
     pub id: Uuid,
 
+    /// Unique identifier of the owner user account.
+    pub user_id: Option<Uuid>,
+
     /// Human-readable name of the routine.
     pub name: String,
 
@@ -36,12 +39,20 @@ impl Routine {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            user_id: None,
             name: name.into(),
             description,
             is_active: true,
             created_at: now,
             updated_at: now,
         }
+    }
+
+    /// Associates an owner `user_id` with this routine instance.
+    #[must_use]
+    pub const fn with_user_id(mut self, user_id: Uuid) -> Self {
+        self.user_id = Some(user_id);
+        self
     }
 }
 
@@ -298,7 +309,7 @@ mod tests {
         .expect("time block insert must succeed");
 
         // 3. Query Routine and TimeBlock
-        let fetched_routine: Routine = sqlx::query_as("SELECT id, name, description, is_active, created_at, updated_at FROM routines WHERE id = ?")
+        let fetched_routine: Routine = sqlx::query_as("SELECT id, user_id, name, description, is_active, created_at, updated_at FROM routines WHERE id = ?")
             .bind(routine.id)
             .fetch_one(&pool)
             .await

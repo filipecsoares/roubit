@@ -25,19 +25,23 @@ pub enum HabitRepositoryError {
 /// Abstract contract for habit persistence operations.
 #[async_trait]
 pub trait HabitRepository: Send + Sync {
-    /// Inserts a new habit definition.
-    async fn create_habit(&self, habit: &Habit) -> Result<(), HabitRepositoryError>;
+    /// Inserts a new habit definition for the specified user.
+    async fn create_habit(&self, user_id: Uuid, habit: &Habit) -> Result<(), HabitRepositoryError>;
 
-    /// Retrieves a habit by its unique identifier.
-    async fn get_habit_by_id(&self, id: Uuid) -> Result<Option<Habit>, HabitRepositoryError>;
+    /// Retrieves a habit by its unique identifier and user id.
+    async fn get_habit_by_id(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Habit>, HabitRepositoryError>;
 
-    /// Lists all active (non-archived) habits.
-    async fn list_active_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError>;
+    /// Lists all active (non-archived) habits for the specified user.
+    async fn list_active_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError>;
 
-    /// Lists all habits, including archived ones.
-    async fn list_all_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError>;
+    /// Lists all habits, including archived ones, for the specified user.
+    async fn list_all_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError>;
 
-    /// Atomically records a daily check-in for a habit.
+    /// Atomically records a daily check-in for a habit owned by `user_id`.
     ///
     /// If `is_increment` is `true`, `value` is added to the existing `actual_value` for that date.
     /// If `is_increment` is `false`, `value` replaces the existing `actual_value`.
@@ -45,24 +49,31 @@ pub trait HabitRepository: Send + Sync {
     async fn record_check_in(
         &self,
         habit_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
         value: f64,
         is_increment: bool,
     ) -> Result<HabitLog, HabitRepositoryError>;
 
-    /// Retrieves chronological habit logs within a bounded date range `[start_date, end_date]`.
+    /// Retrieves chronological habit logs within a bounded date range `[start_date, end_date]` for a habit owned by `user_id`.
     async fn get_logs_for_habit(
         &self,
         habit_id: Uuid,
+        user_id: Uuid,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<HabitLog>, HabitRepositoryError>;
 
     /// Marks a habit as archived.
-    async fn archive_habit(&self, id: Uuid) -> Result<(), HabitRepositoryError>;
+    async fn archive_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), HabitRepositoryError>;
 
     /// Permanently deletes a habit and cascades deletion to all associated logs.
-    async fn delete_habit(&self, id: Uuid) -> Result<(), HabitRepositoryError>;
+    async fn delete_habit(&self, habit_id: Uuid, user_id: Uuid)
+        -> Result<(), HabitRepositoryError>;
 }
 
 /// SQLite-backed implementation of [`HabitRepository`].
@@ -87,14 +98,15 @@ impl SqliteHabitRepository {
 
 #[async_trait]
 impl HabitRepository for SqliteHabitRepository {
-    async fn create_habit(&self, habit: &Habit) -> Result<(), HabitRepositoryError> {
+    async fn create_habit(&self, user_id: Uuid, habit: &Habit) -> Result<(), HabitRepositoryError> {
         sqlx::query(
             r"
-            INSERT INTO habits (id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ",
         )
         .bind(habit.id)
+        .bind(user_id)
         .bind(&habit.name)
         .bind(&habit.description)
         .bind(habit.habit_type)
@@ -111,44 +123,52 @@ impl HabitRepository for SqliteHabitRepository {
         Ok(())
     }
 
-    async fn get_habit_by_id(&self, id: Uuid) -> Result<Option<Habit>, HabitRepositoryError> {
+    async fn get_habit_by_id(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Habit>, HabitRepositoryError> {
         let habit = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
             FROM habits
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             ",
         )
-        .bind(id)
+        .bind(habit_id)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(habit)
     }
 
-    async fn list_active_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError> {
+    async fn list_active_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
         let habits = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
             FROM habits
-            WHERE is_archived = 0
+            WHERE is_archived = 0 AND user_id = ?
             ORDER BY created_at ASC
             ",
         )
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(habits)
     }
 
-    async fn list_all_habits(&self) -> Result<Vec<Habit>, HabitRepositoryError> {
+    async fn list_all_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
         let habits = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
             FROM habits
+            WHERE user_id = ?
             ORDER BY created_at ASC
             ",
         )
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -158,12 +178,13 @@ impl HabitRepository for SqliteHabitRepository {
     async fn record_check_in(
         &self,
         habit_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
         value: f64,
         is_increment: bool,
     ) -> Result<HabitLog, HabitRepositoryError> {
         let habit = self
-            .get_habit_by_id(habit_id)
+            .get_habit_by_id(habit_id, user_id)
             .await?
             .ok_or(HabitRepositoryError::NotFound(habit_id))?;
 
@@ -222,9 +243,15 @@ impl HabitRepository for SqliteHabitRepository {
     async fn get_logs_for_habit(
         &self,
         habit_id: Uuid,
+        user_id: Uuid,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<HabitLog>, HabitRepositoryError> {
+        let _habit = self
+            .get_habit_by_id(habit_id, user_id)
+            .await?
+            .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
         let logs = sqlx::query_as::<_, HabitLog>(
             r"
             SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
@@ -242,36 +269,46 @@ impl HabitRepository for SqliteHabitRepository {
         Ok(logs)
     }
 
-    async fn archive_habit(&self, id: Uuid) -> Result<(), HabitRepositoryError> {
+    async fn archive_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), HabitRepositoryError> {
         let rows_affected = sqlx::query(
             r"
             UPDATE habits
             SET is_archived = 1, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             ",
         )
         .bind(Utc::now())
-        .bind(id)
+        .bind(habit_id)
+        .bind(user_id)
         .execute(&self.pool)
         .await?
         .rows_affected();
 
         if rows_affected == 0 {
-            return Err(HabitRepositoryError::NotFound(id));
+            return Err(HabitRepositoryError::NotFound(habit_id));
         }
 
         Ok(())
     }
 
-    async fn delete_habit(&self, id: Uuid) -> Result<(), HabitRepositoryError> {
-        let rows_affected = sqlx::query("DELETE FROM habits WHERE id = ?")
-            .bind(id)
+    async fn delete_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), HabitRepositoryError> {
+        let rows_affected = sqlx::query("DELETE FROM habits WHERE id = ? AND user_id = ?")
+            .bind(habit_id)
+            .bind(user_id)
             .execute(&self.pool)
             .await?
             .rows_affected();
 
         if rows_affected == 0 {
-            return Err(HabitRepositoryError::NotFound(id));
+            return Err(HabitRepositoryError::NotFound(habit_id));
         }
 
         Ok(())
@@ -288,7 +325,7 @@ impl HabitRepository for SqliteHabitRepository {
 )]
 mod tests {
     use super::*;
-    use crate::domain::create_sqlite_pool;
+    use crate::domain::{create_sqlite_pool, seed_test_user};
 
     async fn setup_repo() -> SqliteHabitRepository {
         let pool = create_sqlite_pool("sqlite::memory:")
@@ -306,54 +343,128 @@ mod tests {
     #[tokio::test]
     async fn test_habit_crud_and_archival() {
         let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
 
-        let habit = Habit::new_numeric("Water Intake", None, 2000.0, "ml");
-        repo.create_habit(&habit).await.expect("create succeeds");
+        let habit = Habit::new_numeric("Water Intake", None, 2000.0, "ml").with_user_id(user_id);
+        repo.create_habit(user_id, &habit)
+            .await
+            .expect("create succeeds");
 
         let fetched = repo
-            .get_habit_by_id(habit.id)
+            .get_habit_by_id(habit.id, user_id)
             .await
             .expect("get succeeds")
             .expect("habit exists");
         assert_eq!(fetched.id, habit.id);
+        assert_eq!(fetched.user_id, Some(user_id));
         assert_eq!(fetched.name, "Water Intake");
         assert_eq!(fetched.target_value, 2000.0);
         assert_eq!(fetched.unit.as_deref(), Some("ml"));
         assert!(!fetched.is_archived);
 
-        let active_habits = repo.list_active_habits().await.expect("list succeeds");
+        let active_habits = repo
+            .list_active_habits(user_id)
+            .await
+            .expect("list succeeds");
         assert_eq!(active_habits.len(), 1);
 
-        repo.archive_habit(habit.id)
+        repo.archive_habit(habit.id, user_id)
             .await
             .expect("archive succeeds");
-        let active_after = repo.list_active_habits().await.expect("list succeeds");
+        let active_after = repo
+            .list_active_habits(user_id)
+            .await
+            .expect("list succeeds");
         assert_eq!(active_after.len(), 0);
 
         let archived_habit = repo
-            .get_habit_by_id(habit.id)
+            .get_habit_by_id(habit.id, user_id)
             .await
             .expect("get succeeds")
             .expect("habit exists");
         assert!(archived_habit.is_archived);
 
-        repo.delete_habit(habit.id).await.expect("delete succeeds");
-        let deleted = repo.get_habit_by_id(habit.id).await.expect("get succeeds");
+        repo.delete_habit(habit.id, user_id)
+            .await
+            .expect("delete succeeds");
+        let deleted = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .expect("get succeeds");
         assert!(deleted.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_habit_multi_tenant_isolation() {
+        let repo = setup_repo().await;
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_a).await.unwrap();
+        seed_test_user(repo.pool(), user_b).await.unwrap();
+
+        let habit_a = Habit::new_numeric("Habit A", None, 100.0, "count").with_user_id(user_a);
+        repo.create_habit(user_a, &habit_a)
+            .await
+            .expect("create habit a");
+
+        // User B cannot see user A's habit
+        assert!(repo
+            .get_habit_by_id(habit_a.id, user_b)
+            .await
+            .expect("get")
+            .is_none());
+
+        // User B's active list is empty
+        let b_list = repo.list_active_habits(user_b).await.expect("list active");
+        assert!(b_list.is_empty());
+
+        // User B cannot check-in to user A's habit
+        let today = Utc::now().date_naive();
+        let checkin_res = repo
+            .record_check_in(habit_a.id, user_b, today, 50.0, true)
+            .await;
+        assert!(matches!(
+            checkin_res,
+            Err(HabitRepositoryError::NotFound(_))
+        ));
+
+        // User B cannot archive user A's habit
+        let archive_res = repo.archive_habit(habit_a.id, user_b).await;
+        assert!(matches!(
+            archive_res,
+            Err(HabitRepositoryError::NotFound(_))
+        ));
+
+        // User B cannot delete user A's habit
+        let delete_res = repo.delete_habit(habit_a.id, user_b).await;
+        assert!(matches!(delete_res, Err(HabitRepositoryError::NotFound(_))));
+
+        // Habit A is still intact and accessible for User A
+        let fetched_a = repo
+            .get_habit_by_id(habit_a.id, user_a)
+            .await
+            .expect("get a")
+            .expect("exists");
+        assert_eq!(fetched_a.id, habit_a.id);
     }
 
     #[tokio::test]
     async fn test_habit_checkin_upsert_and_increment() {
         let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
 
-        let habit = Habit::new_numeric("Drink Water", None, 2000.0, "ml");
-        repo.create_habit(&habit).await.expect("create succeeds");
+        let habit = Habit::new_numeric("Drink Water", None, 2000.0, "ml").with_user_id(user_id);
+        repo.create_habit(user_id, &habit)
+            .await
+            .expect("create succeeds");
 
         let today = Utc::now().date_naive();
 
         // 1. First drink: 500ml (actual: 500.0 < 2000.0 -> not completed)
         let log1 = repo
-            .record_check_in(habit.id, today, 500.0, true)
+            .record_check_in(habit.id, user_id, today, 500.0, true)
             .await
             .expect("first check-in succeeds");
         assert_eq!(log1.actual_value, 500.0);
@@ -361,7 +472,7 @@ mod tests {
 
         // 2. Second drink: 1600ml (increment: 500.0 + 1600.0 = 2100.0 >= 2000.0 -> completed)
         let log2 = repo
-            .record_check_in(habit.id, today, 1600.0, true)
+            .record_check_in(habit.id, user_id, today, 1600.0, true)
             .await
             .expect("second check-in succeeds");
         assert_eq!(log2.actual_value, 2100.0);
@@ -369,7 +480,7 @@ mod tests {
 
         // 3. Overwrite check-in (is_increment = false): reset to 800ml -> not completed
         let log3 = repo
-            .record_check_in(habit.id, today, 800.0, false)
+            .record_check_in(habit.id, user_id, today, 800.0, false)
             .await
             .expect("overwrite check-in succeeds");
         assert_eq!(log3.actual_value, 800.0);
@@ -377,7 +488,7 @@ mod tests {
 
         // 4. Verify exactly 1 log record exists for (habit.id, today)
         let logs = repo
-            .get_logs_for_habit(habit.id, today, today)
+            .get_logs_for_habit(habit.id, user_id, today, today)
             .await
             .expect("get logs succeeds");
         assert_eq!(logs.len(), 1);
@@ -387,11 +498,13 @@ mod tests {
     #[tokio::test]
     async fn test_record_check_in_not_found() {
         let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
         let non_existent_id = Uuid::new_v4();
         let today = Utc::now().date_naive();
 
         let result = repo
-            .record_check_in(non_existent_id, today, 1.0, false)
+            .record_check_in(non_existent_id, user_id, today, 1.0, false)
             .await;
         assert!(matches!(result, Err(HabitRepositoryError::NotFound(_))));
     }
@@ -399,26 +512,30 @@ mod tests {
     #[tokio::test]
     async fn test_get_logs_range_ordering() {
         let repo = setup_repo().await;
-        let habit = Habit::new_binary("Floss", None);
-        repo.create_habit(&habit).await.expect("create succeeds");
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
+        let habit = Habit::new_binary("Floss", None).with_user_id(user_id);
+        repo.create_habit(user_id, &habit)
+            .await
+            .expect("create succeeds");
 
         let d1 = NaiveDate::from_ymd_opt(2026, 10, 20).expect("valid date");
         let d2 = NaiveDate::from_ymd_opt(2026, 10, 21).expect("valid date");
         let d3 = NaiveDate::from_ymd_opt(2026, 10, 22).expect("valid date");
 
         // Insert in reverse order
-        repo.record_check_in(habit.id, d3, 1.0, false)
+        repo.record_check_in(habit.id, user_id, d3, 1.0, false)
             .await
             .expect("d3");
-        repo.record_check_in(habit.id, d1, 1.0, false)
+        repo.record_check_in(habit.id, user_id, d1, 1.0, false)
             .await
             .expect("d1");
-        repo.record_check_in(habit.id, d2, 1.0, false)
+        repo.record_check_in(habit.id, user_id, d2, 1.0, false)
             .await
             .expect("d2");
 
         let logs = repo
-            .get_logs_for_habit(habit.id, d1, d3)
+            .get_logs_for_habit(habit.id, user_id, d1, d3)
             .await
             .expect("fetch logs succeeds");
 

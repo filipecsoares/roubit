@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use chrono::NaiveDate;
 use roubit_core::domain::{
-    create_sqlite_pool, Habit, HabitRepository, KeyResult, Objective, OkrRepository,
-    OkrRepositoryError, OkrSyncService, SqliteHabitRepository, SqliteOkrRepository,
+    create_sqlite_pool, seed_test_user, Habit, HabitRepository, KeyResult, Objective,
+    OkrRepository, OkrRepositoryError, OkrSyncService, SqliteHabitRepository, SqliteOkrRepository,
 };
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -28,7 +28,12 @@ use uuid::Uuid;
 const TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Initializes an isolated in-memory SQLite database repository with all migrations applied.
-async fn setup_test_repos() -> (SqliteOkrRepository, SqliteHabitRepository, sqlx::SqlitePool) {
+async fn setup_test_repos() -> (
+    SqliteOkrRepository,
+    SqliteHabitRepository,
+    sqlx::SqlitePool,
+    Uuid,
+) {
     let pool = create_sqlite_pool("sqlite::memory:")
         .await
         .expect("pool creation must succeed");
@@ -38,46 +43,62 @@ async fn setup_test_repos() -> (SqliteOkrRepository, SqliteHabitRepository, sqlx
         .await
         .expect("migrations must succeed");
 
+    let user_id = Uuid::new_v4();
+    seed_test_user(&pool, user_id)
+        .await
+        .expect("seed user must succeed");
+
     (
         SqliteOkrRepository::new(pool.clone()),
         SqliteHabitRepository::new(pool.clone()),
         pool,
+        user_id,
     )
 }
 
 #[tokio::test]
 async fn test_cascade_delete_objective_removes_krs() {
     timeout(TEST_TIMEOUT, async {
-        let (okr_repo, _, pool) = setup_test_repos().await;
+        let (okr_repo, _, pool, user_id) = setup_test_repos().await;
 
         let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-        let obj = Objective::new("Learn Rust Internals", None, "2026-Q4", start, end);
+        let obj = Objective::new("Learn Rust Internals", None, "2026-Q4", start, end)
+            .with_user_id(user_id);
         okr_repo
-            .create_objective(&obj)
+            .create_objective(user_id, &obj)
             .await
             .expect("create objective");
 
         let kr1 = KeyResult::new_numeric(obj.id, "Read The Rustonomicon", 0.0, 1.0, "book", 1.0);
         let kr2 =
             KeyResult::new_numeric(obj.id, "Write 3 unsafe modules", 0.0, 3.0, "modules", 1.0);
-        okr_repo.create_key_result(&kr1).await.expect("create kr1");
-        okr_repo.create_key_result(&kr2).await.expect("create kr2");
+        okr_repo
+            .create_key_result(user_id, &kr1)
+            .await
+            .expect("create kr1");
+        okr_repo
+            .create_key_result(user_id, &kr2)
+            .await
+            .expect("create kr2");
 
         // Verify key results exist
         let loaded = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .expect("obj exists");
         assert_eq!(loaded.key_results.len(), 2);
 
         // Delete parent objective
-        okr_repo.delete_objective(obj.id).await.expect("delete obj");
+        okr_repo
+            .delete_objective(obj.id, user_id)
+            .await
+            .expect("delete obj");
 
         // Verify objective is gone
         let loaded_after = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch");
         assert!(loaded_after.is_none());
@@ -99,18 +120,22 @@ async fn test_cascade_delete_objective_removes_krs() {
 #[tokio::test]
 async fn test_habit_deletion_sets_null_on_linked_habit_id() {
     timeout(TEST_TIMEOUT, async {
-        let (okr_repo, habit_repo, pool) = setup_test_repos().await;
+        let (okr_repo, habit_repo, pool, user_id) = setup_test_repos().await;
 
         // 1. Create a habit
-        let habit = Habit::new_numeric("Daily Pushups", None, 50.0, "reps");
-        habit_repo.create_habit(&habit).await.expect("create habit");
+        let habit = Habit::new_numeric("Daily Pushups", None, 50.0, "reps").with_user_id(user_id);
+        habit_repo
+            .create_habit(user_id, &habit)
+            .await
+            .expect("create habit");
 
         // 2. Create objective and linked KR
         let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-        let obj = Objective::new("Upper Body Strength", None, "2026-Q4", start, end);
+        let obj = Objective::new("Upper Body Strength", None, "2026-Q4", start, end)
+            .with_user_id(user_id);
         okr_repo
-            .create_objective(&obj)
+            .create_objective(user_id, &obj)
             .await
             .expect("create objective");
 
@@ -122,11 +147,14 @@ async fn test_habit_deletion_sets_null_on_linked_habit_id() {
             "reps",
             1.0,
         );
-        okr_repo.create_key_result(&kr).await.expect("create kr");
+        okr_repo
+            .create_key_result(user_id, &kr)
+            .await
+            .expect("create kr");
 
         // Verify KR is linked to habit
         let loaded = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .expect("obj exists");
@@ -134,13 +162,13 @@ async fn test_habit_deletion_sets_null_on_linked_habit_id() {
 
         // 3. Delete the habit
         habit_repo
-            .delete_habit(habit.id)
+            .delete_habit(habit.id, user_id)
             .await
             .expect("delete habit");
 
         // 4. Verify the Key Result STILL exists, but its linked_habit_id was set to NULL
         let loaded_after = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .expect("obj exists");
@@ -163,29 +191,30 @@ async fn test_habit_deletion_sets_null_on_linked_habit_id() {
 #[tokio::test]
 async fn test_live_progress_propagation_from_habit_checkins() {
     timeout(TEST_TIMEOUT, async {
-        let (okr_repo, habit_repo, _) = setup_test_repos().await;
+        let (okr_repo, habit_repo, _, user_id) = setup_test_repos().await;
         let sync_service = OkrSyncService::new(okr_repo.clone(), habit_repo.clone());
 
         // 1. Create two habits:
         // Habit 1: Numeric Running (target: 5.0 km per session)
         // Habit 2: Binary Meditation
-        let running_habit = Habit::new_numeric("Running", None, 5.0, "km");
-        let meditation_habit = Habit::new_binary("Meditation", None);
+        let running_habit = Habit::new_numeric("Running", None, 5.0, "km").with_user_id(user_id);
+        let meditation_habit = Habit::new_binary("Meditation", None).with_user_id(user_id);
         habit_repo
-            .create_habit(&running_habit)
+            .create_habit(user_id, &running_habit)
             .await
             .expect("create running");
         habit_repo
-            .create_habit(&meditation_habit)
+            .create_habit(user_id, &meditation_habit)
             .await
             .expect("create meditation");
 
         // 2. Create Objective with two linked KRs
         let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-        let obj = Objective::new("Q4 Health & Mindfulness", None, "2026-Q4", start, end);
+        let obj = Objective::new("Q4 Health & Mindfulness", None, "2026-Q4", start, end)
+            .with_user_id(user_id);
         okr_repo
-            .create_objective(&obj)
+            .create_objective(user_id, &obj)
             .await
             .expect("create objective");
 
@@ -202,17 +231,17 @@ async fn test_live_progress_propagation_from_habit_checkins() {
             1.0,
         );
         okr_repo
-            .create_key_result(&kr_run)
+            .create_key_result(user_id, &kr_run)
             .await
             .expect("create kr_run");
         okr_repo
-            .create_key_result(&kr_med)
+            .create_key_result(user_id, &kr_med)
             .await
             .expect("create kr_med");
 
         // Initial progress is 0%
         let loaded = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .unwrap();
@@ -224,11 +253,11 @@ async fn test_live_progress_propagation_from_habit_checkins() {
         let d1 = NaiveDate::from_ymd_opt(2026, 10, 10).unwrap();
         let d2 = NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();
         habit_repo
-            .record_check_in(running_habit.id, d1, 15.0, true)
+            .record_check_in(running_habit.id, user_id, d1, 15.0, true)
             .await
             .unwrap();
         habit_repo
-            .record_check_in(running_habit.id, d2, 10.0, true)
+            .record_check_in(running_habit.id, user_id, d2, 10.0, true)
             .await
             .unwrap();
 
@@ -236,20 +265,20 @@ async fn test_live_progress_propagation_from_habit_checkins() {
         for i in 0..15 {
             let d = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap() + chrono::Duration::days(i);
             habit_repo
-                .record_check_in(meditation_habit.id, d, 1.0, false)
+                .record_check_in(meditation_habit.id, user_id, d, 1.0, false)
                 .await
                 .unwrap();
         }
 
         // 4. Synchronize running habit
         sync_service
-            .sync_linked_krs_for_habit(running_habit.id)
+            .sync_linked_krs_for_habit(user_id, running_habit.id)
             .await
             .expect("sync running");
 
         // 5. Synchronize meditation habit
         sync_service
-            .sync_linked_krs_for_habit(meditation_habit.id)
+            .sync_linked_krs_for_habit(user_id, meditation_habit.id)
             .await
             .expect("sync meditation");
 
@@ -258,7 +287,7 @@ async fn test_live_progress_propagation_from_habit_checkins() {
         // KR 2 (med): 15 / 30 = 50.0%
         // Weighted objective: (25% * 2.0 + 50% * 1.0) / 3.0 = 100.0 / 3.0 = 33.333336%
         let loaded_mid = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .unwrap();
@@ -272,29 +301,29 @@ async fn test_live_progress_propagation_from_habit_checkins() {
         // 7. Complete the rest of running (another 75km) and meditation (another 15 days)
         let d3 = NaiveDate::from_ymd_opt(2026, 10, 20).unwrap();
         habit_repo
-            .record_check_in(running_habit.id, d3, 75.0, true)
+            .record_check_in(running_habit.id, user_id, d3, 75.0, true)
             .await
             .unwrap();
 
         for i in 15..30 {
             let d = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap() + chrono::Duration::days(i);
             habit_repo
-                .record_check_in(meditation_habit.id, d, 1.0, false)
+                .record_check_in(meditation_habit.id, user_id, d, 1.0, false)
                 .await
                 .unwrap();
         }
 
         sync_service
-            .sync_linked_krs_for_habit(running_habit.id)
+            .sync_linked_krs_for_habit(user_id, running_habit.id)
             .await
             .expect("sync running");
         sync_service
-            .sync_linked_krs_for_habit(meditation_habit.id)
+            .sync_linked_krs_for_habit(user_id, meditation_habit.id)
             .await
             .expect("sync meditation");
 
         let loaded_final = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .expect("fetch")
             .unwrap();
@@ -310,34 +339,97 @@ async fn test_live_progress_propagation_from_habit_checkins() {
 #[tokio::test]
 async fn test_quarter_listing_and_not_found_errors() {
     timeout(TEST_TIMEOUT, async {
-        let (okr_repo, _, _) = setup_test_repos().await;
+        let (okr_repo, _, _, user_id) = setup_test_repos().await;
 
         let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
 
-        let obj1 = Objective::new("Q4 Main Goal", None, "2026-Q4", start, end);
-        let obj2 = Objective::new("Q1 Forward Goal", None, "2027-Q1", start, end);
+        let obj1 =
+            Objective::new("Q4 Main Goal", None, "2026-Q4", start, end).with_user_id(user_id);
+        let obj2 =
+            Objective::new("Q1 Forward Goal", None, "2027-Q1", start, end).with_user_id(user_id);
 
-        okr_repo.create_objective(&obj1).await.expect("create obj1");
-        okr_repo.create_objective(&obj2).await.expect("create obj2");
+        okr_repo
+            .create_objective(user_id, &obj1)
+            .await
+            .expect("create obj1");
+        okr_repo
+            .create_objective(user_id, &obj2)
+            .await
+            .expect("create obj2");
 
         let q4_list = okr_repo
-            .list_objectives_by_quarter("2026-Q4")
+            .list_objectives_by_quarter(user_id, "2026-Q4")
             .await
             .expect("list");
         assert_eq!(q4_list.len(), 1);
         assert_eq!(q4_list[0].objective.title, "Q4 Main Goal");
 
         let random_id = Uuid::new_v4();
-        let err_kr = okr_repo.update_key_result_value(random_id, 10.0).await;
+        let err_kr = okr_repo
+            .update_key_result_value(random_id, user_id, 10.0)
+            .await;
         assert!(matches!(
             err_kr,
             Err(OkrRepositoryError::KeyResultNotFound(_))
         ));
 
-        let err_obj = okr_repo.delete_objective(random_id).await;
+        let err_obj = okr_repo.delete_objective(random_id, user_id).await;
         assert!(matches!(
             err_obj,
+            Err(OkrRepositoryError::ObjectiveNotFound(_))
+        ));
+    })
+    .await
+    .expect("test timed out");
+}
+
+#[tokio::test]
+async fn test_okr_multi_tenant_isolation() {
+    timeout(TEST_TIMEOUT, async {
+        let pool = create_sqlite_pool("sqlite::memory:")
+            .await
+            .expect("pool creation must succeed");
+
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("migrations must succeed");
+
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+        seed_test_user(&pool, user_a).await.expect("seed user A");
+        seed_test_user(&pool, user_b).await.expect("seed user B");
+
+        let okr_repo = SqliteOkrRepository::new(pool);
+
+        let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
+        let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
+        let obj_a =
+            Objective::new("User A Objective", None, "2026-Q4", start, end).with_user_id(user_a);
+        okr_repo
+            .create_objective(user_a, &obj_a)
+            .await
+            .expect("create obj for A");
+
+        // User B cannot see User A's objectives in list
+        let objectives_b = okr_repo
+            .list_objectives_by_quarter(user_b, "2026-Q4")
+            .await
+            .expect("list for B");
+        assert_eq!(objectives_b.len(), 0);
+
+        // User B cannot get User A's objective with KRs
+        let obj_fetched_b = okr_repo
+            .get_objective_with_krs(obj_a.id, user_b)
+            .await
+            .expect("fetch for B");
+        assert!(obj_fetched_b.is_none());
+
+        // User B cannot delete User A's objective
+        let delete_b = okr_repo.delete_objective(obj_a.id, user_b).await;
+        assert!(matches!(
+            delete_b,
             Err(OkrRepositoryError::ObjectiveNotFound(_))
         ));
     })

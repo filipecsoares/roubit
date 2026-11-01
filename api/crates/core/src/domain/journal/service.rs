@@ -83,6 +83,7 @@ impl<R: JournalRepository> JournalService<R> {
     /// Returns [`JournalServiceError`] if KDF, cipher, or repository fails.
     pub async fn create_or_update_entry(
         &self,
+        user_id: Uuid,
         date: NaiveDate,
         mood: Option<u8>,
         tags: Vec<String>,
@@ -101,7 +102,7 @@ impl<R: JournalRepository> JournalService<R> {
         let envelope = AesGcmCipher::encrypt(derived_key.as_bytes(), plaintext.as_bytes(), None)?;
 
         // 4. Resolve entry ID and created_at if updating an existing daily record
-        let existing = self.repo.get_entry_by_date(date).await?;
+        let existing = self.repo.get_entry_by_date(date, user_id).await?;
         let (id, created_at) = if let Some(old) = existing {
             (old.metadata.id, old.metadata.created_at)
         } else {
@@ -111,6 +112,7 @@ impl<R: JournalRepository> JournalService<R> {
         let now = Utc::now();
         let metadata = JournalMetadata {
             id,
+            user_id: Some(user_id),
             entry_date: date,
             mood_score: mood,
             tags,
@@ -127,7 +129,7 @@ impl<R: JournalRepository> JournalService<R> {
             envelope.ciphertext,
         )?;
 
-        self.repo.save_entry(&encrypted_entry).await?;
+        self.repo.save_entry(user_id, &encrypted_entry).await?;
 
         Ok(metadata)
     }
@@ -140,11 +142,12 @@ impl<R: JournalRepository> JournalService<R> {
     pub async fn read_and_decrypt_entry(
         &self,
         id: Uuid,
+        user_id: Uuid,
         passphrase: &SecretString,
     ) -> Result<DecryptedJournalEntry, JournalServiceError> {
         let entry = self
             .repo
-            .get_entry_by_id(id)
+            .get_entry_by_id(id, user_id)
             .await?
             .ok_or(JournalRepositoryError::NotFound(id))?;
 
@@ -175,9 +178,10 @@ impl<R: JournalRepository> JournalService<R> {
     pub async fn read_and_decrypt_entry_by_date(
         &self,
         date: NaiveDate,
+        user_id: Uuid,
         passphrase: &SecretString,
     ) -> Result<Option<DecryptedJournalEntry>, JournalServiceError> {
-        let entry_opt = self.repo.get_entry_by_date(date).await?;
+        let entry_opt = self.repo.get_entry_by_date(date, user_id).await?;
 
         let Some(entry) = entry_opt else {
             return Ok(None);
@@ -199,6 +203,15 @@ impl<R: JournalRepository> JournalService<R> {
             entry.metadata,
             plaintext_content,
         )))
+    }
+
+    /// Deletes a journal entry by its unique identifier scoped to `user_id`.
+    ///
+    /// # Errors
+    /// Returns [`JournalRepositoryError`] if entry was not found or deletion fails.
+    pub async fn delete_entry(&self, id: Uuid, user_id: Uuid) -> Result<(), JournalServiceError> {
+        self.repo.delete_entry(id, user_id).await?;
+        Ok(())
     }
 }
 
@@ -224,6 +237,10 @@ mod tests {
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool);
         let service = JournalService::new(repo, test_kdf());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(service.repository().pool(), user_id)
+            .await
+            .unwrap();
 
         let pass = SecretString::new("my-master-vault-password".to_string());
         let reflection = SecretString::new(
@@ -233,6 +250,7 @@ mod tests {
 
         let meta = service
             .create_or_update_entry(
+                user_id,
                 date,
                 Some(5),
                 vec!["focus".to_string(), "rust".to_string()],
@@ -243,11 +261,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(meta.entry_date, date);
+        assert_eq!(meta.user_id, Some(user_id));
         assert_eq!(meta.mood_score, Some(5));
 
         // Read and decrypt by ID
         let decrypted = service
-            .read_and_decrypt_entry(meta.id, &pass)
+            .read_and_decrypt_entry(meta.id, user_id, &pass)
             .await
             .unwrap();
         assert_eq!(
@@ -258,7 +277,7 @@ mod tests {
 
         // Read and decrypt by Date
         let decrypted_by_date = service
-            .read_and_decrypt_entry_by_date(date, &pass)
+            .read_and_decrypt_entry_by_date(date, user_id, &pass)
             .await
             .unwrap();
         assert!(decrypted_by_date.is_some());
@@ -278,6 +297,10 @@ mod tests {
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool);
         let service = JournalService::new(repo, test_kdf());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(service.repository().pool(), user_id)
+            .await
+            .unwrap();
 
         let correct_pass = SecretString::new("correct-password".to_string());
         let wrong_pass = SecretString::new("wrong-password".to_string());
@@ -285,12 +308,12 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
 
         let meta = service
-            .create_or_update_entry(date, Some(4), vec![], reflection, &correct_pass)
+            .create_or_update_entry(user_id, date, Some(4), vec![], reflection, &correct_pass)
             .await
             .unwrap();
 
         let err = service
-            .read_and_decrypt_entry(meta.id, &wrong_pass)
+            .read_and_decrypt_entry(meta.id, user_id, &wrong_pass)
             .await
             .unwrap_err();
 
@@ -310,13 +333,15 @@ mod tests {
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool.clone());
         let service = JournalService::new(repo, test_kdf());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(&pool, user_id).await.unwrap();
 
         let pass = SecretString::new("secure-pass".to_string());
         let reflection = SecretString::new("Unbroken integrity test.".to_string());
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
 
         let meta = service
-            .create_or_update_entry(date, Some(3), vec![], reflection, &pass)
+            .create_or_update_entry(user_id, date, Some(3), vec![], reflection, &pass)
             .await
             .unwrap();
 
@@ -334,7 +359,7 @@ mod tests {
         .unwrap();
 
         let err = service
-            .read_and_decrypt_entry(meta.id, &pass)
+            .read_and_decrypt_entry(meta.id, user_id, &pass)
             .await
             .unwrap_err();
 
@@ -354,6 +379,10 @@ mod tests {
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool);
         let service = JournalService::new(repo, test_kdf());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(service.repository().pool(), user_id)
+            .await
+            .unwrap();
 
         let pass = SecretString::new("vault-pass".to_string());
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
@@ -362,6 +391,7 @@ mod tests {
         let morning_text = SecretString::new("Morning reflection: energized.".to_string());
         let meta1 = service
             .create_or_update_entry(
+                user_id,
                 date,
                 Some(5),
                 vec!["morning".to_string()],
@@ -375,6 +405,7 @@ mod tests {
         let evening_text = SecretString::new("Evening reflection: day complete.".to_string());
         let meta2 = service
             .create_or_update_entry(
+                user_id,
                 date,
                 Some(4),
                 vec!["evening".to_string(), "wrapup".to_string()],
@@ -394,7 +425,7 @@ mod tests {
         );
 
         let decrypted = service
-            .read_and_decrypt_entry(meta1.id, &pass)
+            .read_and_decrypt_entry(meta1.id, user_id, &pass)
             .await
             .unwrap();
         assert_eq!(

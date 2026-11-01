@@ -11,6 +11,9 @@ pub struct Objective {
     /// Unique identifier for the objective.
     pub id: Uuid,
 
+    /// Unique identifier of the owner user account.
+    pub user_id: Option<Uuid>,
+
     /// Short title or statement of the aspirational goal.
     pub title: String,
 
@@ -52,6 +55,7 @@ impl Objective {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            user_id: None,
             title: title.into(),
             description,
             quarter: quarter.into(),
@@ -62,6 +66,13 @@ impl Objective {
             created_at: now,
             updated_at: now,
         }
+    }
+
+    /// Associates an owner `user_id` with this objective instance.
+    #[must_use]
+    pub const fn with_user_id(mut self, user_id: Uuid) -> Self {
+        self.user_id = Some(user_id);
+        self
     }
 
     /// Recalculates the objective's aggregate progress percentage as the weighted

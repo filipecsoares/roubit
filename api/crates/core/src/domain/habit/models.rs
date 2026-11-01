@@ -51,6 +51,9 @@ pub struct Habit {
     /// Unique identifier for the habit.
     pub id: Uuid,
 
+    /// Unique identifier of the owner user account.
+    pub user_id: Option<Uuid>,
+
     /// Title or label of the habit.
     pub name: String,
 
@@ -101,6 +104,7 @@ impl Habit {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            user_id: None,
             name: name.into(),
             description,
             habit_type: HabitType::Binary,
@@ -114,6 +118,13 @@ impl Habit {
         }
     }
 
+    /// Associates an owner `user_id` with this habit instance.
+    #[must_use]
+    pub const fn with_user_id(mut self, user_id: Uuid) -> Self {
+        self.user_id = Some(user_id);
+        self
+    }
+
     /// Creates a new numeric habit with a quantitative target and unit.
     #[must_use]
     pub fn new_numeric(
@@ -125,6 +136,7 @@ impl Habit {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            user_id: None,
             name: name.into(),
             description,
             habit_type: HabitType::Numeric,
@@ -148,6 +160,7 @@ impl Habit {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            user_id: None,
             name: name.into(),
             description,
             habit_type: HabitType::Timer,
@@ -382,7 +395,7 @@ mod tests {
 
         // 3. Query Habit using FromRow
         let fetched_habit: Habit = sqlx::query_as(
-            "SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at FROM habits WHERE id = ?",
+            "SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at FROM habits WHERE id = ?",
         )
         .bind(habit.id)
         .fetch_one(&pool)

@@ -103,7 +103,7 @@ pub async fn register(
         VALUES (?, ?, ?, ?)
         ",
     )
-    .bind(user_id.to_string())
+    .bind(user_id)
     .bind(&email)
     .bind(&password_hash)
     .bind(&created_at)
@@ -149,8 +149,13 @@ pub async fn login(
         ));
     };
 
-    let id_str: String = user_row.get("id");
-    let user_id = Uuid::parse_str(&id_str)
+    let user_id: Uuid = user_row
+        .try_get("id")
+        .or_else(|_| {
+            user_row
+                .try_get::<String, _>("id")
+                .and_then(|s| Uuid::parse_str(&s).map_err(|e| sqlx::Error::Decode(Box::new(e))))
+        })
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("Invalid user UUID in DB: {e}")))?;
     let password_hash: String = user_row.get("password_hash");
 

@@ -73,11 +73,11 @@ fn parse_habit_type(s: &str) -> Result<HabitType, ApiError> {
 /// Returns [`ApiError::Internal`] if database queries fail.
 pub async fn list_habits(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
 ) -> Result<Json<Vec<HabitWithStreakResponse>>, ApiError> {
     let repo = SqliteHabitRepository::new(state.db);
     let habits = repo
-        .list_active_habits()
+        .list_active_habits(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -86,7 +86,12 @@ pub async fn list_habits(
 
     for habit in habits {
         let logs = repo
-            .get_logs_for_habit(habit.id, today - chrono::Duration::days(365), today)
+            .get_logs_for_habit(
+                habit.id,
+                user.id,
+                today - chrono::Duration::days(365),
+                today,
+            )
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -109,7 +114,7 @@ pub async fn list_habits(
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
 pub async fn create_habit(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Json(payload): Json<CreateHabitRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
@@ -119,6 +124,7 @@ pub async fn create_habit(
     let habit_type = parse_habit_type(&payload.habit_type)?;
     let habit = Habit {
         id: Uuid::new_v4(),
+        user_id: Some(user.id),
         name: payload.name,
         description: payload.description,
         habit_type,
@@ -132,7 +138,7 @@ pub async fn create_habit(
     };
 
     let repo = SqliteHabitRepository::new(state.db);
-    repo.create_habit(&habit)
+    repo.create_habit(user.id, &habit)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -145,7 +151,7 @@ pub async fn create_habit(
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
 pub async fn record_checkin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(habit_id): Path<Uuid>,
     Json(payload): Json<HabitCheckinRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -155,21 +161,21 @@ pub async fn record_checkin(
 
     let repo = SqliteHabitRepository::new(state.db.clone());
     let habit = repo
-        .get_habit_by_id(habit_id)
+        .get_habit_by_id(habit_id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
         .ok_or_else(|| ApiError::NotFound(format!("Habit {habit_id} not found")))?;
 
     let is_increment = payload.is_increment.unwrap_or(false);
     let log = repo
-        .record_check_in(habit_id, payload.date, payload.value, is_increment)
+        .record_check_in(habit_id, user.id, payload.date, payload.value, is_increment)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     // Synchronize linked Key Results progress
     let okr_repo = SqliteOkrRepository::new(state.db);
     let sync_svc = OkrSyncService::new(okr_repo, repo.clone());
-    if let Err(err) = sync_svc.sync_linked_krs_for_habit(habit_id).await {
+    if let Err(err) = sync_svc.sync_linked_krs_for_habit(user.id, habit_id).await {
         tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
     }
 
@@ -177,6 +183,7 @@ pub async fn record_checkin(
     let logs = repo
         .get_logs_for_habit(
             habit_id,
+            user.id,
             payload.date - chrono::Duration::days(365),
             payload.date,
         )
@@ -200,11 +207,11 @@ pub async fn record_checkin(
 /// Returns [`ApiError::Internal`] on db error.
 pub async fn delete_habit(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(habit_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteHabitRepository::new(state.db);
-    repo.delete_habit(habit_id)
+    repo.delete_habit(habit_id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 

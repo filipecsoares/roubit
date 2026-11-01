@@ -19,11 +19,11 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
     match args.action {
         HabitSubcommands::List { all } => {
             let habits = if all {
-                repo.list_all_habits()
+                repo.list_all_habits(roubit_core::LOCAL_USER_ID)
                     .await
                     .context("failed to list habits from database")?
             } else {
-                repo.list_active_habits()
+                repo.list_active_habits(roubit_core::LOCAL_USER_ID)
                     .await
                     .context("failed to list habits from database")?
             };
@@ -62,6 +62,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
 
             let habit = roubit_core::Habit {
                 id: Uuid::new_v4(),
+                user_id: Some(roubit_core::LOCAL_USER_ID),
                 name,
                 description,
                 habit_type,
@@ -74,7 +75,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 updated_at: chrono::Utc::now(),
             };
 
-            repo.create_habit(&habit)
+            repo.create_habit(roubit_core::LOCAL_USER_ID, &habit)
                 .await
                 .context("failed to create habit")?;
 
@@ -91,7 +92,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
         HabitSubcommands::Archive { habit_id } => {
             let id = Uuid::parse_str(&habit_id)
                 .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
-            repo.archive_habit(id)
+            repo.archive_habit(id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to archive habit")?;
             if json {
@@ -107,7 +108,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
         HabitSubcommands::Delete { habit_id } => {
             let id = Uuid::parse_str(&habit_id)
                 .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
-            repo.delete_habit(id)
+            repo.delete_habit(id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to delete habit")?;
             if json {
@@ -128,7 +129,13 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
             let checkin_val = value.unwrap_or(1.0);
 
             let log = repo
-                .record_check_in(habit_uuid, target_date, checkin_val, false)
+                .record_check_in(
+                    habit_uuid,
+                    roubit_core::LOCAL_USER_ID,
+                    target_date,
+                    checkin_val,
+                    false,
+                )
                 .await
                 .context("failed to record habit check-in")?;
 
@@ -145,7 +152,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
 
         HabitSubcommands::Streaks => {
             let habits = repo
-                .list_active_habits()
+                .list_active_habits(roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to list active habits for streaks")?;
 
@@ -155,7 +162,7 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
             for h in &habits {
                 let start_date = today - chrono::Duration::days(365);
                 let logs = repo
-                    .get_logs_for_habit(h.id, start_date, today)
+                    .get_logs_for_habit(h.id, roubit_core::LOCAL_USER_ID, start_date, today)
                     .await
                     .unwrap_or_default();
 

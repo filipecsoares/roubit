@@ -98,16 +98,20 @@ where
     #[allow(clippy::option_if_let_else)]
     pub async fn sync_linked_krs_for_habit(
         &self,
+        user_id: Uuid,
         habit_id: Uuid,
     ) -> Result<(), OkrRepositoryError> {
-        let linked_krs = self.okr_repo.list_key_results_by_habit(habit_id).await?;
+        let linked_krs = self
+            .okr_repo
+            .list_key_results_by_habit(user_id, habit_id)
+            .await?;
         if linked_krs.is_empty() {
             return Ok(());
         }
 
         let habit_opt = self
             .habit_repo
-            .get_habit_by_id(habit_id)
+            .get_habit_by_id(habit_id, user_id)
             .await
             .map_err(|e| OkrRepositoryError::Habit(e.to_string()))?;
 
@@ -115,7 +119,7 @@ where
             // Find parent Objective to determine time window
             let Some(parent) = self
                 .okr_repo
-                .get_objective_with_krs(kr.objective_id)
+                .get_objective_with_krs(kr.objective_id, user_id)
                 .await?
             else {
                 continue;
@@ -125,6 +129,7 @@ where
                 .habit_repo
                 .get_logs_for_habit(
                     habit_id,
+                    user_id,
                     parent.objective.start_date,
                     parent.objective.end_date,
                 )
@@ -147,7 +152,7 @@ where
             };
 
             self.okr_repo
-                .update_key_result_value(kr.id, new_value)
+                .update_key_result_value(user_id, kr.id, new_value)
                 .await?;
         }
 
@@ -212,22 +217,25 @@ mod tests {
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
 
         let okr_repo = SqliteOkrRepository::new(pool.clone());
-        let habit_repo = SqliteHabitRepository::new(pool);
+        let habit_repo = SqliteHabitRepository::new(pool.clone());
         let sync_service = OkrSyncService::new(okr_repo.clone(), habit_repo.clone());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(&pool, user_id).await.unwrap();
 
         // 1. Create a Numeric Habit: Running (5km per run target)
-        let habit = Habit::new_numeric("Running", None, 5.0, "km");
-        habit_repo.create_habit(&habit).await.unwrap();
+        let habit = Habit::new_numeric("Running", None, 5.0, "km").with_user_id(user_id);
+        habit_repo.create_habit(user_id, &habit).await.unwrap();
 
         // 2. Create an Objective: Run 100km in Q4
         let start = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-        let obj = Objective::new("Cardio Mastery", None, "2026-Q4", start, end);
-        okr_repo.create_objective(&obj).await.unwrap();
+        let obj =
+            Objective::new("Cardio Mastery", None, "2026-Q4", start, end).with_user_id(user_id);
+        okr_repo.create_objective(user_id, &obj).await.unwrap();
 
         // 3. Create a Key Result linked to the Running Habit
         let kr = KeyResult::new_habit_linked(obj.id, habit.id, "Log 100km Total", 100.0, "km", 1.0);
-        okr_repo.create_key_result(&kr).await.unwrap();
+        okr_repo.create_key_result(user_id, &kr).await.unwrap();
 
         // 4. Record habit check-ins:
         // Day 1: 10km
@@ -235,23 +243,23 @@ mod tests {
         let day1 = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
         let day2 = NaiveDate::from_ymd_opt(2026, 10, 16).unwrap();
         habit_repo
-            .record_check_in(habit.id, day1, 10.0, true)
+            .record_check_in(habit.id, user_id, day1, 10.0, true)
             .await
             .unwrap();
         habit_repo
-            .record_check_in(habit.id, day2, 15.0, true)
+            .record_check_in(habit.id, user_id, day2, 15.0, true)
             .await
             .unwrap();
 
         // 5. Trigger sync
         sync_service
-            .sync_linked_krs_for_habit(habit.id)
+            .sync_linked_krs_for_habit(user_id, habit.id)
             .await
             .unwrap();
 
         // 6. Verify Key Result and parent Objective are updated
         let loaded = okr_repo
-            .get_objective_with_krs(obj.id)
+            .get_objective_with_krs(obj.id, user_id)
             .await
             .unwrap()
             .unwrap();
