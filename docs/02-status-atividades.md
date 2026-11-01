@@ -1,7 +1,7 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟢 Concluído (100% — Todas as 50 atividades entregues e validadas)  
-> **Última Atualização:** 2026-10-30  
+> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (50/66 atividades concluídas — 75.8%)  
+> **Última Atualização:** 2026-11-01  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
 
@@ -22,7 +22,11 @@
 | **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
-| **TOTAL** | **50** | **50** | **0** | **0** | **100.0%** |
+| **12. Multi-Tenancy & Data Isolation** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **13. Habit Streak Performance & Cache** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **14. Real-Time Notifications & SSE** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **TOTAL** | **66** | **50** | **0** | **16** | **75.8%** |
 
 ---
 
@@ -141,5 +145,46 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **11.1** | Motor do Timer Pomodoro, Áudio Nativo & Store | [activity-01-pomodoro-timer-engine-and-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-01-pomodoro-timer-engine-and-store.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **11.2** | Componente FocusModeModal, Integração & Testes | [activity-02-focus-mode-view-dashboard-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-02-focus-mode-view-dashboard-integration.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+
+---
+
+### Feature 12: Multi-Tenancy & Data Isolation
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **12.1** | Migrações de Banco Multi-Tenancy (SQLite & PG) | [activity-01-database-migrations-multi-tenancy.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-01-database-migrations-multi-tenancy.prompt) | ⚪ NÃO INICIADO | — |
+| **12.2** | Scoping de User ID nos Repositórios (`roubit-core`) | [activity-02-repositories-user-scoping.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-02-repositories-user-scoping.prompt) | ⚪ NÃO INICIADO | — |
+| **12.3** | Propagação de Usuário nos Controllers (`roubit-server`) | [activity-03-controllers-auth-user-propagation.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-03-controllers-auth-user-propagation.prompt) | ⚪ NÃO INICIADO | — |
+| **12.4** | Testes de Isolamento Multi-Tenant & IDOR | [activity-04-multi-tenant-security-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-04-multi-tenant-security-integration-tests.prompt) | ⚪ NÃO INICIADO | — |
+
+---
+
+### Feature 13: Habit Streak Performance & Cache
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | ⚪ NÃO INICIADO | — |
+| **13.2** | Motor Incremental Atômico de Streaks | [activity-02-incremental-atomic-streak-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt) | ⚪ NÃO INICIADO | — |
+| **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | ⚪ NÃO INICIADO | — |
+| **13.4** | Benchmark de Carga P99 e Throughput | [activity-04-streak-load-p99-benchmark.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt) | ⚪ NÃO INICIADO | — |
+
+---
+
+### Feature 14: Real-Time Notifications & SSE
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **14.1** | Store Pinia de EventSource SSE | [activity-01-sse-eventsource-pinia-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-01-sse-eventsource-pinia-store.prompt) | ⚪ NÃO INICIADO | — |
+| **14.2** | Integração Web Notifications API & Chime Nativo | [activity-02-web-notifications-audio-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-02-web-notifications-audio-integration.prompt) | ⚪ NÃO INICIADO | — |
+| **14.3** | Componentes de Toast & Feed de Alertas na UI | [activity-03-notification-toast-ui-components.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-03-notification-toast-ui-components.prompt) | ⚪ NÃO INICIADO | — |
+| **14.4** | Suíte de Testes Vitest da Store de Notificações | [activity-04-notification-store-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt) | ⚪ NÃO INICIADO | — |
+
+---
+
+### Feature 15: CLI Hybrid Remote Mode
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **15.1** | Abstração de Transporte e Trait RoubitClient | [activity-01-roubit-client-transport-abstraction.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-01-roubit-client-transport-abstraction.prompt) | ⚪ NÃO INICIADO | — |
+| **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | ⚪ NÃO INICIADO | — |
+| **15.3** | Injeção de Headers JWT & Idempotency-Key | [activity-03-cli-remote-idempotency-jwt-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt) | ⚪ NÃO INICIADO | — |
+| **15.4** | Suíte de Testes E2E da CLI em Modo Remoto | [activity-04-cli-remote-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt) | ⚪ NÃO INICIADO | — |
+
 
 

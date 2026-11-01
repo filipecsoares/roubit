@@ -1,0 +1,27 @@
+# Activity: Scoping User ID Across Domain Repositories (roubit-core)
+
+## 1. Objective & Context
+Enforce multi-tenant boundaries at the repository layer. Update repository traits and SQLx implementations (`HabitRepository`, `RoutineRepository`, `OkrRepository`, `JournalRepository`) so that every read, write, and delete query requires and filters by `user_id: Uuid`.
+
+- **Prerequisites:** Activity 12.1 (Migrations).
+- **Target Location:** `api/crates/core/src/domain/` (habits, routines, okrs, journal).
+
+## 2. Technical Scope & Specifications
+- **Trait Signatures:**
+  - Update `HabitRepository`: `list_active_habits(user_id: Uuid)`, `get_habit_by_id(habit_id: Uuid, user_id: Uuid)`, `create_habit(user_id: Uuid, habit: Habit)`, `delete_habit(habit_id: Uuid, user_id: Uuid)`.
+  - Update `RoutineRepository`: `list_routines(user_id: Uuid)`, `get_active_routine(user_id: Uuid)`.
+  - Update `OkrRepository`: `list_objectives_by_quarter(user_id: Uuid, quarter: &str)`.
+  - Update `JournalRepository`: `list_metadata_by_date_range(user_id: Uuid, start: NaiveDate, end: NaiveDate)`.
+- **Query Scoping:**
+  - Every SQL query must include `AND user_id = $1` or equivalent parameter binding.
+  - Deleting or updating a record that does not belong to `user_id` must return a not-found or unauthorized error.
+
+## 3. Implementation Steps
+1. Update trait definitions in `api/crates/core/src/domain/*/repository.rs`.
+2. Update SQLx queries in `api/crates/core/src/domain/*/sqlite_repo.rs`.
+3. Update core unit tests to pass generated `Uuid::new_v4()` as user context.
+
+## 4. Definition of Done (DoD)
+- [ ] All repository methods require `user_id`.
+- [ ] Cross-tenant data leakage is prevented at the SQL query level.
+- [ ] Unit tests pass in `roubit-core`.

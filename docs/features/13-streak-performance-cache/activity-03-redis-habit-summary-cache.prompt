@@ -1,0 +1,28 @@
+# Activity: Redis Habit Summary Cache with Active Invalidation
+
+## 1. Objective & Context
+Introduce a high-performance Redis cache layer for the habit dashboard summary (`GET /api/v1/habits`). Cache pre-serialized JSON payloads with a short TTL, invalidating the cache atomically whenever a habit check-in or mutation occurs for that user.
+
+- **Prerequisites:** Activity 13.2 (Incremental Engine) and Feature 10 (Redis Foundation).
+- **Target Location:** `api/crates/server/src/controllers/habit_controller.rs` and `roubit-core/src/redis/`.
+
+## 2. Technical Scope & Specifications
+- **Cache Key Pattern:** `roubit:cache:user:{user_id}:habits:summary`.
+- **TTL Strategy:** 300 seconds (5 minutes) default TTL for stale-while-revalidate safety.
+- **Cache Invalidation:**
+  - Evict `roubit:cache:user:{user_id}:habits:summary` upon:
+    - Habit check-in (`POST /api/v1/habits/:id/checkin`).
+    - Habit creation (`POST /api/v1/habits`).
+    - Habit deletion (`DELETE /api/v1/habits/:id`).
+- **Graceful Degradation:**
+  - If Redis is disconnected or unavailable, fall back seamlessly to direct database queries without failing user requests.
+
+## 3. Implementation Steps
+1. Add `get_cached_summary` and `invalidate_user_habits_cache` to Redis service.
+2. Integrate cache check in `habit_controller::list_habits`.
+3. Invalidate cache on check-in and mutation endpoints.
+
+## 4. Definition of Done (DoD)
+- [ ] Cached requests respond in < 1ms from Redis.
+- [ ] Check-ins immediately invalidate cache (no stale data observed).
+- [ ] Works cleanly when Redis is not configured.

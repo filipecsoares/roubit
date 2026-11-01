@@ -1,0 +1,28 @@
+# Activity: Web Notifications API & Native Audio Chime Integration
+
+## 1. Objective & Context
+Allow Roubit to alert the user even when the browser tab is backgrounded. Integrate the native browser `Notification` API with permission management, plus a subtle chime synthesized via Web Audio API.
+
+- **Prerequisites:** Activity 14.1 (Notification Store).
+- **Target Location:** `frontend/src/services/notificationAudio.ts` and `frontend/src/stores/notification.ts`.
+
+## 2. Technical Scope & Specifications
+- **Permission Flow:**
+  - Provide explicit user action button ("Ativar Notificações do Sistema") in user settings / navbar.
+  - Call `Notification.requestPermission()` only upon explicit user gesture.
+- **Native OS Notification:**
+  - When permission is granted, instantiate `new Notification(title, { body, icon: '/favicon.ico', tag })`.
+  - Handle notification click: focus browser window and navigate to the relevant routine block or habit.
+- **Web Audio Chime:**
+  - Synthesize a subtle two-tone chime (520Hz -> 659Hz) with exponential gain decay.
+  - No external mp3/wav assets required.
+
+## 3. Implementation Steps
+1. Create `notificationAudio.ts` utility for Web Audio chime synthesis.
+2. Add `requestSystemPermission()` action to `useNotificationStore`.
+3. Dispatch OS notification on incoming high-priority events when tab is hidden (`document.hidden`).
+
+## 4. Definition of Done (DoD)
+- [ ] OS notifications fire when permitted and document is hidden.
+- [ ] Subtle chime plays without audio latency.
+- [ ] Degrades gracefully when notifications are blocked or unsupported.

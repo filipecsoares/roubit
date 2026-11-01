@@ -1,0 +1,27 @@
+# Activity: Incremental Atomic Streak Computation Engine
+
+## 1. Objective & Context
+Replace full-year log scans during check-in with an incremental streak computation algorithm. Update `current_streak` and `longest_streak` atomically inside the check-in database transaction.
+
+- **Prerequisites:** Activity 13.1 (Schema Update).
+- **Target Location:** `api/crates/core/src/domain/habit/streak.rs` and `sqlite_repo.rs`.
+
+## 2. Technical Scope & Specifications
+- **Incremental Logic:**
+  - Given previous check-in date, new check-in date, frequency bitmask, and existing `current_streak`:
+    - If date is same day (increment): streak unchanged.
+    - If date is next expected frequency day: `current_streak += 1`.
+    - If date is beyond allowed gap: reset `current_streak = 1`.
+    - Update `longest_streak = max(longest_streak, current_streak)`.
+- **Atomic Persistence:**
+  - Execute log insertion and habit streak column update within a single SQL transaction.
+
+## 3. Implementation Steps
+1. Add `update_streak_incremental` to `StreakCalculator`.
+2. Update `record_check_in` in `SqliteHabitRepository` to update `habits` row within transaction.
+3. Remove 365-day query from `habit_controller.rs` check-in handler.
+
+## 4. Definition of Done (DoD)
+- [ ] Streak calculation is executed in O(1) time without log querying.
+- [ ] Transaction guarantees atomicity between log record and habit streak.
+- [ ] Comprehensive unit tests cover edge cases (same-day re-entry, weekend skipping, streak breaks).

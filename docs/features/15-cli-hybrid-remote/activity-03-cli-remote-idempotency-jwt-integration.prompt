@@ -1,0 +1,25 @@
+# Activity: Remote CLI Idempotency-Key & JWT Headers Injection
+
+## 1. Objective & Context
+Ensure all mutating subcommands executed via the remote CLI (`roubit habit checkin`, `roubit routine complete`, `roubit journal write`) automatically attach the user's JWT Bearer token and generate a fresh UUIDv4 `Idempotency-Key` header. This prevents accidental double check-ins upon terminal retry or network failure.
+
+- **Prerequisites:** Activity 15.2 (Credentials Storage).
+- **Target Location:** `api/crates/cli/src/client/remote.rs`.
+
+## 2. Technical Scope & Specifications
+- **Header Injection Middleware / Interceptor:**
+  - `Authorization: Bearer <token>` attached to all HTTP requests.
+  - `Idempotency-Key: <uuidv4>` attached to all POST, PUT, DELETE requests.
+- **Terminal Feedback:**
+  - If server returns 401 Unauthorized, prompt user to re-run `roubit auth login`.
+  - Format terminal output with standard tables and colors matching local CLI mode.
+
+## 3. Implementation Steps
+1. In `HttpClient`, add request builder helper attaching `Authorization` and `Idempotency-Key`.
+2. Map RFC 7807 problem details to clean terminal error messages.
+3. Test check-in retry idempotency over HTTP.
+
+## 4. Definition of Done (DoD)
+- [ ] Mutating CLI commands send `Idempotency-Key`.
+- [ ] Replaying duplicate network calls does not duplicate records on server.
+- [ ] Unauthorized errors produce friendly terminal guidance.

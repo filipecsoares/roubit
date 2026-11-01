@@ -1,8 +1,8 @@
 # Roubit — Plano de Desenvolvimento e Roteiro de Atividades
 
 > **Versão:** 1.0.0  
-> **Status:** Pronto para Execução  
-> **Referência:** [Especificação Técnica](file:///home/filipe/Documents/projects/roubit/docs/00-especificacao-tecnica.md)
+> **Status:** Concluído (v1.0.0 Entregue) | **Evolução:** [Plano v2.0](03-plano-de-desenvolvimento-v2.md)  
+> **Referência:** [Especificação Técnica](00-especificacao-tecnica.md)
 
 ---
 

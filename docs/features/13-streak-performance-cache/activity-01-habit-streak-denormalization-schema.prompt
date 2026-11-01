@@ -1,0 +1,25 @@
+# Activity: Habit Streak Denormalization & Schema Update
+
+## 1. Objective & Context
+Add `current_streak` and `longest_streak` columns directly to the `habits` table. This denormalization allows instant reads during habit list queries without scanning 365 days of historical logs, cutting query complexity from O(N_logs) to O(1).
+
+- **Prerequisites:** Feature 12 (Multi-tenancy).
+- **Target Location:** `api/crates/core/migrations/0008_habit_streak_denormalization.sql` and `api/crates/core/src/domain/habit/models.rs`.
+
+## 2. Technical Scope & Specifications
+- **Migration:**
+  - `ALTER TABLE habits ADD COLUMN current_streak INTEGER NOT NULL DEFAULT 0;`
+  - `ALTER TABLE habits ADD COLUMN longest_streak INTEGER NOT NULL DEFAULT 0;`
+  - Backfill existing habits by computing current and longest streaks from historical `habit_logs`.
+- **Rust Domain Models:**
+  - Update `Habit` struct in `roubit-core` to include `current_streak: i32` and `longest_streak: i32`.
+
+## 3. Implementation Steps
+1. Create `0008_habit_streak_denormalization.sql` in `migrations/` and `migrations_pg/`.
+2. Update SQLx row mapping in `SqliteHabitRepository`.
+3. Update unit tests in `roubit-core`.
+
+## 4. Definition of Done (DoD)
+- [ ] Migration applies cleanly and backfills historical streaks.
+- [ ] `Habit` model includes `current_streak` and `longest_streak`.
+- [ ] Core tests pass.

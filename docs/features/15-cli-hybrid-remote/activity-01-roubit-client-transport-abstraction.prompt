@@ -1,0 +1,33 @@
+# Activity: RoubitClient Trait & Transport Abstraction (roubit-cli)
+
+## 1. Objective & Context
+Decouple CLI command implementations from direct SQLite database dependencies by introducing an asynchronous `RoubitClient` trait. Implement both `LocalClient` (talking directly to `roubit-core`) and `HttpClient` (talking to the Axum REST API using `reqwest`).
+
+- **Prerequisites:** Feature 07 (CLI) and Feature 08 (REST API).
+- **Target Location:** `api/crates/cli/src/client/`.
+
+## 2. Technical Scope & Specifications
+- **Trait Definition:**
+  ```rust
+  #[async_trait::async_trait]
+  pub trait RoubitClient: Send + Sync {
+      async fn list_habits(&self) -> Result<Vec<HabitWithStreak>, ClientError>;
+      async fn checkin_habit(&self, habit_id: Uuid, date: NaiveDate, value: f64) -> Result<CheckinResponse, ClientError>;
+      async fn list_routines(&self) -> Result<Vec<Routine>, ClientError>;
+      async fn list_okrs(&self, quarter: &str) -> Result<Vec<ObjectiveWithKrs>, ClientError>;
+      async fn save_journal(&self, date: NaiveDate, ciphertext: &str, salt: &str, nonce: &str) -> Result<(), ClientError>;
+  }
+  ```
+- **Factory Selection:**
+  - If `--remote <URL>` or `ROUBIT_API_URL` is set: instantiate `HttpClient`.
+  - Otherwise: instantiate `LocalClient` using local SQLite path.
+
+## 3. Implementation Steps
+1. Create `api/crates/cli/src/client/mod.rs` with trait and error enums.
+2. Implement `local.rs` wrapping core repositories.
+3. Implement `remote.rs` using `reqwest::Client`.
+4. Implement `factory.rs` to wire into CLI main entry point.
+
+## 4. Definition of Done (DoD)
+- [ ] `RoubitClient` abstracts both local and remote operations seamlessly.
+- [ ] Subcommands invoke methods on `Box<dyn RoubitClient>` without knowing transport mode.

@@ -1,0 +1,27 @@
+# Activity: Notification Toast & In-App Activity Feed Components
+
+## 1. Objective & Context
+Build an unobtrusive in-app toast component and notification dropdown bell in the navigation bar. Maintain the neutral dark, OLED-friendly aesthetic without jarring colors or layout shift.
+
+- **Prerequisites:** Activity 14.1 (Notification Store).
+- **Target Location:** `frontend/src/components/common/NotificationToast.vue` and `frontend/src/components/common/AppNavbar.vue`.
+
+## 2. Technical Scope & Specifications
+- **Design Specifications:**
+  - Background `#121215`, border `zinc-800`, text `zinc-200`.
+  - Subtle fade & slide-in micro-animation in the top-right corner.
+  - Auto-dismiss after 6 seconds with progress bar or manual close button.
+  - Quick action buttons (e.g. "Iniciar Foco" if routine block started).
+- **Navbar Integration:**
+  - Bell icon with unread badge counter in `AppNavbar.vue`.
+  - Dropdown panel showing latest 5 alerts and "Marcar todas como lidas" button.
+
+## 3. Implementation Steps
+1. Create `NotificationToast.vue` with TransitionGroup.
+2. Embed toast container at root in `App.vue`.
+3. Add bell icon and dropdown trigger to `AppNavbar.vue`.
+
+## 4. Definition of Done (DoD)
+- [ ] In-app toast appears smoothly upon event reception.
+- [ ] Dismisses automatically or via close button.
+- [ ] Matches the minimalist dark palette.

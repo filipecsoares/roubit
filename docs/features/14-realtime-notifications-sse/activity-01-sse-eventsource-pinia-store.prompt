@@ -1,0 +1,31 @@
+# Activity: SSE EventSource Client & Pinia Notification Store
+
+## 1. Objective & Context
+Implement `useNotificationStore` in `frontend/src/stores/notification.ts` using the browser's native `EventSource` API. Connect to `/api/v1/notifications/stream` with automatic JWT bearer query authorization, exponential backoff reconnection, and structured event handling.
+
+- **Prerequisites:** Feature 09 (Frontend SPA) and Feature 10 (Backend SSE).
+- **Target Location:** `frontend/src/stores/notification.ts`.
+
+## 2. Technical Scope & Specifications
+- **Connection Lifecycle:**
+  - Auto-connect when user logs in (`useAuthStore.isAuthenticated`).
+  - Auto-disconnect on logout or session expiration.
+  - Backoff: retry after 1s, 2s, 4s, up to 30s max upon disconnect.
+- **Event Types:**
+  - `routine_block_start`: Triggered when a scheduled time block begins.
+  - `routine_block_end`: Triggered when a scheduled time block concludes.
+  - `habit_reminder`: Triggered by Redis TTL reminder worker.
+- **State Properties:**
+  - `isConnected: boolean`
+  - `unreadCount: number`
+  - `recentNotifications: AppNotification[]`
+
+## 3. Implementation Steps
+1. Define notification types in `frontend/src/types/index.ts`.
+2. Implement `useNotificationStore` with `startListening()` and `stopListening()`.
+3. Hook store initialization in `App.vue` or router guards.
+
+## 4. Definition of Done (DoD)
+- [ ] Connects cleanly to SSE stream with authentication.
+- [ ] Reconnects gracefully if connection drops.
+- [ ] State updates reactively upon incoming events.
