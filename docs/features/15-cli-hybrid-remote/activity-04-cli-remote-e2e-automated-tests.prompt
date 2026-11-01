@@ -1,0 +1,24 @@
+# Activity: CLI Remote Mode Automated End-to-End Test Suite
+
+## 1. Objective & Context
+Construct an automated end-to-end integration test suite verifying the CLI binary operating in `--remote` mode against a live in-process Axum test server.
+
+- **Prerequisites:** Activities 15.1 through 15.3.
+- **Target Location:** `api/tests/cli_remote_e2e.rs`.
+
+## 2. Technical Scope & Specifications
+- **Test Scenarios:**
+  1. `roubit auth login` with test user credentials receives and stores token in a temporary directory (`tempfile`).
+  2. `roubit habit list --remote <URL>` lists user habits in formatted table.
+  3. `roubit habit checkin <ID> --value 1.0 --remote <URL>` succeeds and outputs updated streak.
+  4. Network retry with identical idempotency key returns cached check-in without duplicating log.
+
+## 3. Implementation Steps
+1. Create `api/tests/cli_remote_e2e.rs`.
+2. Spawn ephemeral Axum server bound to `127.0.0.1:0`.
+3. Invoke CLI commands programmatically using `assert_cmd` or programmatic client calls.
+4. Assert stdout formatting and exit codes.
+
+## 4. Definition of Done (DoD)
+- [ ] End-to-end remote CLI tests pass in `cargo test --test cli_remote_e2e`.
+- [ ] Works cleanly on CI environments.

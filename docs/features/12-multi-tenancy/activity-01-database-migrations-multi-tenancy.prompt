@@ -1,0 +1,31 @@
+# Activity: Database Migrations for Multi-Tenancy (SQLite & PostgreSQL)
+
+## 1. Objective & Context
+Upgrade the database schema across SQLite and PostgreSQL to support true multi-tenant data isolation. Add `user_id` foreign keys referencing `users(id)` with cascade deletion to all domain tables (`habits`, `routines`, `objectives`, `journal_entries`) and create performance indexes scoped by user.
+
+- **Prerequisites:** Existing migrations 0001 through 0006.
+- **Target Location:** `api/crates/core/migrations/0007_add_user_id_multi_tenancy.sql` and `api/crates/core/migrations_pg/0007_add_user_id_multi_tenancy.sql`.
+
+## 2. Technical Scope & Specifications
+- **Schema Updates:**
+  - `habits`: Add `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE`.
+  - `routines`: Add `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE`.
+  - `objectives`: Add `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE`.
+  - `journal_entries`: Add `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE`.
+- **Compound Performance Indexes:**
+  - `CREATE INDEX idx_habits_user_archived ON habits(user_id, is_archived);`
+  - `CREATE INDEX idx_routines_user_active ON routines(user_id, is_active);`
+  - `CREATE INDEX idx_objectives_user_quarter ON objectives(user_id, quarter);`
+  - `CREATE INDEX idx_journal_user_date ON journal_entries(user_id, entry_date DESC);`
+- **Data Migration / Backfill Safety:**
+  - For SQLite development databases, if legacy rows exist, associate them with a default admin or migrate gracefully.
+
+## 3. Implementation Steps
+1. Create `0007_add_user_id_multi_tenancy.sql` in `api/crates/core/migrations/`.
+2. Create PostgreSQL equivalent in `api/crates/core/migrations_pg/` ensuring `UUID` type matches PostgreSQL schema conventions.
+3. Update `roubit_core::run_migrations(&pool)` tests to verify clean execution of migration 0007 on fresh and migrated databases.
+
+## 4. Definition of Done (DoD)
+- [ ] Migration 0007 runs cleanly on SQLite and PostgreSQL.
+- [ ] Foreign keys enforce referential integrity to `users(id)`.
+- [ ] Indexes are created successfully without locking or syntax issues.

@@ -91,3 +91,42 @@ This directory organizes all engineering features for the Roubit project. Each f
 3. [Activity 03: Dual-Database Support (SQLite & PostgreSQL) with SQLx](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-03-dual-database-postgresql-support.prompt)
 4. [Activity 04: Multi-Stage Dockerfiles & Docker Compose Orchestration](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-04-docker-compose-production-orchestration.prompt)
 5. [Activity 05: Load Testing, Memory Profiling & P99 Benchmarks](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-05-load-testing-p99-benchmarks.prompt)
+
+---
+
+### [11. Focus Mode & Pomodoro Timer](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro)
+1. [Activity 01: Focus Mode & Pomodoro Timer Engine (Pinia Store & Web Audio Synthesis)](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-01-pomodoro-timer-engine-and-store.prompt)
+2. [Activity 02: Focus Mode UI Component & Time Block Integration](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-02-focus-mode-view-dashboard-integration.prompt)
+
+---
+
+### [12. Multi-Tenancy & Data Isolation](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy)
+1. [Activity 01: Database Migrations for Multi-Tenancy (SQLite & PostgreSQL)](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-01-database-migrations-multi-tenancy.prompt)
+2. [Activity 02: Scoping User ID Across Domain Repositories (roubit-core)](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-02-repositories-user-scoping.prompt)
+3. [Activity 03: Controllers Authentication & User Propagation (roubit-server)](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-03-controllers-auth-user-propagation.prompt)
+4. [Activity 04: Multi-Tenant Security & IDOR Prevention Integration Tests](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-04-multi-tenant-security-integration-tests.prompt)
+
+---
+
+### [13. Habit Streak Performance & Caching](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache)
+1. [Activity 01: Habit Streak Denormalization & Schema Update](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt)
+2. [Activity 02: Incremental Atomic Streak Computation Engine](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt)
+3. [Activity 03: Redis Habit Summary Cache with Active Invalidation](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt)
+4. [Activity 04: Streak Performance & P99 Latency Benchmark Suite](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt)
+
+---
+
+### [14. Real-Time Notifications & SSE](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse)
+1. [Activity 01: SSE EventSource Client & Pinia Notification Store](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-01-sse-eventsource-pinia-store.prompt)
+2. [Activity 02: Web Notifications API & Native Audio Chime Integration](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-02-web-notifications-audio-integration.prompt)
+3. [Activity 03: Notification Toast & In-App Activity Feed Components](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-03-notification-toast-ui-components.prompt)
+4. [Activity 04: Notification Store Vitest Suite & Event Mocking](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt)
+
+---
+
+### [15. CLI Hybrid Remote Mode](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote)
+1. [Activity 01: RoubitClient Trait & Transport Abstraction (roubit-cli)](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-01-roubit-client-transport-abstraction.prompt)
+2. [Activity 02: CLI Authentication & Secure Token Storage (~/.roubit/)](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt)
+3. [Activity 03: Remote CLI Idempotency-Key & JWT Headers Injection](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt)
+4. [Activity 04: CLI Remote Mode Automated End-to-End Test Suite](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt)
+

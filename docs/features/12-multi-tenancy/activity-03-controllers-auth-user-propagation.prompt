@@ -1,0 +1,26 @@
+# Activity: Controllers Authentication & User Propagation (roubit-server)
+
+## 1. Objective & Context
+Connect the `AuthenticatedUser` extractor in Axum to all protected REST controllers (`habit_controller`, `routine_controller`, `okr_controller`, `journal_controller`). Replace discarded `_user` parameters with active `user.id` propagation into repositories and services.
+
+- **Prerequisites:** Activity 12.2 (Repositories Scoping).
+- **Target Location:** `api/crates/server/src/controllers/`.
+
+## 2. Technical Scope & Specifications
+- **Controllers to Update:**
+  - `habit_controller.rs`: `list_habits`, `create_habit`, `record_checkin`, `delete_habit`.
+  - `routine_controller.rs`: `list_routines`, `create_routine`, `complete_block`.
+  - `okr_controller.rs`: `list_okrs`, `create_objective`, `create_kr`.
+  - `journal_controller.rs`: `list_journal_metadata`, `get_journal_entry`, `save_journal_entry`.
+- **Error Responses:**
+  - If a user tries to check in or delete a habit ID that belongs to another user, return `ApiError::NotFound` (standard security practice to avoid leaking resource existence).
+
+## 3. Implementation Steps
+1. In each controller method, use `user.id` instead of ignoring `_user`.
+2. Pass `user.id` to repository constructors or method calls.
+3. Update `OkrSyncService` and `JournalService` to operate within the tenant boundary.
+
+## 4. Definition of Done (DoD)
+- [ ] No `_user: AuthenticatedUser` is left unused in controllers.
+- [ ] Attempting to modify resources of other users returns 404/403.
+- [ ] Server builds cleanly with 0 warnings.

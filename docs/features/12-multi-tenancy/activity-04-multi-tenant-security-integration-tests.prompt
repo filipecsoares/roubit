@@ -1,0 +1,23 @@
+# Activity: Multi-Tenant Security & IDOR Prevention Integration Tests
+
+## 1. Objective & Context
+Develop an end-to-end integration test suite specifically verifying multi-tenant data isolation and preventing Insecure Direct Object References (IDOR). Validate that two independent users (User Alice and User Bob) cannot read, mutate, or delete each other's data across all domain modules.
+
+- **Prerequisites:** Activity 12.3 (Controllers User Propagation).
+- **Target Location:** `api/tests/multi_tenant_integration.rs`.
+
+## 2. Technical Scope & Specifications
+- **Test Scenarios:**
+  1. **Habits Isolation:** Alice creates habit "Meditation". Bob calls `GET /api/v1/habits` and receives an empty list. Bob attempts `POST /api/v1/habits/:alice_id/checkin` and receives 404.
+  2. **Routines Isolation:** Alice creates active routine "Morning Focus". Bob calls `GET /api/v1/routines` and sees only his routines.
+  3. **OKRs Isolation:** Bob cannot link Alice's habit to his Key Result.
+  4. **Journaling Zero-Knowledge Isolation:** Alice writes an encrypted journal entry. Bob cannot fetch Alice's ciphertext metadata or entry.
+
+## 3. Implementation Steps
+1. Create `api/tests/multi_tenant_integration.rs`.
+2. Register two distinct users via `/api/v1/auth/register` and obtain two distinct JWT tokens.
+3. Assert that all cross-tenant access attempts fail with 404/403.
+
+## 4. Definition of Done (DoD)
+- [ ] Integration tests verify full isolation across all 4 modules.
+- [ ] `cargo test --test multi_tenant_integration` passes 100%.

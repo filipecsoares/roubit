@@ -1,0 +1,24 @@
+# Activity: Notification Store Vitest Suite & Event Mocking
+
+## 1. Objective & Context
+Ensure robust test coverage for `useNotificationStore` and `NotificationToast.vue` using Vitest and `@vue/test-utils`. Mock `EventSource` and `window.Notification` to validate connection lifecycles, event dispatching, and queue management.
+
+- **Prerequisites:** Activities 14.1 through 14.3.
+- **Target Location:** `frontend/src/stores/__tests__/notification.spec.ts`.
+
+## 2. Technical Scope & Specifications
+- **Test Cases:**
+  1. Store establishes SSE connection when user authenticates.
+  2. Incoming messages increment `unreadCount` and append to `recentNotifications`.
+  3. Action "markAsRead" resets unread counter.
+  4. Disconnect cleans up `EventSource` instance without memory leak.
+  5. Backoff timer triggers reconnect when connection errors out.
+
+## 3. Implementation Steps
+1. Create `EventSourceMock` helper class.
+2. Implement test suite in `frontend/src/stores/__tests__/notification.spec.ts`.
+3. Assert that all tests pass cleanly under `npm test`.
+
+## 4. Definition of Done (DoD)
+- [ ] 100% of notification unit tests pass in Vitest.
+- [ ] No unhandled timers or hanging subscriptions.

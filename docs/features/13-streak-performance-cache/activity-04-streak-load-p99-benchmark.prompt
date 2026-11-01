@@ -1,0 +1,27 @@
+# Activity: Streak Performance & P99 Latency Benchmark Suite
+
+## 1. Objective & Context
+Validate that habit check-ins and habit listings scale to thousands of historical logs while strictly respecting the performance requirement: P99 latency < 10ms and zero memory bloat.
+
+- **Prerequisites:** Activity 13.3 (Redis Cache).
+- **Target Location:** `api/tests/load_p99_benchmark.rs`.
+
+## 2. Technical Scope & Specifications
+- **Benchmark Fixture:**
+  - Seed database with 50 habits and 10,000 historical logs across multiple mock users.
+- **Scenarios Tested:**
+  - 1,000 concurrent habit check-in requests.
+  - 5,000 concurrent habit list requests with active Redis caching.
+- **Assertions:**
+  - P99 latency <= 10.0 ms.
+  - P50 latency <= 2.0 ms.
+  - Resident Set Size (RSS) memory increase <= 15MB.
+
+## 3. Implementation Steps
+1. Enhance `api/tests/load_p99_benchmark.rs` with large dataset seed routines.
+2. Measure latency percentiles using high-resolution timing (`std::time::Instant`).
+3. Output benchmark results to markdown log.
+
+## 4. Definition of Done (DoD)
+- [ ] P99 latency remains under 10ms with 10k logs.
+- [ ] Benchmark test passes on CI.
