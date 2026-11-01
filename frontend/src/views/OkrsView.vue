@@ -152,15 +152,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+  <div class="space-y-6 sm:space-y-8 animate-fade-in">
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
-      class="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
+      class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'
-          ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
-          : 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+          ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200'
+          : 'bg-rose-950/95 border-rose-500/50 text-rose-200'
       "
     >
       <AlertCircle v-if="toastMessage.type === 'error'" class="w-4 h-4 shrink-0" />
@@ -169,29 +169,29 @@ onMounted(async () => {
     </div>
 
     <!-- Header & Actions -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-extrabold tracking-tight text-white font-outfit">
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-outfit">
           Objetivos & Resultados-Chave (OKRs)
         </h1>
-        <p class="text-sm text-slate-400 mt-1">
+        <p class="text-xs sm:text-sm text-slate-400 mt-1">
           Alinhamento estratégico conectando metas trimestrais diretamente à cadência dos seus hábitos diários.
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
         <!-- Quarter Pills -->
-        <div class="flex items-center gap-1.5 p-1 bg-surface-card rounded-xl border border-surface-border">
+        <div class="flex items-center gap-1 p-1 bg-surface-card rounded-2xl border border-surface-border overflow-x-auto max-w-full">
           <button
             v-for="q in quarters"
             :key="q"
             type="button"
             @click="handleQuarterChange(q)"
-            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 font-mono"
             :class="
               selectedQuarter === q
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white'
             "
           >
             {{ q }}
@@ -202,38 +202,38 @@ onMounted(async () => {
         <button
           type="button"
           @click="isCreateModalOpen = true"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 transition-all shrink-0"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all shrink-0 touch-target sm:min-h-0 sm:min-w-0"
         >
           <Plus class="w-4 h-4" />
-          Novo Objetivo
+          <span>Novo Objetivo</span>
         </button>
       </div>
     </header>
 
-    <!-- Overview Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Objetivos</span>
-        <p class="text-2xl font-bold text-white mt-1">{{ totalObjectives }}</p>
+    <!-- Overview Stats Grid (2 cols mobile, 4 cols desktop) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div class="p-3.5 sm:p-4 rounded-2xl bg-surface-card border border-surface-border shadow-sm glow-card">
+        <span class="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Objetivos</span>
+        <p class="text-xl sm:text-2xl font-extrabold text-white mt-1 font-mono">{{ totalObjectives }}</p>
       </div>
 
-      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Progresso Médio</span>
+      <div class="p-3.5 sm:p-4 rounded-2xl bg-surface-card border border-surface-border shadow-sm glow-card">
+        <span class="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Progresso Médio</span>
         <div class="flex items-center gap-1.5 mt-1">
           <TrendingUp class="w-5 h-5 text-brand-400" />
-          <p class="text-2xl font-bold text-white">{{ averageProgress }}%</p>
+          <p class="text-xl sm:text-2xl font-extrabold text-white font-mono">{{ averageProgress }}%</p>
         </div>
       </div>
 
-      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resultados-Chave</span>
-        <p class="text-2xl font-bold text-white mt-1">{{ totalKeyResults }}</p>
+      <div class="p-3.5 sm:p-4 rounded-2xl bg-surface-card border border-surface-border shadow-sm glow-card">
+        <span class="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Resultados-Chave</span>
+        <p class="text-xl sm:text-2xl font-extrabold text-white mt-1 font-mono">{{ totalKeyResults }}</p>
       </div>
 
-      <div class="p-4 rounded-xl bg-surface-card border border-surface-border">
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">KRs com Hábitos</span>
-        <p class="text-2xl font-bold text-emerald-400 mt-1">
-          {{ linkedKeyResultsCount }} <span class="text-xs font-normal text-slate-400">/ {{ totalKeyResults }}</span>
+      <div class="p-3.5 sm:p-4 rounded-2xl bg-surface-card border border-surface-border shadow-sm glow-card">
+        <span class="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">KRs com Hábitos</span>
+        <p class="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-1 font-mono">
+          {{ linkedKeyResultsCount }} <span class="text-xs font-normal text-slate-400 font-sans">/ {{ totalKeyResults }}</span>
         </p>
       </div>
     </div>
@@ -241,7 +241,8 @@ onMounted(async () => {
     <!-- Objectives Tree Section -->
     <section class="space-y-4">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-bold text-white">Objetivos em {{ selectedQuarter }}</h2>
+        <h2 class="text-base sm:text-lg font-bold text-white font-outfit">Objetivos em {{ selectedQuarter }}</h2>
+        <span class="text-xs text-slate-400 font-mono">{{ okrStore.objectives.length }} no trimestre</span>
       </div>
 
       <!-- Empty state with CTA button -->
@@ -261,10 +262,10 @@ onMounted(async () => {
         <button
           type="button"
           @click="isCreateModalOpen = true"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 transition-all"
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-sm transition-all touch-target"
         >
           <Plus class="w-4 h-4" />
-          Cadastrar Primeiro Objetivo
+          <span>Cadastrar Primeiro Objetivo</span>
         </button>
       </div>
 

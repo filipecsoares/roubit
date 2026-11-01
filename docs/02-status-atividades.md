@@ -1,6 +1,6 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟢 Concluído (100% — Todas as 48 atividades entregues e validadas)  
+> **Status Geral do Projeto:** 🟢 Concluído (100% — Todas as 50 atividades entregues e validadas)  
 > **Última Atualização:** 2026-10-30  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
@@ -21,7 +21,8 @@
 | **08. API REST & Idempotência** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
-| **TOTAL** | **48** | **48** | **0** | **0** | **100.0%** |
+| **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
+| **TOTAL** | **50** | **50** | **0** | **0** | **100.0%** |
 
 ---
 
@@ -132,3 +133,13 @@
 | **10.3** | Suporte Dual Database (SQLite / Postgres) | [activity-03-dual-database-postgresql-support.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-03-dual-database-postgresql-support.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **10.4** | Dockerfiles & Orquestração Docker Compose | [activity-04-docker-compose-production-orchestration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-04-docker-compose-production-orchestration.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
 | **10.5** | Testes de Carga, P99 < 10ms & RAM < 25MB | [activity-05-load-testing-p99-benchmarks.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/10-infrastructure-redis-postgres/activity-05-load-testing-p99-benchmarks.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+
+---
+
+### Feature 11: Modo Foco & Timer Pomodoro
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **11.1** | Motor do Timer Pomodoro, Áudio Nativo & Store | [activity-01-pomodoro-timer-engine-and-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-01-pomodoro-timer-engine-and-store.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+| **11.2** | Componente FocusModeModal, Integração & Testes | [activity-02-focus-mode-view-dashboard-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/11-focus-mode-pomodoro/activity-02-focus-mode-view-dashboard-integration.prompt) | 🟢 CONCLUÍDO | 2026-10-30 |
+
+

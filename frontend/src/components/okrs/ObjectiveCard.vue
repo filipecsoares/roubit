@@ -41,42 +41,42 @@ const badgeStatusClasses = computed(() => {
 </script>
 
 <template>
-  <div class="rounded-2xl bg-surface-card border border-surface-border overflow-hidden transition-all duration-200 hover:border-slate-700 shadow-sm">
+  <div class="rounded-2xl bg-surface-card border border-surface-border overflow-hidden transition-all duration-200 hover:border-slate-700 shadow-sm glow-card">
     <!-- Card Header -->
     <div
-      class="p-5 flex items-start justify-between gap-4 cursor-pointer select-none"
+      class="p-4 sm:p-5 flex items-start justify-between gap-3 sm:gap-4 cursor-pointer select-none"
       @click="isExpanded = !isExpanded"
     >
       <div class="space-y-1.5 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <!-- Quarter Badge -->
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
             <Target class="w-3 h-3" />
             {{ objective.quarter }}
           </span>
 
           <!-- Status Badge -->
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-medium border" :class="badgeStatusClasses">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-medium border font-mono" :class="badgeStatusClasses">
             {{ progressClamped }}% Concluído
           </span>
         </div>
 
-        <h3 class="text-base font-bold text-white tracking-tight">
+        <h3 class="text-sm sm:text-base font-bold text-white tracking-tight">
           {{ objective.title }}
         </h3>
 
-        <p v-if="objective.description" class="text-xs text-slate-400 line-clamp-2">
+        <p v-if="objective.description" class="text-xs text-zinc-400 line-clamp-2">
           {{ objective.description }}
         </p>
       </div>
 
       <!-- Right: Toggle & Overall Progress Bar -->
-      <div class="flex items-center gap-4 shrink-0">
+      <div class="flex items-center gap-1.5 sm:gap-4 shrink-0">
         <div class="hidden sm:flex flex-col items-end gap-1">
-          <span class="text-xs text-slate-400 font-mono">{{ keyResults.length }} Resultados-Chave</span>
+          <span class="text-xs text-zinc-400 font-mono">{{ keyResults.length }} Resultados-Chave</span>
           <div class="w-24 h-2 rounded-full bg-surface-border/40 overflow-hidden">
             <div
-              class="h-full rounded-full bg-brand-500 transition-all duration-500"
+              class="h-full rounded-full bg-zinc-200 transition-all duration-500"
               :style="{ width: `${progressClamped}%` }"
             />
           </div>
@@ -86,14 +86,14 @@ const badgeStatusClasses = computed(() => {
           type="button"
           @click.stop="emit('delete', objective.id)"
           title="Excluir objetivo"
-          class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+          class="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all touch-target sm:min-h-0 sm:min-w-0"
         >
           <Trash2 class="w-4 h-4" />
         </button>
 
         <button
           type="button"
-          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+          class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <ChevronUp v-if="isExpanded" class="w-5 h-5" />
           <ChevronDown v-else class="w-5 h-5" />
@@ -102,7 +102,7 @@ const badgeStatusClasses = computed(() => {
     </div>
 
     <!-- Expandable Key Results Section -->
-    <div v-show="isExpanded" class="px-5 pb-5 pt-1 border-t border-surface-border/40 space-y-3">
+    <div v-show="isExpanded" class="px-4 pb-4 sm:px-5 sm:pb-5 pt-2 border-t border-surface-border/40 space-y-3">
       <div v-if="keyResults.length === 0" class="text-xs text-slate-500 py-2 italic">
         Nenhum Resultado-Chave cadastrado para este objetivo.
       </div>

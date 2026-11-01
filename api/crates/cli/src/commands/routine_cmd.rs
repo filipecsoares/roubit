@@ -143,7 +143,9 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                 .context("failed to create routine")?;
 
             if active {
-                let _ = repo.set_active_routine(routine_id).await;
+                repo.set_active_routine(routine_id)
+                    .await
+                    .context("failed to set routine as active")?;
             }
 
             if json {

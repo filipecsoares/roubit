@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { X, Clock, Plus, Trash2 } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +29,8 @@ const emit = defineEmits<{
     }>
   }): void
 }>()
+
+useModal(() => props.isOpen, () => emit('close'))
 
 const routineName = ref('Rotina Diária de Foco')
 const routineDescription = ref('')
@@ -142,28 +145,28 @@ function handleSave() {
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
       @click="emit('close')"
     >
       <div
-        class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto"
+        class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-surface-border/60 pb-4">
           <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
-              <Clock class="w-5 h-5" />
+            <div class="p-2 sm:p-2.5 rounded-xl bg-zinc-800 text-zinc-100 border border-zinc-700">
+              <Clock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-lg font-bold text-white">Criar / Configurar Rotina</h3>
-              <p class="text-xs text-slate-400">Estruture seus blocos de tempo diários e rotina ativa</p>
+              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Criar / Configurar Rotina</h3>
+              <p class="text-xs text-zinc-400">Estruture seus blocos de tempo diários e rotina ativa</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors"
+            class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
           </button>
@@ -178,11 +181,11 @@ function handleSave() {
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="handleSave" class="space-y-5">
+        <form @submit.prevent="handleSave" class="space-y-4 sm:space-y-5">
           <!-- Routine Info -->
           <div class="space-y-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Nome da Rotina *
               </label>
               <input
@@ -190,38 +193,38 @@ function handleSave() {
                 type="text"
                 required
                 placeholder="Ex: Rotina Semanal de Foco"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white placeholder-slate-500 outline-none transition-all"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-zinc-500 text-sm text-white placeholder-zinc-500 outline-none transition-all"
               />
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Descrição (opcional)
               </label>
               <input
                 v-model="routineDescription"
                 type="text"
                 placeholder="Ex: Cronograma otimizado para dias úteis"
-                class="w-full px-3.5 py-2 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white placeholder-slate-500 outline-none"
+                class="w-full px-3.5 py-2 rounded-xl bg-surface-dark border border-surface-border focus:border-zinc-500 text-sm text-white placeholder-zinc-500 outline-none"
               />
             </div>
           </div>
 
           <!-- Time Blocks Builder -->
           <div class="space-y-3 pt-2 border-t border-surface-border/60">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h4 class="text-sm font-bold text-white">Blocos de Tempo (Time Blocks)</h4>
-                <p class="text-xs text-slate-400">Defina os horários de início e término de cada atividade</p>
+                <h4 class="text-xs sm:text-sm font-bold text-white font-outfit">Blocos de Tempo (Time Blocks)</h4>
+                <p class="text-[11px] sm:text-xs text-zinc-400">Defina os horários de início e término de cada atividade</p>
               </div>
 
               <button
                 type="button"
                 @click="addBlock"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 transition-colors"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors touch-target sm:min-h-0 sm:min-w-0"
               >
                 <Plus class="w-3.5 h-3.5" />
-                Adicionar Bloco
+                <span>Adicionar Bloco</span>
               </button>
             </div>
 
@@ -230,7 +233,7 @@ function handleSave() {
               <div
                 v-for="(block, idx) in blocks"
                 :key="block.id"
-                class="p-4 rounded-xl bg-surface-dark/70 border border-surface-border space-y-3"
+                class="p-3 sm:p-4 rounded-xl bg-surface-dark/70 border border-surface-border space-y-3"
               >
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-xs font-bold text-slate-400 font-mono">Bloco #{{ idx + 1 }}</span>
@@ -238,16 +241,16 @@ function handleSave() {
                     v-if="blocks.length > 1"
                     type="button"
                     @click="removeBlock(idx)"
-                    class="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
+                    class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 transition-colors touch-target sm:min-h-0 sm:min-w-0"
                     title="Remover bloco"
                   >
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-12 gap-2.5 sm:gap-3">
                   <!-- Name -->
-                  <div class="md:col-span-5">
+                  <div class="col-span-2 sm:col-span-5">
                     <label class="block text-[11px] text-slate-400 mb-1">Nome do Bloco</label>
                     <input
                       v-model="block.name"
@@ -258,7 +261,7 @@ function handleSave() {
                   </div>
 
                   <!-- Start Time -->
-                  <div class="md:col-span-2">
+                  <div class="col-span-1 sm:col-span-2">
                     <label class="block text-[11px] text-slate-400 mb-1">Início</label>
                     <input
                       v-model="block.start_time"
@@ -269,7 +272,7 @@ function handleSave() {
                   </div>
 
                   <!-- End Time -->
-                  <div class="md:col-span-2">
+                  <div class="col-span-1 sm:col-span-2">
                     <label class="block text-[11px] text-slate-400 mb-1">Fim</label>
                     <input
                       v-model="block.end_time"
@@ -280,7 +283,7 @@ function handleSave() {
                   </div>
 
                   <!-- Category -->
-                  <div class="md:col-span-3">
+                  <div class="col-span-2 sm:col-span-3">
                     <label class="block text-[11px] text-slate-400 mb-1">Categoria</label>
                     <input
                       v-model="block.category"
@@ -295,18 +298,18 @@ function handleSave() {
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center justify-end gap-3 pt-4 border-t border-surface-border/60">
+          <div class="flex items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-surface-border/60">
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              class="px-4 py-2.5 rounded-xl border border-surface-border text-sm font-medium text-zinc-400 hover:text-white transition-colors touch-target sm:min-h-0 sm:min-w-0"
             >
               Cancelar
             </button>
             <button
               type="submit"
               :disabled="loading || !routineName.trim()"
-              class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all"
+              class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white disabled:opacity-50 text-sm font-semibold text-zinc-950 shadow-sm transition-all touch-target sm:min-h-0 sm:min-w-0"
             >
               {{ loading ? 'Salvando...' : 'Salvar Rotina' }}
             </button>

@@ -1,0 +1,51 @@
+# Activity: Focus Mode Fullscreen Component & Dashboard Integration
+
+## 1. Objective & Context
+Develop the immersive Focus Mode overlay component (`FocusModeModal.vue`) and integrate it directly into `DashboardView.vue` and `TimeBlockCard.vue`. Users can launch focus mode directly from the active routine block, track their countdown with a sleek SVG progress ring, pause/resume, and mark the time block completed upon finishing.
+
+- **Prerequisites:** Activity 01 of Feature 11 (`useFocusStore`).
+- **Target Location:**
+  - `frontend/src/components/dashboard/FocusModeModal.vue`
+  - `frontend/src/components/dashboard/TimeBlockCard.vue`
+  - `frontend/src/views/DashboardView.vue`
+  - `frontend/src/components/dashboard/__tests__/FocusMode.spec.ts`
+
+## 2. Technical Scope & Specifications
+- **Component: `FocusModeModal.vue`:**
+  - Fullscreen or distraction-free centered overlay with deep dark backdrop (`bg-surface-dark/95 backdrop-blur-2xl`).
+  - Large SVG circular progress ring indicating elapsed percentage with smooth gradient.
+  - Large digital countdown (`MM:SS`) in JetBrains Mono font.
+  - Display of active block name, category tag, and cycle count (Pomodoro dots).
+  - Controls:
+    - Play / Pause button (accessible via keyboard `Space`).
+    - Reset session button.
+    - Skip to Break / Skip to Focus button.
+    - Quick "Concluir Bloco" button that directly completes the active block in `useRoutineStore`.
+    - Minimize / Close button (`Esc` or `X`).
+- **Integration with `TimeBlockCard.vue`:**
+  - If the block is active (`isActive === true`) and not completed, render a prominent "Iniciar Foco" / Timer action button.
+- **Integration with `DashboardView.vue`:**
+  - Floating focus indicator banner when timer is running in the background and modal is closed, allowing one-click return to fullscreen focus.
+- **Responsiveness:**
+  - Smooth scaling on mobile screens ($\ge 360\text{px}$) and desktops with touch targets $\ge 48\text{px}$.
+
+## 3. Implementation Steps
+1. Create `frontend/src/components/dashboard/FocusModeModal.vue`.
+2. Connect `useFocusStore` and `useRoutineStore` to emit block completion when desired.
+3. Add focus button on `TimeBlockCard.vue` for active blocks.
+4. Mount `FocusModeModal.vue` in `DashboardView.vue` and add floating focus badge when session is running.
+5. Add keyboard event listeners (`Space` to pause/resume, `Escape` to close).
+6. Write unit tests in `frontend/src/components/dashboard/__tests__/FocusMode.spec.ts`.
+
+## 4. Security & Edge Cases
+- Ensure keyboard shortcuts are only captured while the modal is open to avoid interfering with normal text inputs.
+- Audio context initialization on first user tap/click.
+- Prevent background scroll while focus modal is open (`overflow: hidden` on body).
+
+## 5. Definition of Done (DoD)
+- [ ] `FocusModeModal.vue` renders circular timer with formatted `MM:SS`.
+- [ ] Controls for Play, Pause, Reset, and Mode switching (Pomodoro / Break).
+- [ ] "Iniciar Foco" button visible on active time block card.
+- [ ] Direct completion of routine block from focus view.
+- [ ] All automated unit tests in `FocusMode.spec.ts` pass with 100% assertions.
+- [ ] Fully responsive on mobile and desktop viewports.

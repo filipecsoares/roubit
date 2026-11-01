@@ -35,7 +35,6 @@ const hoveredCell = ref<{
   y: number
 } | null>(null)
 
-
 // Generate weeks structure ending on the week of props.endDate
 const weeks = computed<HeatmapWeek[]>(() => {
   const result: HeatmapWeek[] = []
@@ -127,16 +126,17 @@ function handleMouseLeave() {
 </script>
 
 <template>
-  <div class="relative p-5 rounded-2xl bg-surface-card border border-surface-border overflow-hidden">
+  <div class="relative p-4 sm:p-5 rounded-2xl bg-surface-card border border-surface-border overflow-hidden glow-card">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
       <div class="space-y-0.5">
         <h3 class="text-sm font-semibold text-white">Consistência Anual</h3>
         <p class="text-xs text-slate-400">Mapa de calor dos últimos 365 dias de check-ins</p>
       </div>
 
       <!-- Legend -->
-      <div class="flex items-center gap-1.5 text-xs text-slate-400">
+      <div class="flex items-center gap-2 text-xs text-slate-400 self-start sm:self-auto">
+        <span class="text-[11px] text-slate-500 sm:hidden mr-1">Deslize para ver</span>
         <span>Menos</span>
         <div class="flex items-center gap-1">
           <span
@@ -150,9 +150,9 @@ function handleMouseLeave() {
       </div>
     </div>
 
-    <!-- Heatmap Grid Container with horizontal scrolling on smaller screens -->
-    <div class="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-surface-border">
-      <div class="inline-flex gap-1.5 min-w-max">
+    <!-- Heatmap Grid Container with touch momentum horizontal scrolling -->
+    <div class="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-surface-border overscroll-x-contain" style="-webkit-overflow-scrolling: touch;">
+      <div class="inline-flex gap-1.5 min-w-max py-1">
         <!-- Day labels column (Mon, Wed, Fri) -->
         <div class="flex flex-col justify-between py-0.5 text-[10px] text-slate-500 font-mono pr-1 select-none">
           <span class="h-3 flex items-center">Seg</span>
@@ -190,10 +190,10 @@ function handleMouseLeave() {
         class="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 shadow-xl text-xs whitespace-nowrap"
         :style="{ left: `${hoveredCell.x}px`, top: `${hoveredCell.y}px` }"
       >
-        <span class="font-semibold text-white">
+        <span class="font-semibold text-white font-mono">
           {{ hoveredCell.count }} {{ hoveredCell.count === 1 ? 'check-in' : 'check-ins' }}
         </span>
-        <span class="text-slate-400 ml-1.5">em {{ hoveredCell.formattedDate }}</span>
+        <span class="text-slate-400 ml-1.5 font-sans">em {{ hoveredCell.formattedDate }}</span>
       </div>
     </Teleport>
   </div>
