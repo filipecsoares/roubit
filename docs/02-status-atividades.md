@@ -23,10 +23,10 @@
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
 | **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **13. Habit Streak Performance & Cache** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **13. Habit Streak Performance & Cache** | 4 | 1 | 0 | 3 | 🟡 Em Progresso |
 | **14. Real-Time Notifications & SSE** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **54** | **0** | **12** | **81.8%** |
+| **TOTAL** | **66** | **55** | **0** | **11** | **83.3%** |
 
 ---
 
@@ -161,7 +161,7 @@
 ### Feature 13: Habit Streak Performance & Cache
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | ⚪ NÃO INICIADO | — |
+| **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **13.2** | Motor Incremental Atômico de Streaks | [activity-02-incremental-atomic-streak-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt) | ⚪ NÃO INICIADO | — |
 | **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | ⚪ NÃO INICIADO | — |
 | **13.4** | Benchmark de Carga P99 e Throughput | [activity-04-streak-load-p99-benchmark.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt) | ⚪ NÃO INICIADO | — |

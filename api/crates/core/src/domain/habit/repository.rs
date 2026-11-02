@@ -101,8 +101,8 @@ impl HabitRepository for SqliteHabitRepository {
     async fn create_habit(&self, user_id: Uuid, habit: &Habit) -> Result<(), HabitRepositoryError> {
         sqlx::query(
             r"
-            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ",
         )
         .bind(habit.id)
@@ -115,6 +115,8 @@ impl HabitRepository for SqliteHabitRepository {
         .bind(habit.frequency_days)
         .bind(&habit.color_hex)
         .bind(habit.is_archived)
+        .bind(habit.current_streak)
+        .bind(habit.longest_streak)
         .bind(habit.created_at)
         .bind(habit.updated_at)
         .execute(&self.pool)
@@ -130,7 +132,7 @@ impl HabitRepository for SqliteHabitRepository {
     ) -> Result<Option<Habit>, HabitRepositoryError> {
         let habit = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
             FROM habits
             WHERE id = ? AND user_id = ?
             ",
@@ -146,7 +148,7 @@ impl HabitRepository for SqliteHabitRepository {
     async fn list_active_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
         let habits = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
             FROM habits
             WHERE is_archived = 0 AND user_id = ?
             ORDER BY created_at ASC
@@ -162,7 +164,7 @@ impl HabitRepository for SqliteHabitRepository {
     async fn list_all_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
         let habits = sqlx::query_as::<_, Habit>(
             r"
-            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
             FROM habits
             WHERE user_id = ?
             ORDER BY created_at ASC
@@ -543,5 +545,35 @@ mod tests {
         assert_eq!(logs[0].log_date, d1);
         assert_eq!(logs[1].log_date, d2);
         assert_eq!(logs[2].log_date, d3);
+    }
+
+    #[tokio::test]
+    async fn test_habit_denormalized_streak_columns_persisted() {
+        let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
+        let mut habit = Habit::new_binary("Denorm Habit", None).with_user_id(user_id);
+        habit.current_streak = 5;
+        habit.longest_streak = 12;
+
+        repo.create_habit(user_id, &habit)
+            .await
+            .expect("create succeeds");
+
+        let fetched = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .expect("get succeeds")
+            .expect("habit found");
+
+        assert_eq!(fetched.current_streak, 5);
+        assert_eq!(fetched.longest_streak, 12);
+
+        let list = repo
+            .list_active_habits(user_id)
+            .await
+            .expect("list succeeds");
+        assert_eq!(list[0].current_streak, 5);
+        assert_eq!(list[0].longest_streak, 12);
     }
 }

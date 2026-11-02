@@ -78,6 +78,12 @@ pub struct Habit {
     /// Whether this habit is archived and hidden from daily check-ins.
     pub is_archived: bool,
 
+    /// Current consecutive completion streak count.
+    pub current_streak: i32,
+
+    /// All-time longest completion streak count.
+    pub longest_streak: i32,
+
     /// UTC timestamp of creation.
     pub created_at: DateTime<Utc>,
 
@@ -113,6 +119,8 @@ impl Habit {
             frequency_days: Self::FREQUENCY_DAILY,
             color_hex: Self::DEFAULT_COLOR.to_string(),
             is_archived: false,
+            current_streak: 0,
+            longest_streak: 0,
             created_at: now,
             updated_at: now,
         }
@@ -145,6 +153,8 @@ impl Habit {
             frequency_days: Self::FREQUENCY_DAILY,
             color_hex: Self::DEFAULT_COLOR.to_string(),
             is_archived: false,
+            current_streak: 0,
+            longest_streak: 0,
             created_at: now,
             updated_at: now,
         }
@@ -169,6 +179,8 @@ impl Habit {
             frequency_days: Self::FREQUENCY_DAILY,
             color_hex: Self::DEFAULT_COLOR.to_string(),
             is_archived: false,
+            current_streak: 0,
+            longest_streak: 0,
             created_at: now,
             updated_at: now,
         }
@@ -395,7 +407,7 @@ mod tests {
 
         // 3. Query Habit using FromRow
         let fetched_habit: Habit = sqlx::query_as(
-            "SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at FROM habits WHERE id = ?",
+            "SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at FROM habits WHERE id = ?",
         )
         .bind(habit.id)
         .fetch_one(&pool)
@@ -406,6 +418,8 @@ mod tests {
         assert_eq!(fetched_habit.habit_type, HabitType::Numeric);
         assert_eq!(fetched_habit.target_value, 20.0);
         assert_eq!(fetched_habit.unit.as_deref(), Some("pages"));
+        assert_eq!(fetched_habit.current_streak, 0);
+        assert_eq!(fetched_habit.longest_streak, 0);
 
         // 4. Query HabitLog using FromRow
         let fetched_log: HabitLog = sqlx::query_as(

@@ -54,9 +54,9 @@ flowchart TD
 ### Fase 7: Otimização de Performance e Cache dos Streaks de Hábitos
 *Objetivo: Eliminar o gargalo de consultas N+1 e leituras de 365 dias de logs a cada check-in, mantendo a latência P99 < 10ms à medida que o histórico de logs cresce.*
 
-- [ ] **7.1 Desnormalização do Schema de Hábitos (Streaks)**
-  - [ ] Criar migration `0008_habit_streak_denormalization.sql` adicionando colunas `current_streak INTEGER NOT NULL DEFAULT 0` e `longest_streak INTEGER NOT NULL DEFAULT 0` na tabela `habits`.
-  - [ ] Criar script de backfill/migração para calcular e preencher os streaks históricos existentes.
+- [x] **7.1 Desnormalização do Schema de Hábitos (Streaks)**
+  - [x] Criar migration `0008_habit_streak_denormalization.sql` adicionando colunas `current_streak INTEGER NOT NULL DEFAULT 0` e `longest_streak INTEGER NOT NULL DEFAULT 0` na tabela `habits`.
+  - [x] Criar script de backfill/migração para calcular e preencher os streaks históricos existentes.
 - [ ] **7.2 Algoritmo de Atualização Incremental Atômica de Streak**
   - [ ] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
   - [ ] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.

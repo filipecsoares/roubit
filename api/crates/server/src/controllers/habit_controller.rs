@@ -132,6 +132,8 @@ pub async fn create_habit(
         unit: payload.unit,
         frequency_days: payload.frequency_days.unwrap_or(0b0111_1111),
         is_archived: false,
+        current_streak: 0,
+        longest_streak: 0,
         color_hex: payload.color_hex.unwrap_or_else(|| "#10B981".to_string()),
         created_at: Utc::now(),
         updated_at: Utc::now(),
