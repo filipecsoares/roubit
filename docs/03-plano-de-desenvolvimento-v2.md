@@ -61,9 +61,9 @@ flowchart TD
   - [x] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
   - [x] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.
   - [x] Eliminar a consulta `get_logs_for_habit(habit_id, today - 365 days, today)` dos endpoints críticos de check-in e listagem.
-- [ ] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
-  - [ ] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
-  - [ ] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).
+- [x] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
+  - [x] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
+  - [x] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).
 - [ ] **7.4 Benchmarks de Regressão e Validação de Throughput**
   - [ ] Atualizar suíte de testes de carga em `api/tests/load_p99_benchmark.rs`.
   - [ ] Comprovar redução no consumo de CPU e tempo de resposta em check-in com base histórica de 10.000 logs por usuário.

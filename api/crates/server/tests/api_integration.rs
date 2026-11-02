@@ -523,3 +523,100 @@ async fn test_controller_multi_tenant_idor_prevention() {
     let res = app.clone().oneshot(req_del_journal_b).await.unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn test_habit_summary_cache_and_offline_redis_graceful_degradation() {
+    let pool = create_sqlite_pool("sqlite::memory:")
+        .await
+        .expect("Failed to create in-memory database");
+    roubit_core::run_migrations(&pool)
+        .await
+        .expect("Failed to apply migrations");
+    let config = AppConfig {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 0,
+        jwt_secret: "super-secure-test-jwt-secret-with-minimum-32-bytes!!".to_string(),
+        ..Default::default()
+    };
+
+    // Attach a RedisService pointing to an unreachable port to test graceful degradation
+    let redis_offline = roubit_core::redis::RedisService::new("redis://127.0.0.1:6399/0")
+        .expect("Create offline redis service");
+    let state = AppState::new(pool, config).with_redis(redis_offline);
+    let app = build_router(state);
+
+    let token = register_and_get_token(&app, "cache_graceful_tester@roubit.app").await;
+
+    // 1. Create a habit
+    let habit_payload = serde_json::json!({
+        "name": "Daily Hydration",
+        "habit_type": "binary",
+        "target_value": 1.0,
+        "frequency_days": 127
+    });
+    let req_create = Request::builder()
+        .uri("/api/v1/habits")
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&habit_payload).unwrap()))
+        .unwrap();
+    let res_create = app.clone().oneshot(req_create).await.unwrap();
+    assert_eq!(res_create.status(), StatusCode::CREATED);
+    let habit_bytes = to_bytes(res_create.into_body(), usize::MAX).await.unwrap();
+    let created_habit: serde_json::Value = serde_json::from_slice(&habit_bytes).unwrap();
+    let habit_id = created_habit["id"].as_str().unwrap();
+
+    // 2. List habits (falls back gracefully to DB despite Redis being offline)
+    let req_list = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let res_list = app.clone().oneshot(req_list).await.unwrap();
+    assert_eq!(res_list.status(), StatusCode::OK);
+    assert_eq!(
+        res_list
+            .headers()
+            .get("x-cache")
+            .and_then(|v| v.to_str().ok()),
+        Some("MISS")
+    );
+    let list_bytes = to_bytes(res_list.into_body(), usize::MAX).await.unwrap();
+    let habits: Vec<serde_json::Value> = serde_json::from_slice(&list_bytes).unwrap();
+    assert_eq!(habits.len(), 1);
+    assert_eq!(habits[0]["habit"]["name"], "Daily Hydration");
+    assert_eq!(habits[0]["streak"]["current_streak"], 0);
+
+    // 3. Record check-in (evicts cache safely with graceful degradation)
+    let today = chrono::Utc::now().date_naive();
+    let checkin_payload = serde_json::json!({
+        "date": today.to_string(),
+        "value": 1.0,
+        "is_increment": false
+    });
+    let req_checkin = Request::builder()
+        .uri(format!("/api/v1/habits/{habit_id}/checkin"))
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&checkin_payload).unwrap()))
+        .unwrap();
+    let res_checkin = app.clone().oneshot(req_checkin).await.unwrap();
+    assert_eq!(res_checkin.status(), StatusCode::OK);
+
+    // 4. List habits again -> streak is 1
+    let req_list2 = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let res_list2 = app.clone().oneshot(req_list2).await.unwrap();
+    assert_eq!(res_list2.status(), StatusCode::OK);
+    let list_bytes2 = to_bytes(res_list2.into_body(), usize::MAX).await.unwrap();
+    let habits2: Vec<serde_json::Value> = serde_json::from_slice(&list_bytes2).unwrap();
+    assert_eq!(habits2[0]["streak"]["current_streak"], 1);
+    assert_eq!(habits2[0]["streak"]["is_active_today"], true);
+}

@@ -1,7 +1,7 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (50/66 atividades concluídas — 75.8%)  
-> **Última Atualização:** 2026-11-01  
+> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (57/66 atividades concluídas — 86.4%)  
+> **Última Atualização:** 2026-11-02  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
 
@@ -23,10 +23,10 @@
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
 | **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **13. Habit Streak Performance & Cache** | 4 | 2 | 0 | 2 | 🟡 Em Progresso |
+| **13. Habit Streak Performance & Cache** | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
 | **14. Real-Time Notifications & SSE** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **56** | **0** | **10** | **84.8%** |
+| **TOTAL** | **66** | **57** | **0** | **9** | **86.4%** |
 
 ---
 
@@ -163,7 +163,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **13.2** | Motor Incremental Atômico de Streaks | [activity-02-incremental-atomic-streak-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
-| **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | ⚪ NÃO INICIADO | — |
+| **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **13.4** | Benchmark de Carga P99 e Throughput | [activity-04-streak-load-p99-benchmark.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt) | ⚪ NÃO INICIADO | — |
 
 ---

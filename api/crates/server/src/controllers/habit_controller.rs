@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
 use axum::{
+    body::Body,
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -69,12 +70,37 @@ fn parse_habit_type(s: &str) -> Result<HabitType, ApiError> {
 
 /// Handler for `GET /api/v1/habits`
 ///
+/// Returns cached summary from Redis if available, or reads habits and today's completion
+/// from SQLite and caches the result for 300 seconds.
+///
 /// # Errors
 /// Returns [`ApiError::Internal`] if database queries fail.
 pub async fn list_habits(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<Json<Vec<HabitWithStreakResponse>>, ApiError> {
+) -> Result<Response, ApiError> {
+    let user_id_str = user.id.to_string();
+
+    // 1. Check Redis cache first if Redis service is active
+    if let Some(redis) = &state.redis {
+        match redis.get_cached_habit_summary(&user_id_str).await {
+            Ok(Some(cached_json)) => {
+                let res = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(axum::http::header::CONTENT_TYPE, "application/json")
+                    .header("x-cache", "HIT")
+                    .body(Body::from(cached_json))
+                    .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+                return Ok(res);
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::warn!(error = %err, user_id = %user.id, "Redis cache lookup failed; falling back to database");
+            }
+        }
+    }
+
+    // 2. Query SQLite
     let repo = SqliteHabitRepository::new(state.db.clone());
     let habits = repo
         .list_active_habits(user.id)
@@ -109,7 +135,29 @@ pub async fn list_habits(
         result.push(HabitWithStreakResponse { habit, streak });
     }
 
-    Ok(Json(result))
+    let payload_bytes = serde_json::to_vec(&result)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Serialization error: {e}")))?;
+
+    // 3. Populate Redis cache if active
+    if let Some(redis) = &state.redis {
+        if let Ok(json_str) = std::str::from_utf8(&payload_bytes) {
+            if let Err(err) = redis
+                .set_cached_habit_summary(&user_id_str, json_str, 300)
+                .await
+            {
+                tracing::warn!(error = %err, user_id = %user.id, "Failed to cache habit summary in Redis");
+            }
+        }
+    }
+
+    let res = Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .header("x-cache", "MISS")
+        .body(Body::from(payload_bytes))
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+
+    Ok(res)
 }
 
 /// Handler for `POST /api/v1/habits`
@@ -147,6 +195,15 @@ pub async fn create_habit(
     repo.create_habit(user.id, &habit)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if let Some(redis) = &state.redis {
+        if let Err(err) = redis
+            .invalidate_user_habits_cache(&user.id.to_string())
+            .await
+        {
+            tracing::warn!(error = %err, user_id = %user.id, "Failed to invalidate habit summary cache after create");
+        }
+    }
 
     Ok((StatusCode::CREATED, Json(habit)))
 }
@@ -193,6 +250,16 @@ pub async fn record_checkin(
         tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
     }
 
+    // Invalidate Redis habit summary cache atomically on check-in
+    if let Some(redis) = &state.redis {
+        if let Err(err) = redis
+            .invalidate_user_habits_cache(&user.id.to_string())
+            .await
+        {
+            tracing::warn!(error = %err, user_id = %user.id, "Failed to invalidate habit summary cache after checkin");
+        }
+    }
+
     // Read updated habit streak atomically computed in O(1)
     let updated_habit = repo
         .get_habit_by_id(habit_id, user.id)
@@ -220,7 +287,17 @@ pub async fn delete_habit(
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteHabitRepository::new(state.db);
     match repo.delete_habit(habit_id, user.id).await {
-        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+        Ok(()) => {
+            if let Some(redis) = &state.redis {
+                if let Err(err) = redis
+                    .invalidate_user_habits_cache(&user.id.to_string())
+                    .await
+                {
+                    tracing::warn!(error = %err, user_id = %user.id, "Failed to invalidate habit summary cache after delete");
+                }
+            }
+            Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+        }
         Err(HabitRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Habit {habit_id} not found")))
         }
