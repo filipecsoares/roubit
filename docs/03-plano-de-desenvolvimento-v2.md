@@ -57,10 +57,10 @@ flowchart TD
 - [x] **7.1 Desnormalização do Schema de Hábitos (Streaks)**
   - [x] Criar migration `0008_habit_streak_denormalization.sql` adicionando colunas `current_streak INTEGER NOT NULL DEFAULT 0` e `longest_streak INTEGER NOT NULL DEFAULT 0` na tabela `habits`.
   - [x] Criar script de backfill/migração para calcular e preencher os streaks históricos existentes.
-- [ ] **7.2 Algoritmo de Atualização Incremental Atômica de Streak**
-  - [ ] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
-  - [ ] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.
-  - [ ] Eliminar a consulta `get_logs_for_habit(habit_id, today - 365 days, today)` dos endpoints críticos de check-in e listagem.
+- [x] **7.2 Algoritmo de Atualização Incremental Atômica de Streak**
+  - [x] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
+  - [x] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.
+  - [x] Eliminar a consulta `get_logs_for_habit(habit_id, today - 365 days, today)` dos endpoints críticos de check-in e listagem.
 - [ ] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
   - [ ] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
   - [ ] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).

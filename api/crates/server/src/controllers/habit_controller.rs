@@ -1,4 +1,4 @@
-//! Habit Tracking REST API Controllers (RF02)
+use std::collections::HashSet;
 
 use axum::{
     extract::{Path, State},
@@ -14,7 +14,7 @@ use validator::Validate;
 
 use roubit_core::{
     Habit, HabitLog, HabitRepository, HabitRepositoryError, HabitType, OkrSyncService,
-    SqliteHabitRepository, SqliteOkrRepository, StreakCalculator, StreakMetrics,
+    SqliteHabitRepository, SqliteOkrRepository, StreakMetrics,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -75,33 +75,37 @@ pub async fn list_habits(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<HabitWithStreakResponse>>, ApiError> {
-    let repo = SqliteHabitRepository::new(state.db);
+    let repo = SqliteHabitRepository::new(state.db.clone());
     let habits = repo
         .list_active_habits(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     let today = Utc::now().date_naive();
+    let today_completed: HashSet<Uuid> = sqlx::query_scalar::<_, Uuid>(
+        r"
+        SELECT hl.habit_id
+        FROM habit_logs hl
+        JOIN habits h ON hl.habit_id = h.id
+        WHERE h.user_id = ? AND hl.log_date = ? AND hl.is_completed = 1
+        ",
+    )
+    .bind(user.id)
+    .bind(today)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .collect();
+
     let mut result = Vec::with_capacity(habits.len());
-
     for habit in habits {
-        let logs = repo
-            .get_logs_for_habit(
-                habit.id,
-                user.id,
-                today - chrono::Duration::days(365),
-                today,
-            )
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-
-        let completed_dates: Vec<NaiveDate> = logs
-            .iter()
-            .filter(|l| l.is_completed)
-            .map(|l| l.log_date)
-            .collect();
-
-        let streak = StreakCalculator::calculate(&completed_dates, habit.frequency_days, today);
+        let is_active_today = today_completed.contains(&habit.id);
+        let streak = StreakMetrics {
+            current_streak: u32::try_from(habit.current_streak.max(0)).unwrap_or(0),
+            longest_streak: u32::try_from(habit.longest_streak.max(0)).unwrap_or(0),
+            is_active_today,
+        };
         result.push(HabitWithStreakResponse { habit, streak });
     }
 
@@ -189,24 +193,18 @@ pub async fn record_checkin(
         tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
     }
 
-    // Recalculate streak
-    let logs = repo
-        .get_logs_for_habit(
-            habit_id,
-            user.id,
-            payload.date - chrono::Duration::days(365),
-            payload.date,
-        )
+    // Read updated habit streak atomically computed in O(1)
+    let updated_habit = repo
+        .get_habit_by_id(habit_id, user.id)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .unwrap_or(habit);
 
-    let completed_dates: Vec<NaiveDate> = logs
-        .iter()
-        .filter(|l| l.is_completed)
-        .map(|l| l.log_date)
-        .collect();
-
-    let streak = StreakCalculator::calculate(&completed_dates, habit.frequency_days, payload.date);
+    let streak = StreakMetrics {
+        current_streak: u32::try_from(updated_habit.current_streak.max(0)).unwrap_or(0),
+        longest_streak: u32::try_from(updated_habit.longest_streak.max(0)).unwrap_or(0),
+        is_active_today: log.is_completed,
+    };
 
     Ok((StatusCode::OK, Json(CheckinResponse { log, streak })))
 }

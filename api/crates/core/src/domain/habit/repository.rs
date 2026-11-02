@@ -8,7 +8,10 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use super::models::{Habit, HabitLog};
+use super::{
+    models::{Habit, HabitLog},
+    streak::StreakCalculator,
+};
 
 /// Errors occurring during habit repository operations.
 #[derive(Debug, thiserror::Error)]
@@ -97,6 +100,7 @@ impl SqliteHabitRepository {
 }
 
 #[async_trait]
+#[allow(clippy::too_many_lines)]
 impl HabitRepository for SqliteHabitRepository {
     async fn create_habit(&self, user_id: Uuid, habit: &Habit) -> Result<(), HabitRepositoryError> {
         sqlx::query(
@@ -185,10 +189,35 @@ impl HabitRepository for SqliteHabitRepository {
         value: f64,
         is_increment: bool,
     ) -> Result<HabitLog, HabitRepositoryError> {
-        let habit = self
-            .get_habit_by_id(habit_id, user_id)
-            .await?
-            .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+        let mut tx = self.pool.begin().await?;
+
+        let habit = sqlx::query_as::<_, Habit>(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE id = ? AND user_id = ?
+            ",
+        )
+        .bind(habit_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
+        // Check if there was an existing completed log for this date to avoid double-incrementing streak
+        let existing_log: Option<HabitLog> = sqlx::query_as(
+            r"
+            SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+            FROM habit_logs
+            WHERE habit_id = ? AND log_date = ?
+            ",
+        )
+        .bind(habit_id)
+        .bind(date)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
 
         let log_id = Uuid::new_v4();
         let now: DateTime<Utc> = Utc::now();
@@ -214,7 +243,7 @@ impl HabitRepository for SqliteHabitRepository {
             .bind(initial_completed)
             .bind(now)
             .bind(target_value)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await?
         } else {
             sqlx::query_as::<_, HabitLog>(
@@ -235,9 +264,52 @@ impl HabitRepository for SqliteHabitRepository {
             .bind(initial_completed)
             .bind(now)
             .bind(target_value)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await?
         };
+
+        // Atomically update habit's denormalized streak when habit reaches completed state
+        if log.is_completed && !was_already_completed {
+            let last_completed_date: Option<NaiveDate> = sqlx::query_scalar(
+                r"
+                SELECT log_date
+                FROM habit_logs
+                WHERE habit_id = ? AND log_date < ? AND is_completed = 1
+                ORDER BY log_date DESC
+                LIMIT 1
+                ",
+            )
+            .bind(habit_id)
+            .bind(date)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            let (new_current_streak, new_longest_streak) =
+                StreakCalculator::update_streak_incremental(
+                    habit.current_streak,
+                    habit.longest_streak,
+                    last_completed_date,
+                    date,
+                    habit.frequency_days,
+                );
+
+            sqlx::query(
+                r"
+                UPDATE habits
+                SET current_streak = ?, longest_streak = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                ",
+            )
+            .bind(new_current_streak)
+            .bind(new_longest_streak)
+            .bind(now)
+            .bind(habit_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
 
         Ok(log)
     }
