@@ -45,9 +45,9 @@ flowchart TD
   - [x] Conectar o extractor `user: AuthenticatedUser` em todos os handlers das rotas protegidas em `api/crates/server/src/controllers/`.
   - [x] Propagar `user.id` para serviços de aplicação (`OkrSyncService`, `JournalService`).
   - [x] Retornar `404 Not Found` (ou `403 Forbidden`) em tentativas de acesso a IDs pertencentes a outros usuários (prevenção contra IDOR).
-- [ ] **6.4 Testes de Isolamento Multi-tenant & Validação de Segurança**
-  - [ ] Testes de integração em `api/tests/` simulando múltiplos usuários simultâneos (Usuário A e Usuário B).
-  - [ ] Garantir que o Usuário A não consiga listar, alterar, dar check-in ou deletar hábitos, rotinas, OKRs ou entradas de diário do Usuário B.
+- [x] **6.4 Testes de Isolamento Multi-tenant & Validação de Segurança**
+  - [x] Testes de integração em `api/tests/` simulando múltiplos usuários simultâneos (Usuário A e Usuário B).
+  - [x] Garantir que o Usuário A não consiga listar, alterar, dar check-in ou deletar hábitos, rotinas, OKRs ou entradas de diário do Usuário B.
 
 ---
 
