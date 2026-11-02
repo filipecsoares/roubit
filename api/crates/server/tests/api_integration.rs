@@ -329,3 +329,197 @@ async fn test_zero_knowledge_journal_contract_in_memory() {
     let res_get = app.clone().oneshot(req_get).await.expect("Execute request");
     assert_eq!(res_get.status(), StatusCode::OK);
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn test_controller_multi_tenant_idor_prevention() {
+    let app = setup_test_api_app().await;
+    let token_a = register_and_get_token(&app, "user_a@roubit.app").await;
+    let token_b = register_and_get_token(&app, "user_b@roubit.app").await;
+
+    // 1. Habit Isolation: User A creates a habit
+    let habit_payload = serde_json::json!({
+        "name": "User A Meditation",
+        "habit_type": "binary",
+        "target_value": 1.0
+    });
+    let req_create_habit = Request::builder()
+        .uri("/api/v1/habits")
+        .method("POST")
+        .header("authorization", format!("Bearer {token_a}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&habit_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_create_habit).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let habit_a: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let habit_a_id = habit_a["id"].as_str().unwrap();
+
+    // User B attempts checkin on User A's habit -> 404 Not Found
+    let checkin_payload = serde_json::json!({
+        "date": "2026-11-01",
+        "value": 1.0
+    });
+    let req_checkin_b = Request::builder()
+        .uri(format!("/api/v1/habits/{habit_a_id}/checkin"))
+        .method("POST")
+        .header("authorization", format!("Bearer {token_b}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&checkin_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_checkin_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // User B attempts deletion of User A's habit -> 404 Not Found
+    let req_del_habit_b = Request::builder()
+        .uri(format!("/api/v1/habits/{habit_a_id}"))
+        .method("DELETE")
+        .header("authorization", format!("Bearer {token_b}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_del_habit_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 2. Routine Isolation: User A creates a routine
+    let routine_payload = serde_json::json!({
+        "name": "User A Flow",
+        "blocks": [
+            {
+                "name": "Deep Work",
+                "start_time": "09:00:00",
+                "end_time": "11:00:00"
+            }
+        ]
+    });
+    let req_create_routine = Request::builder()
+        .uri("/api/v1/routines")
+        .method("POST")
+        .header("authorization", format!("Bearer {token_a}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&routine_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_create_routine).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let routine_a: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let routine_a_id = routine_a["id"].as_str().unwrap();
+
+    // Fetch User A's routine progress to extract block ID
+    let req_get_routine_a = Request::builder()
+        .uri("/api/v1/routines")
+        .method("GET")
+        .header("authorization", format!("Bearer {token_a}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_get_routine_a).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let routine_prog_a: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let block_a_id = routine_prog_a["blocks"][0]["id"].as_str().unwrap();
+
+    // User B attempts to complete User A's block -> 404 Not Found
+    let req_complete_b = Request::builder()
+        .uri(format!("/api/v1/routines/blocks/{block_a_id}/complete"))
+        .method("POST")
+        .header("authorization", format!("Bearer {token_b}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"status": "completed"}"#))
+        .unwrap();
+    let res = app.clone().oneshot(req_complete_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // User B attempts to delete User A's routine -> 404 Not Found
+    let req_del_routine_b = Request::builder()
+        .uri(format!("/api/v1/routines/{routine_a_id}"))
+        .method("DELETE")
+        .header("authorization", format!("Bearer {token_b}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_del_routine_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 3. OKR Isolation: User A creates an Objective
+    let okr_payload = serde_json::json!({
+        "title": "User A Objective",
+        "quarter": "2026-Q4"
+    });
+    let req_create_okr = Request::builder()
+        .uri("/api/v1/okrs")
+        .method("POST")
+        .header("authorization", format!("Bearer {token_a}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&okr_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_create_okr).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let okr_a: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let objective_a_id = okr_a["objective"]["id"].as_str().unwrap();
+
+    // User B attempts to add a Key Result to User A's objective -> 404 Not Found
+    let kr_payload = serde_json::json!({
+        "title": "Attacker KR",
+        "target_value": 10.0
+    });
+    let req_create_kr_b = Request::builder()
+        .uri(format!("/api/v1/okrs/{objective_a_id}/key-results"))
+        .method("POST")
+        .header("authorization", format!("Bearer {token_b}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&kr_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_create_kr_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // User B attempts to delete User A's objective -> 404 Not Found
+    let req_del_okr_b = Request::builder()
+        .uri(format!("/api/v1/okrs/{objective_a_id}"))
+        .method("DELETE")
+        .header("authorization", format!("Bearer {token_b}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_del_okr_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 4. Journal Isolation: User A saves an encrypted entry
+    let journal_payload = serde_json::json!({
+        "entry_date": "2026-11-01",
+        "mood_score": 5,
+        "salt_base64": BASE64_STANDARD.encode([1u8; 16]),
+        "nonce_base64": BASE64_STANDARD.encode([2u8; 12]),
+        "ciphertext_base64": BASE64_STANDARD.encode(vec![3u8; 32])
+    });
+    let req_save_journal = Request::builder()
+        .uri("/api/v1/journal")
+        .method("POST")
+        .header("authorization", format!("Bearer {token_a}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&journal_payload).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req_save_journal).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let journal_a: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let journal_a_id = journal_a["id"].as_str().unwrap();
+
+    // User B attempts to fetch User A's journal entry -> 404 Not Found
+    let req_get_journal_b = Request::builder()
+        .uri(format!("/api/v1/journal/{journal_a_id}"))
+        .method("GET")
+        .header("authorization", format!("Bearer {token_b}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_get_journal_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // User B attempts to delete User A's journal entry -> 404 Not Found
+    let req_del_journal_b = Request::builder()
+        .uri(format!("/api/v1/journal/{journal_a_id}"))
+        .method("DELETE")
+        .header("authorization", format!("Bearer {token_b}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_del_journal_b).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}

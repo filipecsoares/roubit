@@ -29,25 +29,25 @@ flowchart TD
 ### Fase 6: Multi-tenancy Real & Isolamento Estrito de Dados por Usuário
 *Objetivo: Migrar a persistência global para suporte nativo a múltiplos usuários, garantindo isolamento criptográfico e relacional absoluto entre contas.*
 
-- [ ] **6.1 Migração de Banco de Dados Multi-tenant (SQLite & PostgreSQL)**
-  - [ ] Criar migration `0007_add_user_id_multi_tenancy.sql` adicionando coluna `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE` nas tabelas `habits`, `routines`, `objectives` e `journal_entries`.
-  - [ ] Criar índices compostos para alta performance de consulta por usuário:
+- [x] **6.1 Migração de Banco de Dados Multi-tenant (SQLite & PostgreSQL)**
+  - [x] Criar migration `0007_add_user_id_multi_tenancy.sql` adicionando coluna `user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE` nas tabelas `habits`, `routines`, `objectives` e `journal_entries`.
+  - [x] Criar índices compostos para alta performance de consulta por usuário:
     - `idx_habits_user_archived ON habits(user_id, is_archived)`
     - `idx_routines_user_active ON routines(user_id, is_active)`
     - `idx_objectives_user_quarter ON objectives(user_id, quarter)`
     - `idx_journal_user_date ON journal_entries(user_id, entry_date DESC)`
-  - [ ] Garantir compatibilidade com o dialeto PostgreSQL em `api/crates/core/migrations_pg/`.
-- [ ] **6.2 Scoping de Usuário na Camada de Repositórios (`roubit-core`)**
-  - [ ] Atualizar as traits de repositório (`HabitRepository`, `RoutineRepository`, `OkrRepository`, `JournalRepository`) para exigir `user_id: Uuid` em todas as operações de leitura, criação e exclusão.
-  - [ ] Modificar implementações `SqliteHabitRepository`, `SqliteRoutineRepository`, `SqliteOkrRepository` e `SqliteJournalRepository` garantindo que queries `SELECT`, `UPDATE` e `DELETE` incluam cláusula `WHERE user_id = ?`.
-  - [ ] Assegurar integridade relacional ao vincular Key Results a Hábitos apenas se pertencerem ao mesmo `user_id`.
-- [ ] **6.3 Extração e Injeção do Usuário Autenticado nos Controladores Axum (`roubit-server`)**
-  - [ ] Conectar o extractor `user: AuthenticatedUser` em todos os handlers das rotas protegidas em `api/crates/server/src/controllers/`.
-  - [ ] Propagar `user.id` para serviços de aplicação (`OkrSyncService`, `JournalService`).
-  - [ ] Retornar `404 Not Found` (ou `403 Forbidden`) em tentativas de acesso a IDs pertencentes a outros usuários (prevenção contra IDOR).
-- [ ] **6.4 Testes de Isolamento Multi-tenant & Validação de Segurança**
-  - [ ] Testes de integração em `api/tests/` simulando múltiplos usuários simultâneos (Usuário A e Usuário B).
-  - [ ] Garantir que o Usuário A não consiga listar, alterar, dar check-in ou deletar hábitos, rotinas, OKRs ou entradas de diário do Usuário B.
+  - [x] Garantir compatibilidade com o dialeto PostgreSQL em `api/crates/core/migrations_pg/`.
+- [x] **6.2 Scoping de Usuário na Camada de Repositórios (`roubit-core`)**
+  - [x] Atualizar as traits de repositório (`HabitRepository`, `RoutineRepository`, `OkrRepository`, `JournalRepository`) para exigir `user_id: Uuid` em todas as operações de leitura, criação e exclusão.
+  - [x] Modificar implementações `SqliteHabitRepository`, `SqliteRoutineRepository`, `SqliteOkrRepository` e `SqliteJournalRepository` garantindo que queries `SELECT`, `UPDATE` e `DELETE` incluam cláusula `WHERE user_id = ?`.
+  - [x] Assegurar integridade relacional ao vincular Key Results a Hábitos apenas se pertencerem ao mesmo `user_id`.
+- [x] **6.3 Extração e Injeção do Usuário Autenticado nos Controladores Axum (`roubit-server`)**
+  - [x] Conectar o extractor `user: AuthenticatedUser` em todos os handlers das rotas protegidas em `api/crates/server/src/controllers/`.
+  - [x] Propagar `user.id` para serviços de aplicação (`OkrSyncService`, `JournalService`).
+  - [x] Retornar `404 Not Found` (ou `403 Forbidden`) em tentativas de acesso a IDs pertencentes a outros usuários (prevenção contra IDOR).
+- [x] **6.4 Testes de Isolamento Multi-tenant & Validação de Segurança**
+  - [x] Testes de integração em `api/tests/` simulando múltiplos usuários simultâneos (Usuário A e Usuário B).
+  - [x] Garantir que o Usuário A não consiga listar, alterar, dar check-in ou deletar hábitos, rotinas, OKRs ou entradas de diário do Usuário B.
 
 ---
 

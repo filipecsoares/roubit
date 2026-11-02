@@ -13,7 +13,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, SqliteOkrRepository,
+    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError,
+    SqliteOkrRepository,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -55,16 +56,16 @@ pub struct CreateObjectiveRequest {
 /// Returns [`ApiError::Internal`] if database queries fail.
 pub async fn list_okrs(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Query(query): Query<ListOkrsQuery>,
 ) -> Result<Json<Vec<ObjectiveWithKeyResults>>, ApiError> {
     let repo = SqliteOkrRepository::new(state.db);
     let objectives = if let Some(quarter) = query.quarter {
-        repo.list_objectives_by_quarter(&quarter)
+        repo.list_objectives_by_quarter(user.id, &quarter)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     } else {
-        repo.list_all_objectives()
+        repo.list_all_objectives(user.id)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     };
@@ -78,7 +79,7 @@ pub async fn list_okrs(
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
 pub async fn create_objective(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Json(payload): Json<CreateObjectiveRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
@@ -99,7 +100,8 @@ pub async fn create_objective(
         quarter,
         start_date,
         end_date,
-    );
+    )
+    .with_user_id(user.id);
 
     // Validate all nested key results upfront to prevent orphaned objectives on validation error
     if let Some(ref krs) = payload.key_results {
@@ -110,7 +112,7 @@ pub async fn create_objective(
         }
     }
 
-    repo.create_objective(&objective)
+    repo.create_objective(user.id, &objective)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -137,11 +139,17 @@ pub async fn create_objective(
                 )
             };
 
-            repo.create_key_result(&kr)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-
-            created_krs.push(kr);
+            match repo.create_key_result(user.id, &kr).await {
+                Ok(()) => created_krs.push(kr),
+                Err(OkrRepositoryError::Habit(msg)) => return Err(ApiError::NotFound(msg)),
+                Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
+                    return Err(ApiError::NotFound(format!(
+                        "Objective {} not found",
+                        objective.id
+                    )));
+                }
+                Err(e) => return Err(ApiError::Internal(e.into())),
+            }
         }
     }
 
@@ -154,21 +162,68 @@ pub async fn create_objective(
     ))
 }
 
+/// Handler for `POST /api/v1/okrs/:id/key-results`
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if objective or linked habit not found, [`ApiError::BadRequest`] on validation error, or [`ApiError::Internal`] on db error.
+pub async fn create_kr(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(objective_id): Path<Uuid>,
+    Json(payload): Json<CreateKeyResultRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    payload
+        .validate()
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let kr = if let Some(linked_habit_id) = payload.linked_habit_id {
+        KeyResult::new_habit_linked(
+            objective_id,
+            linked_habit_id,
+            payload.title,
+            payload.target_value,
+            payload.unit.unwrap_or_else(|| "%".to_string()),
+            payload.weight.unwrap_or(1.0),
+        )
+    } else {
+        KeyResult::new_numeric(
+            objective_id,
+            payload.title,
+            payload.initial_value.unwrap_or(0.0),
+            payload.target_value,
+            payload.unit.unwrap_or_else(|| "%".to_string()),
+            payload.weight.unwrap_or(1.0),
+        )
+    };
+
+    let repo = SqliteOkrRepository::new(state.db);
+    match repo.create_key_result(user.id, &kr).await {
+        Ok(()) => Ok((StatusCode::CREATED, Json(kr))),
+        Err(OkrRepositoryError::ObjectiveNotFound(_)) => Err(ApiError::NotFound(format!(
+            "Objective {objective_id} not found"
+        ))),
+        Err(OkrRepositoryError::Habit(msg)) => Err(ApiError::NotFound(msg)),
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
+}
+
 /// Handler for `DELETE /api/v1/okrs/:id`
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] on db error.
+/// Returns [`ApiError::NotFound`] if objective not found or not owned by user, or [`ApiError::Internal`] on db error.
 pub async fn delete_objective(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteOkrRepository::new(state.db);
-    repo.delete_objective(id)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+    match repo.delete_objective(id, user.id).await {
+        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+        Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
+            Err(ApiError::NotFound(format!("Objective {id} not found")))
+        }
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
 }
 
 /// Constructs router for OKR endpoints
@@ -176,4 +231,5 @@ pub fn okr_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_okrs).post(create_objective))
         .route("/{id}", axum::routing::delete(delete_objective))
+        .route("/{id}/key-results", axum::routing::post(create_kr))
 }

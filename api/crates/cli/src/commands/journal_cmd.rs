@@ -41,7 +41,14 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
             };
 
             let meta = service
-                .create_or_update_entry(target_date, mood, tags, reflection_secret, &pass)
+                .create_or_update_entry(
+                    roubit_core::LOCAL_USER_ID,
+                    target_date,
+                    mood,
+                    tags,
+                    reflection_secret,
+                    &pass,
+                )
                 .await
                 .context("failed to encrypt and persist journal entry")?;
 
@@ -62,13 +69,13 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 let uuid = Uuid::parse_str(&id_str)
                     .with_context(|| format!("Invalid UUID for journal entry id: '{id_str}'"))?;
                 service
-                    .read_and_decrypt_entry(uuid, &pass)
+                    .read_and_decrypt_entry(uuid, roubit_core::LOCAL_USER_ID, &pass)
                     .await
                     .context("failed to decrypt journal entry with provided passphrase")?
             } else {
                 let target_date = parse_date_or_today(date.as_deref())?;
                 service
-                    .read_and_decrypt_entry_by_date(target_date, &pass)
+                    .read_and_decrypt_entry_by_date(target_date, roubit_core::LOCAL_USER_ID, &pass)
                     .await
                     .context("failed to decrypt journal entry with provided passphrase")?
                     .context("No journal entry found for target date")?
@@ -117,7 +124,7 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
             };
 
             let metadata_list = repo
-                .list_metadata_in_range(start, end)
+                .list_metadata_in_range(roubit_core::LOCAL_USER_ID, start, end)
                 .await
                 .context("failed to list journal metadata")?;
 
@@ -148,11 +155,11 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 .with_context(|| format!("Invalid date format '{date}'. Expected YYYY-MM-DD"))?;
 
             if let Some(entry) = repo
-                .get_entry_by_date(target_date)
+                .get_entry_by_date(target_date, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to check journal entry")?
             {
-                repo.delete_entry(entry.metadata.id)
+                repo.delete_entry(entry.metadata.id, roubit_core::LOCAL_USER_ID)
                     .await
                     .context("failed to delete journal entry")?;
                 if json {

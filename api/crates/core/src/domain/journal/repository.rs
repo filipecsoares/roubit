@@ -32,8 +32,11 @@ pub trait JournalRepository: Send + Sync {
     ///
     /// # Errors
     /// Returns [`JournalRepositoryError`] on database failure or serialization issues.
-    async fn save_entry(&self, entry: &EncryptedJournalEntry)
-        -> Result<(), JournalRepositoryError>;
+    async fn save_entry(
+        &self,
+        user_id: Uuid,
+        entry: &EncryptedJournalEntry,
+    ) -> Result<(), JournalRepositoryError>;
 
     /// Fetches an encrypted journal entry by its unique identifier.
     ///
@@ -42,6 +45,7 @@ pub trait JournalRepository: Send + Sync {
     async fn get_entry_by_id(
         &self,
         id: Uuid,
+        user_id: Uuid,
     ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError>;
 
     /// Fetches the most recent encrypted journal entry for a given calendar date.
@@ -51,6 +55,7 @@ pub trait JournalRepository: Send + Sync {
     async fn get_entry_by_date(
         &self,
         date: NaiveDate,
+        user_id: Uuid,
     ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError>;
 
     /// Lists open metadata for all journal entries within the inclusive date range `[start_date, end_date]`.
@@ -62,6 +67,7 @@ pub trait JournalRepository: Send + Sync {
     /// Returns [`JournalRepositoryError`] on database failure.
     async fn list_metadata_in_range(
         &self,
+        user_id: Uuid,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, JournalRepositoryError>;
@@ -71,7 +77,7 @@ pub trait JournalRepository: Send + Sync {
     /// # Errors
     /// Returns [`JournalRepositoryError::NotFound`] if no row was deleted, or [`JournalRepositoryError::Database`]
     /// on database failure.
-    async fn delete_entry(&self, id: Uuid) -> Result<(), JournalRepositoryError>;
+    async fn delete_entry(&self, id: Uuid, user_id: Uuid) -> Result<(), JournalRepositoryError>;
 }
 
 /// SQLite implementation of [`JournalRepository`].
@@ -98,16 +104,17 @@ impl SqliteJournalRepository {
 impl JournalRepository for SqliteJournalRepository {
     async fn save_entry(
         &self,
+        user_id: Uuid,
         entry: &EncryptedJournalEntry,
     ) -> Result<(), JournalRepositoryError> {
         let tags_json = entry.metadata.tags_to_json()?;
 
-        sqlx::query(
+        let result = sqlx::query(
             r"
             INSERT INTO journal_entries (
-                id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at
+                id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 entry_date = excluded.entry_date,
                 mood_score = excluded.mood_score,
@@ -116,9 +123,11 @@ impl JournalRepository for SqliteJournalRepository {
                 nonce = excluded.nonce,
                 encrypted_payload = excluded.encrypted_payload,
                 updated_at = excluded.updated_at
+            WHERE journal_entries.user_id = excluded.user_id
             ",
         )
         .bind(entry.metadata.id)
+        .bind(user_id)
         .bind(entry.metadata.entry_date)
         .bind(entry.metadata.mood_score.map(i64::from))
         .bind(&tags_json)
@@ -130,17 +139,23 @@ impl JournalRepository for SqliteJournalRepository {
         .execute(&self.pool)
         .await?;
 
+        if result.rows_affected() == 0 {
+            return Err(JournalRepositoryError::NotFound(entry.metadata.id));
+        }
+
         Ok(())
     }
 
     async fn get_entry_by_id(
         &self,
         id: Uuid,
+        user_id: Uuid,
     ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError> {
         let entry = sqlx::query_as::<_, EncryptedJournalEntry>(
-            "SELECT * FROM journal_entries WHERE id = ?",
+            "SELECT * FROM journal_entries WHERE id = ? AND user_id = ?",
         )
         .bind(id)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -150,11 +165,13 @@ impl JournalRepository for SqliteJournalRepository {
     async fn get_entry_by_date(
         &self,
         date: NaiveDate,
+        user_id: Uuid,
     ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError> {
         let entry = sqlx::query_as::<_, EncryptedJournalEntry>(
-            "SELECT * FROM journal_entries WHERE entry_date = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM journal_entries WHERE entry_date = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1",
         )
         .bind(date)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -163,17 +180,19 @@ impl JournalRepository for SqliteJournalRepository {
 
     async fn list_metadata_in_range(
         &self,
+        user_id: Uuid,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, JournalRepositoryError> {
         let metadata = sqlx::query_as::<_, JournalMetadata>(
             r"
-            SELECT id, entry_date, mood_score, tags, LENGTH(encrypted_payload) as ciphertext_bytes_len, created_at, updated_at
+            SELECT id, user_id, entry_date, mood_score, tags, LENGTH(encrypted_payload) as ciphertext_bytes_len, created_at, updated_at
             FROM journal_entries
-            WHERE entry_date BETWEEN ? AND ?
+            WHERE user_id = ? AND entry_date BETWEEN ? AND ?
             ORDER BY entry_date DESC, created_at DESC
             ",
         )
+        .bind(user_id)
         .bind(start_date)
         .bind(end_date)
         .fetch_all(&self.pool)
@@ -182,9 +201,10 @@ impl JournalRepository for SqliteJournalRepository {
         Ok(metadata)
     }
 
-    async fn delete_entry(&self, id: Uuid) -> Result<(), JournalRepositoryError> {
-        let result = sqlx::query("DELETE FROM journal_entries WHERE id = ?")
+    async fn delete_entry(&self, id: Uuid, user_id: Uuid) -> Result<(), JournalRepositoryError> {
+        let result = sqlx::query("DELETE FROM journal_entries WHERE id = ? AND user_id = ?")
             .bind(id)
+            .bind(user_id)
             .execute(&self.pool)
             .await?;
 
@@ -222,19 +242,24 @@ mod tests {
 
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool);
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
         let entry = mock_entry(date, Some(5), vec!["productivity".to_string()]);
         let entry_id = entry.metadata.id;
 
         // 1. Save entry
-        repo.save_entry(&entry).await.unwrap();
+        repo.save_entry(user_id, &entry).await.unwrap();
 
         // 2. Fetch by ID
-        let fetched = repo.get_entry_by_id(entry_id).await.unwrap();
+        let fetched = repo.get_entry_by_id(entry_id, user_id).await.unwrap();
         assert!(fetched.is_some());
         let fetched = fetched.unwrap();
         assert_eq!(fetched.metadata.id, entry_id);
+        assert_eq!(fetched.metadata.user_id, Some(user_id));
         assert_eq!(fetched.metadata.entry_date, date);
         assert_eq!(fetched.metadata.mood_score, Some(5));
         assert_eq!(fetched.salt, entry.salt);
@@ -242,7 +267,7 @@ mod tests {
         assert_eq!(fetched.encrypted_payload, entry.encrypted_payload);
 
         // 3. Fetch by Date
-        let fetched_by_date = repo.get_entry_by_date(date).await.unwrap();
+        let fetched_by_date = repo.get_entry_by_date(date, user_id).await.unwrap();
         assert!(fetched_by_date.is_some());
         assert_eq!(fetched_by_date.unwrap().metadata.id, entry_id);
 
@@ -253,9 +278,13 @@ mod tests {
         updated_entry.metadata.updated_at = Utc::now();
         updated_entry.encrypted_payload = vec![9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6];
 
-        repo.save_entry(&updated_entry).await.unwrap();
+        repo.save_entry(user_id, &updated_entry).await.unwrap();
 
-        let refetched = repo.get_entry_by_id(entry_id).await.unwrap().unwrap();
+        let refetched = repo
+            .get_entry_by_id(entry_id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(refetched.metadata.mood_score, Some(4));
         assert_eq!(
             refetched.metadata.tags,
@@ -264,12 +293,12 @@ mod tests {
         assert_eq!(refetched.encrypted_payload, updated_entry.encrypted_payload);
 
         // 5. Delete entry
-        repo.delete_entry(entry_id).await.unwrap();
-        let after_delete = repo.get_entry_by_id(entry_id).await.unwrap();
+        repo.delete_entry(entry_id, user_id).await.unwrap();
+        let after_delete = repo.get_entry_by_id(entry_id, user_id).await.unwrap();
         assert!(after_delete.is_none());
 
         // 6. Delete again returns NotFound
-        let delete_err = repo.delete_entry(entry_id).await.unwrap_err();
+        let delete_err = repo.delete_entry(entry_id, user_id).await.unwrap_err();
         match delete_err {
             JournalRepositoryError::NotFound(id) => assert_eq!(id, entry_id),
             other => panic!("Expected NotFound error, got: {other:?}"),
@@ -285,6 +314,10 @@ mod tests {
 
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         let repo = SqliteJournalRepository::new(pool);
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
         let d1 = NaiveDate::from_ymd_opt(2026, 10, 25).unwrap();
         let d2 = NaiveDate::from_ymd_opt(2026, 10, 27).unwrap();
@@ -296,12 +329,12 @@ mod tests {
         let e3 = mock_entry(d3, Some(5), vec!["super".to_string()]);
         let e_out = mock_entry(d_outside, Some(2), vec!["late".to_string()]);
 
-        repo.save_entry(&e1).await.unwrap();
-        repo.save_entry(&e2).await.unwrap();
-        repo.save_entry(&e3).await.unwrap();
-        repo.save_entry(&e_out).await.unwrap();
+        repo.save_entry(user_id, &e1).await.unwrap();
+        repo.save_entry(user_id, &e2).await.unwrap();
+        repo.save_entry(user_id, &e3).await.unwrap();
+        repo.save_entry(user_id, &e_out).await.unwrap();
 
-        let metadata_list = repo.list_metadata_in_range(d1, d3).await.unwrap();
+        let metadata_list = repo.list_metadata_in_range(user_id, d1, d3).await.unwrap();
 
         assert_eq!(metadata_list.len(), 3);
         // Ordered by entry_date DESC
@@ -312,5 +345,57 @@ mod tests {
 
         assert_eq!(metadata_list[1].entry_date, d2);
         assert_eq!(metadata_list[2].entry_date, d1);
+    }
+
+    #[tokio::test]
+    async fn test_journal_multi_tenant_isolation() {
+        let pool = SqlitePoolOptions::new()
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let repo = SqliteJournalRepository::new(pool);
+
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_a)
+            .await
+            .unwrap();
+        crate::domain::seed_test_user(repo.pool(), user_b)
+            .await
+            .unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
+
+        let entry_a = mock_entry(date, Some(5), vec!["user_a".to_string()]);
+        let entry_id_a = entry_a.metadata.id;
+
+        repo.save_entry(user_a, &entry_a).await.unwrap();
+
+        // User B cannot fetch User A's entry by ID
+        let fetched_b = repo.get_entry_by_id(entry_id_a, user_b).await.unwrap();
+        assert!(fetched_b.is_none());
+
+        // User B cannot fetch User A's entry by date
+        let fetched_by_date_b = repo.get_entry_by_date(date, user_b).await.unwrap();
+        assert!(fetched_by_date_b.is_none());
+
+        // User B's list_metadata_in_range is empty
+        let list_b = repo
+            .list_metadata_in_range(user_b, date, date)
+            .await
+            .unwrap();
+        assert_eq!(list_b.len(), 0);
+
+        // User B cannot delete User A's entry
+        let delete_err = repo.delete_entry(entry_id_a, user_b).await.unwrap_err();
+        match delete_err {
+            JournalRepositoryError::NotFound(id) => assert_eq!(id, entry_id_a),
+            other => panic!("Expected NotFound error, got: {other:?}"),
+        }
+
+        // User A's entry still intact
+        let fetched_a = repo.get_entry_by_id(entry_id_a, user_a).await.unwrap();
+        assert!(fetched_a.is_some());
     }
 }

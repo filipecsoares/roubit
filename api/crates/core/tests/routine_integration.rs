@@ -14,8 +14,9 @@ use std::time::Duration;
 
 use chrono::{NaiveDate, NaiveTime};
 use roubit_core::domain::{
-    create_sqlite_pool, BlockStatus, Routine, RoutineProgressTracker, RoutineRepository,
-    SqliteRoutineRepository, TimeBlock, TimeBlockValidationError, TimeBlockValidator,
+    create_sqlite_pool, seed_test_user, BlockStatus, Routine, RoutineProgressTracker,
+    RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository, TimeBlock,
+    TimeBlockValidationError, TimeBlockValidator,
 };
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -24,7 +25,7 @@ use uuid::Uuid;
 const TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Initializes an isolated in-memory SQLite database repository with all migrations applied.
-async fn setup_test_db() -> SqliteRoutineRepository {
+async fn setup_test_db() -> (SqliteRoutineRepository, Uuid) {
     let pool = create_sqlite_pool("sqlite::memory:")
         .await
         .expect("pool creation must succeed");
@@ -34,7 +35,12 @@ async fn setup_test_db() -> SqliteRoutineRepository {
         .await
         .expect("migrations must succeed");
 
-    SqliteRoutineRepository::new(pool)
+    let user_id = Uuid::new_v4();
+    seed_test_user(&pool, user_id)
+        .await
+        .expect("seed user must succeed");
+
+    (SqliteRoutineRepository::new(pool), user_id)
 }
 
 fn create_time_block(
@@ -56,10 +62,11 @@ fn create_time_block(
 #[tokio::test]
 async fn test_routine_full_lifecycle_and_adherence_reporting() {
     timeout(TEST_TIMEOUT, async {
-        let repo = setup_test_db().await;
+        let (repo, user_id) = setup_test_db().await;
 
         // 1. Create Routine entity
-        let routine = Routine::new("Workday Routine", Some("Focus day template".into()));
+        let routine = Routine::new("Workday Routine", Some("Focus day template".into()))
+            .with_user_id(user_id);
         let routine_id = routine.id;
 
         // 2. Define 4 consecutive time blocks
@@ -81,13 +88,13 @@ async fn test_routine_full_lifecycle_and_adherence_reporting() {
             .expect("schedule validation must pass for consecutive blocks");
 
         // 4. Atomic transaction persistence
-        repo.create_routine_with_blocks(&routine, &blocks)
+        repo.create_routine_with_blocks(user_id, &routine, &blocks)
             .await
             .expect("routine creation with blocks must succeed");
 
         // 5. Verify persisted blocks
         let fetched_blocks = repo
-            .list_blocks_for_routine(routine_id)
+            .list_blocks_for_routine(routine_id, user_id)
             .await
             .expect("list blocks must succeed");
         assert_eq!(fetched_blocks.len(), 4);
@@ -100,6 +107,7 @@ async fn test_routine_full_lifecycle_and_adherence_reporting() {
 
         repo.log_block_status(
             block_1_id,
+            user_id,
             target_date,
             BlockStatus::Completed,
             Some("Completed morning planning smoothly".into()),
@@ -108,7 +116,7 @@ async fn test_routine_full_lifecycle_and_adherence_reporting() {
         .expect("log block status must succeed");
 
         let log_1 = repo
-            .get_daily_log(block_1_id, target_date)
+            .get_daily_log(block_1_id, user_id, target_date)
             .await
             .expect("fetch log must succeed")
             .expect("log entry must exist");
@@ -193,9 +201,9 @@ async fn test_conflict_prevention_and_overlap_rejection() {
 #[tokio::test]
 async fn test_cascade_deletion_removes_blocks_and_daily_logs() {
     timeout(TEST_TIMEOUT, async {
-        let repo = setup_test_db().await;
+        let (repo, user_id) = setup_test_db().await;
 
-        let routine = Routine::new("Temporary Routine", None);
+        let routine = Routine::new("Temporary Routine", None).with_user_id(user_id);
         let routine_id = routine.id;
 
         let blocks = vec![
@@ -203,7 +211,7 @@ async fn test_cascade_deletion_removes_blocks_and_daily_logs() {
             create_time_block(routine_id, "Block Two", "09:00:00", "10:00:00", 2),
         ];
 
-        repo.create_routine_with_blocks(&routine, &blocks)
+        repo.create_routine_with_blocks(user_id, &routine, &blocks)
             .await
             .expect("routine creation must succeed");
 
@@ -212,38 +220,43 @@ async fn test_cascade_deletion_removes_blocks_and_daily_logs() {
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).expect("valid date");
 
         // Log execution for both blocks
-        repo.log_block_status(block_1_id, date, BlockStatus::Completed, None)
+        repo.log_block_status(block_1_id, user_id, date, BlockStatus::Completed, None)
             .await
             .expect("log block 1 must succeed");
-        repo.log_block_status(block_2_id, date, BlockStatus::Skipped, None)
+        repo.log_block_status(block_2_id, user_id, date, BlockStatus::Skipped, None)
             .await
             .expect("log block 2 must succeed");
 
         // Verify records exist before cascade
         let initial_blocks = repo
-            .list_blocks_for_routine(routine_id)
+            .list_blocks_for_routine(routine_id, user_id)
             .await
             .expect("list blocks succeeds");
         assert_eq!(initial_blocks.len(), 2);
 
         // Delete parent routine
-        repo.delete_routine(routine_id)
+        repo.delete_routine(routine_id, user_id)
             .await
             .expect("delete routine succeeds");
 
         // 1. Verify routine is gone
         let fetched_routine = repo
-            .get_routine_by_id(routine_id)
+            .get_routine_by_id(routine_id, user_id)
             .await
             .expect("fetch succeeds");
         assert!(fetched_routine.is_none());
 
-        // 2. Verify associated blocks are gone
-        let remaining_blocks = repo
-            .list_blocks_for_routine(routine_id)
-            .await
-            .expect("list blocks succeeds");
-        assert_eq!(remaining_blocks.len(), 0);
+        // 2. Verify associated blocks were cascade-deleted from database
+        let remaining_blocks: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM time_blocks WHERE routine_id = ?")
+                .bind(routine_id)
+                .fetch_one(repo.pool())
+                .await
+                .expect("count blocks succeeds");
+        assert_eq!(remaining_blocks.0, 0);
+
+        let list_res = repo.list_blocks_for_routine(routine_id, user_id).await;
+        assert!(matches!(list_res, Err(RoutineRepositoryError::NotFound(_))));
 
         // 3. Verify associated daily routine logs were cascaded
         let logs_count: (i64,) =
@@ -266,15 +279,15 @@ async fn test_cascade_deletion_removes_blocks_and_daily_logs() {
 #[tokio::test]
 async fn test_idempotent_daily_routine_logging_and_status_transitions() {
     timeout(TEST_TIMEOUT, async {
-        let repo = setup_test_db().await;
+        let (repo, user_id) = setup_test_db().await;
 
-        let routine = Routine::new("Daily Standup Routine", None);
+        let routine = Routine::new("Daily Standup Routine", None).with_user_id(user_id);
         let routine_id = routine.id;
         let blocks = vec![create_time_block(
             routine_id, "Standup", "09:00:00", "09:30:00", 1,
         )];
 
-        repo.create_routine_with_blocks(&routine, &blocks)
+        repo.create_routine_with_blocks(user_id, &routine, &blocks)
             .await
             .expect("routine creation succeeds");
 
@@ -284,6 +297,7 @@ async fn test_idempotent_daily_routine_logging_and_status_transitions() {
         // 1. Start execution -> InProgress
         repo.log_block_status(
             block_id,
+            user_id,
             date,
             BlockStatus::InProgress,
             Some("Started standup discussion".into()),
@@ -292,7 +306,7 @@ async fn test_idempotent_daily_routine_logging_and_status_transitions() {
         .expect("log in_progress succeeds");
 
         let log_in_progress = repo
-            .get_daily_log(block_id, date)
+            .get_daily_log(block_id, user_id, date)
             .await
             .expect("fetch log succeeds")
             .expect("log entry exists");
@@ -310,6 +324,7 @@ async fn test_idempotent_daily_routine_logging_and_status_transitions() {
         // 2. Complete execution on the same date with updated note (idempotent upsert)
         repo.log_block_status(
             block_id,
+            user_id,
             date,
             BlockStatus::Completed,
             Some("Standup concluded with team alignment".into()),
@@ -318,7 +333,7 @@ async fn test_idempotent_daily_routine_logging_and_status_transitions() {
         .expect("log completed succeeds");
 
         let log_completed = repo
-            .get_daily_log(block_id, date)
+            .get_daily_log(block_id, user_id, date)
             .await
             .expect("fetch log succeeds")
             .expect("log entry exists");
@@ -356,32 +371,88 @@ async fn test_idempotent_daily_routine_logging_and_status_transitions() {
 #[tokio::test]
 async fn test_active_routine_switching() {
     timeout(TEST_TIMEOUT, async {
-        let repo = setup_test_db().await;
+        let (repo, user_id) = setup_test_db().await;
 
-        let routine_a = Routine::new("Routine A", None);
-        let routine_b = Routine::new("Routine B", None);
+        let routine_a = Routine::new("Routine A", None).with_user_id(user_id);
+        let routine_b = Routine::new("Routine B", None).with_user_id(user_id);
 
-        repo.create_routine(&routine_a).await.expect("create A");
-        repo.create_routine(&routine_b).await.expect("create B");
+        repo.create_routine(user_id, &routine_a)
+            .await
+            .expect("create A");
+        repo.create_routine(user_id, &routine_b)
+            .await
+            .expect("create B");
 
         // Activate Routine A exclusively
-        repo.set_active_routine(routine_a.id)
+        repo.set_active_routine(routine_a.id, user_id)
             .await
             .expect("set active A");
 
         let active = repo
-            .get_active_routine()
+            .get_active_routine(user_id)
             .await
             .expect("get active")
             .expect("active exists");
         assert_eq!(active.id, routine_a.id);
 
         let fetched_b = repo
-            .get_routine_by_id(routine_b.id)
+            .get_routine_by_id(routine_b.id, user_id)
             .await
             .expect("fetch B")
             .expect("B exists");
         assert!(!fetched_b.is_active, "Routine B should be deactivated");
+    })
+    .await
+    .expect("test execution completed within timeout");
+}
+
+#[tokio::test]
+async fn test_routine_multi_tenant_isolation() {
+    timeout(TEST_TIMEOUT, async {
+        let pool = create_sqlite_pool("sqlite::memory:")
+            .await
+            .expect("pool creation must succeed");
+
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("migrations must succeed");
+
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+        seed_test_user(&pool, user_a).await.expect("seed user A");
+        seed_test_user(&pool, user_b).await.expect("seed user B");
+
+        let repo = SqliteRoutineRepository::new(pool);
+
+        let routine_a = Routine::new("User A Routine", None).with_user_id(user_a);
+        let routine_a_id = routine_a.id;
+        let blocks = vec![create_time_block(
+            routine_a_id,
+            "Block A",
+            "09:00:00",
+            "10:00:00",
+            1,
+        )];
+
+        repo.create_routine_with_blocks(user_a, &routine_a, &blocks)
+            .await
+            .expect("create routine with blocks for user A");
+
+        // User B cannot see User A's active routine
+        let active_b = repo
+            .get_active_routine(user_b)
+            .await
+            .expect("get active for user B");
+        assert!(active_b.is_none());
+
+        // User B cannot list blocks for User A's routine (rejected with NotFound)
+        let blocks_b = repo.list_blocks_for_routine(routine_a_id, user_b).await;
+        assert!(matches!(blocks_b, Err(RoutineRepositoryError::NotFound(_))));
+
+        // User B cannot delete User A's routine
+        let delete_b = repo.delete_routine(routine_a_id, user_b).await;
+        assert!(matches!(delete_b, Err(RoutineRepositoryError::NotFound(_))));
     })
     .await
     .expect("test execution completed within timeout");

@@ -22,11 +22,11 @@
 | **09. Frontend SPA (Vue 3)** | 6 | 6 | 0 | 0 | 🟢 Concluído |
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
-| **12. Multi-Tenancy & Data Isolation** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **13. Habit Streak Performance & Cache** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **14. Real-Time Notifications & SSE** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **50** | **0** | **16** | **75.8%** |
+| **TOTAL** | **66** | **54** | **0** | **12** | **81.8%** |
 
 ---
 
@@ -151,10 +151,10 @@
 ### Feature 12: Multi-Tenancy & Data Isolation
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **12.1** | Migrações de Banco Multi-Tenancy (SQLite & PG) | [activity-01-database-migrations-multi-tenancy.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-01-database-migrations-multi-tenancy.prompt) | ⚪ NÃO INICIADO | — |
-| **12.2** | Scoping de User ID nos Repositórios (`roubit-core`) | [activity-02-repositories-user-scoping.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-02-repositories-user-scoping.prompt) | ⚪ NÃO INICIADO | — |
-| **12.3** | Propagação de Usuário nos Controllers (`roubit-server`) | [activity-03-controllers-auth-user-propagation.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-03-controllers-auth-user-propagation.prompt) | ⚪ NÃO INICIADO | — |
-| **12.4** | Testes de Isolamento Multi-Tenant & IDOR | [activity-04-multi-tenant-security-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-04-multi-tenant-security-integration-tests.prompt) | ⚪ NÃO INICIADO | — |
+| **12.1** | Migrações de Banco Multi-Tenancy (SQLite & PG) | [activity-01-database-migrations-multi-tenancy.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-01-database-migrations-multi-tenancy.prompt) | 🟢 CONCLUÍDO | 2026-11-01 |
+| **12.2** | Scoping de User ID nos Repositórios (`roubit-core`) | [activity-02-repositories-user-scoping.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-02-repositories-user-scoping.prompt) | 🟢 CONCLUÍDO | 2026-11-01 |
+| **12.3** | Propagação de Usuário nos Controllers (`roubit-server`) | [activity-03-controllers-auth-user-propagation.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-03-controllers-auth-user-propagation.prompt) | 🟢 CONCLUÍDO | 2026-11-01 |
+| **12.4** | Testes de Isolamento Multi-Tenant & IDOR | [activity-04-multi-tenant-security-integration-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/12-multi-tenancy/activity-04-multi-tenant-security-integration-tests.prompt) | 🟢 CONCLUÍDO | 2026-11-01 |
 
 ---
 

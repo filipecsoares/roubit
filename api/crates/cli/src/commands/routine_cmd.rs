@@ -22,7 +22,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
         RoutineSubcommands::List { date } => {
             let target_date = parse_date_or_today(date.as_deref())?;
             let routine_opt = repo
-                .get_active_routine()
+                .get_active_routine(roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to fetch active routine")?;
 
@@ -36,14 +36,14 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
             };
 
             let blocks = repo
-                .list_blocks_for_routine(routine.id)
+                .list_blocks_for_routine(routine.id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to list blocks for routine")?;
 
             let mut block_statuses = Vec::new();
             for block in &blocks {
                 let log_opt = repo
-                    .get_daily_log(block.id, target_date)
+                    .get_daily_log(block.id, roubit_core::LOCAL_USER_ID, target_date)
                     .await
                     .context("failed to fetch block log")?;
                 let status = log_opt.map_or(BlockStatus::Pending, |l| l.status);
@@ -131,6 +131,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
 
             let routine = roubit_core::Routine {
                 id: routine_id,
+                user_id: Some(roubit_core::LOCAL_USER_ID),
                 name,
                 description: None,
                 is_active: active,
@@ -138,12 +139,12 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                 updated_at: chrono::Utc::now(),
             };
 
-            repo.create_routine_with_blocks(&routine, &domain_blocks)
+            repo.create_routine_with_blocks(roubit_core::LOCAL_USER_ID, &routine, &domain_blocks)
                 .await
                 .context("failed to create routine")?;
 
             if active {
-                repo.set_active_routine(routine_id)
+                repo.set_active_routine(routine_id, roubit_core::LOCAL_USER_ID)
                     .await
                     .context("failed to set routine as active")?;
             }
@@ -169,7 +170,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
         RoutineSubcommands::Activate { routine_id } => {
             let id = Uuid::parse_str(&routine_id)
                 .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
-            repo.set_active_routine(id)
+            repo.set_active_routine(id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to activate routine")?;
             if json {
@@ -187,7 +188,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
         RoutineSubcommands::Delete { routine_id } => {
             let id = Uuid::parse_str(&routine_id)
                 .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
-            repo.delete_routine(id)
+            repo.delete_routine(id, roubit_core::LOCAL_USER_ID)
                 .await
                 .context("failed to delete routine")?;
             if json {
@@ -228,9 +229,15 @@ async fn update_block_status(
         .with_context(|| format!("Invalid UUID for block_id: '{block_id_str}'"))?;
     let target_date = parse_date_or_today(date_str)?;
 
-    repo.log_block_status(block_uuid, target_date, status, None)
-        .await
-        .context("failed to update time block status")?;
+    repo.log_block_status(
+        block_uuid,
+        roubit_core::LOCAL_USER_ID,
+        target_date,
+        status,
+        None,
+    )
+    .await
+    .context("failed to update time block status")?;
 
     if json {
         let response = serde_json::json!({

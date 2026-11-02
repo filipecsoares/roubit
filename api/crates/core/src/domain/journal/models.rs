@@ -41,6 +41,9 @@ pub struct JournalMetadata {
     /// Unique identifier for the journal entry.
     pub id: Uuid,
 
+    /// Unique identifier of the owner user account.
+    pub user_id: Option<Uuid>,
+
     /// Calendar date associated with this journal entry.
     pub entry_date: NaiveDate,
 
@@ -75,6 +78,7 @@ impl JournalMetadata {
         let now = Utc::now();
         Ok(Self {
             id: Uuid::new_v4(),
+            user_id: None,
             entry_date,
             mood_score,
             tags,
@@ -82,6 +86,13 @@ impl JournalMetadata {
             created_at: now,
             updated_at: now,
         })
+    }
+
+    /// Associates an owner `user_id` with this journal metadata instance.
+    #[must_use]
+    pub const fn with_user_id(mut self, user_id: Uuid) -> Self {
+        self.user_id = Some(user_id);
+        self
     }
 
     /// Validates that a mood score falls within the allowed 1..=5 range.
@@ -191,6 +202,7 @@ pub fn deserialize_tags(tags_json: &str) -> Result<Vec<String>, JournalModelErro
 impl<'r> FromRow<'r, SqliteRow> for JournalMetadata {
     fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
         let id: Uuid = row.try_get("id")?;
+        let user_id: Option<Uuid> = row.try_get("user_id").ok().flatten();
         let entry_date: NaiveDate = row.try_get("entry_date")?;
         let mood_score: Option<u8> = row
             .try_get::<Option<i64>, _>("mood_score")?
@@ -218,6 +230,7 @@ impl<'r> FromRow<'r, SqliteRow> for JournalMetadata {
 
         Ok(Self {
             id,
+            user_id,
             entry_date,
             mood_score,
             tags,
@@ -231,6 +244,7 @@ impl<'r> FromRow<'r, SqliteRow> for JournalMetadata {
 impl<'r> FromRow<'r, SqliteRow> for EncryptedJournalEntry {
     fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
         let id: Uuid = row.try_get("id")?;
+        let user_id: Option<Uuid> = row.try_get("user_id").ok().flatten();
         let entry_date: NaiveDate = row.try_get("entry_date")?;
         let mood_score: Option<u8> = row
             .try_get::<Option<i64>, _>("mood_score")?
@@ -261,6 +275,7 @@ impl<'r> FromRow<'r, SqliteRow> for EncryptedJournalEntry {
 
         let metadata = JournalMetadata {
             id,
+            user_id,
             entry_date,
             mood_score,
             tags,

@@ -59,52 +59,78 @@ pub async fn create_sqlite_pool(database_url: &str) -> Result<SqlitePool, sqlx::
 /// Abstract contract for routine and time-blocking persistence operations.
 #[async_trait]
 pub trait RoutineRepository: Send + Sync {
-    /// Inserts a new routine template.
-    async fn create_routine(&self, routine: &Routine) -> Result<(), RoutineRepositoryError>;
+    /// Inserts a new routine template for the specified user.
+    async fn create_routine(
+        &self,
+        user_id: Uuid,
+        routine: &Routine,
+    ) -> Result<(), RoutineRepositoryError>;
 
-    /// Atomically inserts a routine template alongside its initial time blocks within a single transaction.
+    /// Atomically inserts a routine template alongside its initial time blocks within a single transaction for the specified user.
     async fn create_routine_with_blocks(
         &self,
+        user_id: Uuid,
         routine: &Routine,
         blocks: &[TimeBlock],
     ) -> Result<(), RoutineRepositoryError>;
 
-    /// Retrieves a routine by its unique identifier.
-    async fn get_routine_by_id(&self, id: Uuid) -> Result<Option<Routine>, RoutineRepositoryError>;
+    /// Retrieves a routine by its unique identifier and user id.
+    async fn get_routine_by_id(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Routine>, RoutineRepositoryError>;
 
-    /// Retrieves the currently active routine template (most recently updated active routine).
-    async fn get_active_routine(&self) -> Result<Option<Routine>, RoutineRepositoryError>;
+    /// Lists all routines for the specified user.
+    async fn list_routines(&self, user_id: Uuid) -> Result<Vec<Routine>, RoutineRepositoryError>;
 
-    /// Marks a specific routine as active, optionally deactivating all other routines.
-    async fn set_active_routine(&self, id: Uuid) -> Result<(), RoutineRepositoryError>;
+    /// Retrieves the currently active routine template for the specified user.
+    async fn get_active_routine(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<Routine>, RoutineRepositoryError>;
 
-    /// Appends a new time block to a routine.
-    async fn add_time_block(&self, block: &TimeBlock) -> Result<(), RoutineRepositoryError>;
+    /// Marks a specific routine as active, deactivating all other routines owned by `user_id`.
+    async fn set_active_routine(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), RoutineRepositoryError>;
 
-    /// Lists all time blocks associated with a routine, ordered chronologically.
+    /// Appends a new time block to a routine owned by `user_id`.
+    async fn add_time_block(
+        &self,
+        block: &TimeBlock,
+        user_id: Uuid,
+    ) -> Result<(), RoutineRepositoryError>;
+
+    /// Lists all time blocks associated with a routine owned by `user_id`, ordered chronologically.
     async fn list_blocks_for_routine(
         &self,
         routine_id: Uuid,
+        user_id: Uuid,
     ) -> Result<Vec<TimeBlock>, RoutineRepositoryError>;
 
-    /// Upserts a daily execution check-in log for a time block on a specific date.
+    /// Upserts a daily execution check-in log for a time block on a specific date for a routine owned by `user_id`.
     async fn log_block_status(
         &self,
         block_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
         status: BlockStatus,
         notes: Option<String>,
     ) -> Result<(), RoutineRepositoryError>;
 
-    /// Retrieves the daily execution log for a specific block and date.
+    /// Retrieves the daily execution log for a specific block and date for a routine owned by `user_id`.
     async fn get_daily_log(
         &self,
         block_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
     ) -> Result<Option<DailyRoutineLog>, RoutineRepositoryError>;
 
-    /// Deletes a routine and cascades deletion to all associated time blocks and logs.
-    async fn delete_routine(&self, id: Uuid) -> Result<(), RoutineRepositoryError>;
+    /// Deletes a routine owned by `user_id` and cascades deletion to all associated time blocks and logs.
+    async fn delete_routine(&self, id: Uuid, user_id: Uuid) -> Result<(), RoutineRepositoryError>;
 }
 
 /// SQLite-backed implementation of [`RoutineRepository`].
@@ -128,15 +154,17 @@ impl SqliteRoutineRepository {
 
     async fn insert_routine_tx(
         tx: &mut Transaction<'_, Sqlite>,
+        user_id: Uuid,
         routine: &Routine,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
-            INSERT INTO routines (id, name, description, is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO routines (id, user_id, name, description, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ",
         )
         .bind(routine.id)
+        .bind(user_id)
         .bind(&routine.name)
         .bind(&routine.description)
         .bind(routine.is_active)
@@ -176,20 +204,25 @@ impl SqliteRoutineRepository {
 
 #[async_trait]
 impl RoutineRepository for SqliteRoutineRepository {
-    async fn create_routine(&self, routine: &Routine) -> Result<(), RoutineRepositoryError> {
+    async fn create_routine(
+        &self,
+        user_id: Uuid,
+        routine: &Routine,
+    ) -> Result<(), RoutineRepositoryError> {
         let mut tx = self.pool.begin().await?;
-        Self::insert_routine_tx(&mut tx, routine).await?;
+        Self::insert_routine_tx(&mut tx, user_id, routine).await?;
         tx.commit().await?;
         Ok(())
     }
 
     async fn create_routine_with_blocks(
         &self,
+        user_id: Uuid,
         routine: &Routine,
         blocks: &[TimeBlock],
     ) -> Result<(), RoutineRepositoryError> {
         let mut tx = self.pool.begin().await?;
-        Self::insert_routine_tx(&mut tx, routine).await?;
+        Self::insert_routine_tx(&mut tx, user_id, routine).await?;
 
         for block in blocks {
             Self::insert_block_tx(&mut tx, block).await?;
@@ -199,51 +232,85 @@ impl RoutineRepository for SqliteRoutineRepository {
         Ok(())
     }
 
-    async fn get_routine_by_id(&self, id: Uuid) -> Result<Option<Routine>, RoutineRepositoryError> {
+    async fn get_routine_by_id(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Routine>, RoutineRepositoryError> {
         let routine = sqlx::query_as::<_, Routine>(
             r"
-            SELECT id, name, description, is_active, created_at, updated_at
+            SELECT id, user_id, name, description, is_active, created_at, updated_at
             FROM routines
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             ",
         )
         .bind(id)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(routine)
     }
 
-    async fn get_active_routine(&self) -> Result<Option<Routine>, RoutineRepositoryError> {
+    async fn list_routines(&self, user_id: Uuid) -> Result<Vec<Routine>, RoutineRepositoryError> {
+        let routines = sqlx::query_as::<_, Routine>(
+            r"
+            SELECT id, user_id, name, description, is_active, created_at, updated_at
+            FROM routines
+            WHERE user_id = ?
+            ORDER BY created_at ASC
+            ",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(routines)
+    }
+
+    async fn get_active_routine(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<Routine>, RoutineRepositoryError> {
         let routine = sqlx::query_as::<_, Routine>(
             r"
-            SELECT id, name, description, is_active, created_at, updated_at
+            SELECT id, user_id, name, description, is_active, created_at, updated_at
             FROM routines
-            WHERE is_active = 1
+            WHERE is_active = 1 AND user_id = ?
             ORDER BY updated_at DESC
             LIMIT 1
             ",
         )
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(routine)
     }
 
-    async fn set_active_routine(&self, id: Uuid) -> Result<(), RoutineRepositoryError> {
+    async fn set_active_routine(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), RoutineRepositoryError> {
         let mut tx = self.pool.begin().await?;
 
-        // Deactivate all existing routines
-        sqlx::query("UPDATE routines SET is_active = 0 WHERE is_active = 1")
+        // Deactivate all existing routines for this user
+        sqlx::query("UPDATE routines SET is_active = 0 WHERE is_active = 1 AND user_id = ?")
+            .bind(user_id)
             .execute(&mut *tx)
             .await?;
 
-        // Activate selected routine
-        let rows_affected = sqlx::query("UPDATE routines SET is_active = 1 WHERE id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await?
-            .rows_affected();
+        // Activate selected routine for this user
+        let rows_affected = sqlx::query(
+            "UPDATE routines SET is_active = 1, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(chrono::Utc::now())
+        .bind(id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
 
         if rows_affected == 0 {
             return Err(RoutineRepositoryError::NotFound(id));
@@ -253,7 +320,16 @@ impl RoutineRepository for SqliteRoutineRepository {
         Ok(())
     }
 
-    async fn add_time_block(&self, block: &TimeBlock) -> Result<(), RoutineRepositoryError> {
+    async fn add_time_block(
+        &self,
+        block: &TimeBlock,
+        user_id: Uuid,
+    ) -> Result<(), RoutineRepositoryError> {
+        let _routine = self
+            .get_routine_by_id(block.routine_id, user_id)
+            .await?
+            .ok_or(RoutineRepositoryError::NotFound(block.routine_id))?;
+
         let mut tx = self.pool.begin().await?;
         Self::insert_block_tx(&mut tx, block).await?;
         tx.commit().await?;
@@ -263,7 +339,13 @@ impl RoutineRepository for SqliteRoutineRepository {
     async fn list_blocks_for_routine(
         &self,
         routine_id: Uuid,
+        user_id: Uuid,
     ) -> Result<Vec<TimeBlock>, RoutineRepositoryError> {
+        let _routine = self
+            .get_routine_by_id(routine_id, user_id)
+            .await?
+            .ok_or(RoutineRepositoryError::NotFound(routine_id))?;
+
         let blocks = sqlx::query_as::<_, TimeBlock>(
             r"
             SELECT id, routine_id, name, start_time, end_time, category, color_hex, order_index, created_at
@@ -282,10 +364,27 @@ impl RoutineRepository for SqliteRoutineRepository {
     async fn log_block_status(
         &self,
         block_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
         status: BlockStatus,
         notes: Option<String>,
     ) -> Result<(), RoutineRepositoryError> {
+        let exists = sqlx::query_scalar::<_, i64>(
+            r"
+            SELECT 1 FROM time_blocks tb
+            JOIN routines r ON tb.routine_id = r.id
+            WHERE tb.id = ? AND r.user_id = ?
+            ",
+        )
+        .bind(block_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if exists.is_none() {
+            return Err(RoutineRepositoryError::BlockNotFound(block_id));
+        }
+
         let log_id = Uuid::new_v4();
         let now = chrono::Utc::now();
         let started_at = if status == BlockStatus::InProgress {
@@ -326,16 +425,20 @@ impl RoutineRepository for SqliteRoutineRepository {
     async fn get_daily_log(
         &self,
         block_id: Uuid,
+        user_id: Uuid,
         date: NaiveDate,
     ) -> Result<Option<DailyRoutineLog>, RoutineRepositoryError> {
         let log = sqlx::query_as::<_, DailyRoutineLog>(
             r"
-            SELECT id, time_block_id, date, status, started_at, completed_at, notes
-            FROM daily_routine_logs
-            WHERE time_block_id = ? AND date = ?
+            SELECT dl.id, dl.time_block_id, dl.date, dl.status, dl.started_at, dl.completed_at, dl.notes
+            FROM daily_routine_logs dl
+            JOIN time_blocks tb ON dl.time_block_id = tb.id
+            JOIN routines r ON tb.routine_id = r.id
+            WHERE dl.time_block_id = ? AND r.user_id = ? AND dl.date = ?
             ",
         )
         .bind(block_id)
+        .bind(user_id)
         .bind(date)
         .fetch_optional(&self.pool)
         .await?;
@@ -343,9 +446,10 @@ impl RoutineRepository for SqliteRoutineRepository {
         Ok(log)
     }
 
-    async fn delete_routine(&self, id: Uuid) -> Result<(), RoutineRepositoryError> {
-        let rows_affected = sqlx::query("DELETE FROM routines WHERE id = ?")
+    async fn delete_routine(&self, id: Uuid, user_id: Uuid) -> Result<(), RoutineRepositoryError> {
+        let rows_affected = sqlx::query("DELETE FROM routines WHERE id = ? AND user_id = ?")
             .bind(id)
+            .bind(user_id)
             .execute(&self.pool)
             .await?
             .rows_affected();
@@ -380,35 +484,109 @@ mod tests {
     #[tokio::test]
     async fn test_sqlite_routine_crud() {
         let repo = setup_test_repo().await;
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
-        let routine = Routine::new("Morning Focus", Some("High performance morning".into()));
-        repo.create_routine(&routine)
+        let routine = Routine::new("Morning Focus", Some("High performance morning".into()))
+            .with_user_id(user_id);
+        repo.create_routine(user_id, &routine)
             .await
             .expect("create routine should succeed");
 
         let fetched = repo
-            .get_routine_by_id(routine.id)
+            .get_routine_by_id(routine.id, user_id)
             .await
             .expect("get routine should succeed")
             .expect("routine must be present");
 
         assert_eq!(fetched.name, "Morning Focus");
+        assert_eq!(fetched.user_id, Some(user_id));
         assert!(fetched.is_active);
 
         // Active routine query
         let active = repo
-            .get_active_routine()
+            .get_active_routine(user_id)
             .await
             .expect("get active routine should succeed")
             .expect("active routine must exist");
         assert_eq!(active.id, routine.id);
+
+        let list = repo.list_routines(user_id).await.expect("list routines");
+        assert_eq!(list.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_routine_multi_tenant_isolation() {
+        let repo = setup_test_repo().await;
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_a)
+            .await
+            .unwrap();
+        crate::domain::seed_test_user(repo.pool(), user_b)
+            .await
+            .unwrap();
+
+        let routine_a = Routine::new("User A Routine", None).with_user_id(user_a);
+        let block_a = TimeBlock::new(
+            routine_a.id,
+            "Block A",
+            NaiveTime::from_hms_opt(9, 0, 0).expect("time"),
+            NaiveTime::from_hms_opt(10, 0, 0).expect("time"),
+            1,
+        );
+        repo.create_routine_with_blocks(user_a, &routine_a, std::slice::from_ref(&block_a))
+            .await
+            .expect("create routine a");
+
+        // User B cannot see routine A
+        assert!(repo
+            .get_routine_by_id(routine_a.id, user_b)
+            .await
+            .expect("get")
+            .is_none());
+
+        // User B's routines list is empty
+        let b_routines = repo.list_routines(user_b).await.expect("list");
+        assert_eq!(b_routines.len(), 0);
+
+        // User B cannot fetch active routine of A
+        assert!(repo
+            .get_active_routine(user_b)
+            .await
+            .expect("active")
+            .is_none());
+
+        // User B cannot list blocks of routine A
+        let list_res = repo.list_blocks_for_routine(routine_a.id, user_b).await;
+        assert!(matches!(list_res, Err(RoutineRepositoryError::NotFound(_))));
+
+        // User B cannot log block status for block A
+        let date = NaiveDate::from_ymd_opt(2026, 11, 1).expect("date");
+        let log_res = repo
+            .log_block_status(block_a.id, user_b, date, BlockStatus::Completed, None)
+            .await;
+        assert!(matches!(
+            log_res,
+            Err(RoutineRepositoryError::BlockNotFound(_))
+        ));
+
+        // User B cannot delete routine A
+        let del_res = repo.delete_routine(routine_a.id, user_b).await;
+        assert!(matches!(del_res, Err(RoutineRepositoryError::NotFound(_))));
     }
 
     #[tokio::test]
     async fn test_sqlite_transactional_create_routine_with_blocks() {
         let repo = setup_test_repo().await;
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
-        let routine = Routine::new("Full Day Flow", None);
+        let routine = Routine::new("Full Day Flow", None).with_user_id(user_id);
         let start1 = NaiveTime::from_hms_opt(8, 0, 0).expect("valid time");
         let end1 = NaiveTime::from_hms_opt(9, 30, 0).expect("valid time");
         let start2 = NaiveTime::from_hms_opt(10, 0, 0).expect("valid time");
@@ -419,12 +597,12 @@ mod tests {
             TimeBlock::new(routine.id, "Deep Work", start2, end2, 2),
         ];
 
-        repo.create_routine_with_blocks(&routine, &blocks)
+        repo.create_routine_with_blocks(user_id, &routine, &blocks)
             .await
             .expect("transactional creation should succeed");
 
         let fetched_blocks = repo
-            .list_blocks_for_routine(routine.id)
+            .list_blocks_for_routine(routine.id, user_id)
             .await
             .expect("list blocks should succeed");
 
@@ -436,20 +614,29 @@ mod tests {
     #[tokio::test]
     async fn test_sqlite_log_block_status_upsert_idempotence() {
         let repo = setup_test_repo().await;
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
-        let routine = Routine::new("Evening Winddown", None);
+        let routine = Routine::new("Evening Winddown", None).with_user_id(user_id);
         let start = NaiveTime::from_hms_opt(21, 0, 0).expect("valid time");
         let end = NaiveTime::from_hms_opt(22, 0, 0).expect("valid time");
         let block = TimeBlock::new(routine.id, "Meditation", start, end, 1);
 
-        repo.create_routine(&routine).await.expect("routine insert");
-        repo.add_time_block(&block).await.expect("block insert");
+        repo.create_routine(user_id, &routine)
+            .await
+            .expect("routine insert");
+        repo.add_time_block(&block, user_id)
+            .await
+            .expect("block insert");
 
         let date = NaiveDate::from_ymd_opt(2026, 10, 29).expect("valid date");
 
         // 1. Log In Progress
         repo.log_block_status(
             block.id,
+            user_id,
             date,
             BlockStatus::InProgress,
             Some("Starting session".into()),
@@ -458,7 +645,7 @@ mod tests {
         .expect("log in progress");
 
         let log = repo
-            .get_daily_log(block.id, date)
+            .get_daily_log(block.id, user_id, date)
             .await
             .expect("get log")
             .expect("log exists");
@@ -469,6 +656,7 @@ mod tests {
         // 2. Upsert to Completed (same block and date)
         repo.log_block_status(
             block.id,
+            user_id,
             date,
             BlockStatus::Completed,
             Some("Finished peacefully".into()),
@@ -477,7 +665,7 @@ mod tests {
         .expect("log completed");
 
         let updated_log = repo
-            .get_daily_log(block.id, date)
+            .get_daily_log(block.id, user_id, date)
             .await
             .expect("get log")
             .expect("log exists");
@@ -489,32 +677,38 @@ mod tests {
     #[tokio::test]
     async fn test_sqlite_cascade_delete() {
         let repo = setup_test_repo().await;
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
 
-        let routine = Routine::new("Temporary Routine", None);
+        let routine = Routine::new("Temporary Routine", None).with_user_id(user_id);
         let start = NaiveTime::from_hms_opt(14, 0, 0).expect("valid time");
         let end = NaiveTime::from_hms_opt(15, 0, 0).expect("valid time");
         let block = TimeBlock::new(routine.id, "Quick Sync", start, end, 1);
 
-        repo.create_routine_with_blocks(&routine, &[block])
+        repo.create_routine_with_blocks(user_id, &routine, &[block])
             .await
             .expect("insert");
 
         let blocks_before = repo
-            .list_blocks_for_routine(routine.id)
+            .list_blocks_for_routine(routine.id, user_id)
             .await
             .expect("list");
         assert_eq!(blocks_before.len(), 1);
 
         // Delete parent routine
-        repo.delete_routine(routine.id).await.expect("delete");
-
-        let blocks_after = repo
-            .list_blocks_for_routine(routine.id)
+        repo.delete_routine(routine.id, user_id)
             .await
-            .expect("list");
-        assert_eq!(blocks_after.len(), 0);
+            .expect("delete");
 
-        let routine_opt = repo.get_routine_by_id(routine.id).await.expect("get");
+        let list_res = repo.list_blocks_for_routine(routine.id, user_id).await;
+        assert!(matches!(list_res, Err(RoutineRepositoryError::NotFound(_))));
+
+        let routine_opt = repo
+            .get_routine_by_id(routine.id, user_id)
+            .await
+            .expect("get");
         assert!(routine_opt.is_none());
     }
 }
