@@ -81,7 +81,23 @@ pub async fn list_habits(
 ) -> Result<Response, ApiError> {
     let user_id_str = user.id.to_string();
 
-    // 1. Check Redis cache first if Redis service is active
+    // 1. Check L1 in-memory summary cache first
+    {
+        let cache_read = state.summary_cache.read().await;
+        if let Some((cached_at, ref cached_json)) = cache_read.get(&user.id) {
+            if cached_at.elapsed() < std::time::Duration::from_secs(300) {
+                let res = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(axum::http::header::CONTENT_TYPE, "application/json")
+                    .header("x-cache", "HIT")
+                    .body(Body::from(cached_json.clone()))
+                    .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+                return Ok(res);
+            }
+        }
+    }
+
+    // 2. Check L2 Redis cache if available
     if let Some(redis) = &state.redis {
         match redis.get_cached_habit_summary(&user_id_str).await {
             Ok(Some(cached_json)) => {
@@ -89,8 +105,16 @@ pub async fn list_habits(
                     .status(StatusCode::OK)
                     .header(axum::http::header::CONTENT_TYPE, "application/json")
                     .header("x-cache", "HIT")
-                    .body(Body::from(cached_json))
+                    .body(Body::from(cached_json.clone()))
                     .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+
+                // Populate L1 cache from Redis hit
+                state
+                    .summary_cache
+                    .write()
+                    .await
+                    .insert(user.id, (std::time::Instant::now(), cached_json));
+
                 return Ok(res);
             }
             Ok(None) => {}
@@ -100,7 +124,7 @@ pub async fn list_habits(
         }
     }
 
-    // 2. Query SQLite
+    // 3. Query SQLite
     let repo = SqliteHabitRepository::new(state.db.clone());
     let habits = repo
         .list_active_habits(user.id)
@@ -138,9 +162,15 @@ pub async fn list_habits(
     let payload_bytes = serde_json::to_vec(&result)
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("Serialization error: {e}")))?;
 
-    // 3. Populate Redis cache if active
-    if let Some(redis) = &state.redis {
-        if let Ok(json_str) = std::str::from_utf8(&payload_bytes) {
+    // 4. Populate L1 and L2 caches
+    if let Ok(json_str) = std::str::from_utf8(&payload_bytes) {
+        state
+            .summary_cache
+            .write()
+            .await
+            .insert(user.id, (std::time::Instant::now(), json_str.to_string()));
+
+        if let Some(redis) = &state.redis {
             if let Err(err) = redis
                 .set_cached_habit_summary(&user_id_str, json_str, 300)
                 .await
@@ -196,6 +226,11 @@ pub async fn create_habit(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    // Invalidate L1 & L2 caches
+    {
+        let mut cache = state.summary_cache.write().await;
+        cache.remove(&user.id);
+    }
     if let Some(redis) = &state.redis {
         if let Err(err) = redis
             .invalidate_user_habits_cache(&user.id.to_string())
@@ -250,7 +285,11 @@ pub async fn record_checkin(
         tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
     }
 
-    // Invalidate Redis habit summary cache atomically on check-in
+    // Invalidate L1 & L2 habit summary cache atomically on check-in
+    {
+        let mut cache = state.summary_cache.write().await;
+        cache.remove(&user.id);
+    }
     if let Some(redis) = &state.redis {
         if let Err(err) = redis
             .invalidate_user_habits_cache(&user.id.to_string())
@@ -288,6 +327,11 @@ pub async fn delete_habit(
     let repo = SqliteHabitRepository::new(state.db);
     match repo.delete_habit(habit_id, user.id).await {
         Ok(()) => {
+            // Invalidate L1 & L2 caches
+            {
+                let mut cache = state.summary_cache.write().await;
+                cache.remove(&user.id);
+            }
             if let Some(redis) = &state.redis {
                 if let Err(err) = redis
                     .invalidate_user_habits_cache(&user.id.to_string())

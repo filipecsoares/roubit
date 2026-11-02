@@ -189,129 +189,142 @@ impl HabitRepository for SqliteHabitRepository {
         value: f64,
         is_increment: bool,
     ) -> Result<HabitLog, HabitRepositoryError> {
-        let mut tx = self.pool.begin().await?;
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;
 
-        let habit = sqlx::query_as::<_, Habit>(
-            r"
-            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
-            FROM habits
-            WHERE id = ? AND user_id = ?
-            ",
-        )
-        .bind(habit_id)
-        .bind(user_id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or(HabitRepositoryError::NotFound(habit_id))?;
-
-        // Check if there was an existing completed log for this date to avoid double-incrementing streak
-        let existing_log: Option<HabitLog> = sqlx::query_as(
-            r"
-            SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
-            FROM habit_logs
-            WHERE habit_id = ? AND log_date = ?
-            ",
-        )
-        .bind(habit_id)
-        .bind(date)
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
-
-        let log_id = Uuid::new_v4();
-        let now: DateTime<Utc> = Utc::now();
-        let target_value = habit.target_value;
-        let initial_completed = value >= target_value;
-
-        let log: HabitLog = if is_increment {
-            sqlx::query_as::<_, HabitLog>(
+        let res: Result<HabitLog, HabitRepositoryError> = async {
+            let habit = sqlx::query_as::<_, Habit>(
                 r"
-                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
-                VALUES (?, ?, ?, ?, ?, NULL, ?)
-                ON CONFLICT(habit_id, log_date) DO UPDATE SET
-                    actual_value = habit_logs.actual_value + excluded.actual_value,
-                    is_completed = (habit_logs.actual_value + excluded.actual_value >= ?),
-                    logged_at = excluded.logged_at
-                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
-                ",
-            )
-            .bind(log_id)
-            .bind(habit_id)
-            .bind(date)
-            .bind(value)
-            .bind(initial_completed)
-            .bind(now)
-            .bind(target_value)
-            .fetch_one(&mut *tx)
-            .await?
-        } else {
-            sqlx::query_as::<_, HabitLog>(
-                r"
-                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
-                VALUES (?, ?, ?, ?, ?, NULL, ?)
-                ON CONFLICT(habit_id, log_date) DO UPDATE SET
-                    actual_value = excluded.actual_value,
-                    is_completed = (excluded.actual_value >= ?),
-                    logged_at = excluded.logged_at
-                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
-                ",
-            )
-            .bind(log_id)
-            .bind(habit_id)
-            .bind(date)
-            .bind(value)
-            .bind(initial_completed)
-            .bind(now)
-            .bind(target_value)
-            .fetch_one(&mut *tx)
-            .await?
-        };
-
-        // Atomically update habit's denormalized streak when habit reaches completed state
-        if log.is_completed && !was_already_completed {
-            let last_completed_date: Option<NaiveDate> = sqlx::query_scalar(
-                r"
-                SELECT log_date
-                FROM habit_logs
-                WHERE habit_id = ? AND log_date < ? AND is_completed = 1
-                ORDER BY log_date DESC
-                LIMIT 1
-                ",
-            )
-            .bind(habit_id)
-            .bind(date)
-            .fetch_optional(&mut *tx)
-            .await?;
-
-            let (new_current_streak, new_longest_streak) =
-                StreakCalculator::update_streak_incremental(
-                    habit.current_streak,
-                    habit.longest_streak,
-                    last_completed_date,
-                    date,
-                    habit.frequency_days,
-                );
-
-            sqlx::query(
-                r"
-                UPDATE habits
-                SET current_streak = ?, longest_streak = ?, updated_at = ?
+                SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+                FROM habits
                 WHERE id = ? AND user_id = ?
                 ",
             )
-            .bind(new_current_streak)
-            .bind(new_longest_streak)
-            .bind(now)
             .bind(habit_id)
             .bind(user_id)
-            .execute(&mut *tx)
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
+            // Check if there was an existing completed log for this date to avoid double-incrementing streak
+            let existing_log: Option<HabitLog> = sqlx::query_as(
+                r"
+                SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                FROM habit_logs
+                WHERE habit_id = ? AND log_date = ?
+                ",
+            )
+            .bind(habit_id)
+            .bind(date)
+            .fetch_optional(&mut *conn)
             .await?;
+
+            let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
+
+            let log_id = Uuid::new_v4();
+            let now: DateTime<Utc> = Utc::now();
+            let target_value = habit.target_value;
+            let initial_completed = value >= target_value;
+
+            let log: HabitLog = if is_increment {
+                sqlx::query_as::<_, HabitLog>(
+                    r"
+                    INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                    VALUES (?, ?, ?, ?, ?, NULL, ?)
+                    ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                        actual_value = habit_logs.actual_value + excluded.actual_value,
+                        is_completed = (habit_logs.actual_value + excluded.actual_value >= ?),
+                        logged_at = excluded.logged_at
+                    RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                    ",
+                )
+                .bind(log_id)
+                .bind(habit_id)
+                .bind(date)
+                .bind(value)
+                .bind(initial_completed)
+                .bind(now)
+                .bind(target_value)
+                .fetch_one(&mut *conn)
+                .await?
+            } else {
+                sqlx::query_as::<_, HabitLog>(
+                    r"
+                    INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                    VALUES (?, ?, ?, ?, ?, NULL, ?)
+                    ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                        actual_value = excluded.actual_value,
+                        is_completed = (excluded.actual_value >= ?),
+                        logged_at = excluded.logged_at
+                    RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                    ",
+                )
+                .bind(log_id)
+                .bind(habit_id)
+                .bind(date)
+                .bind(value)
+                .bind(initial_completed)
+                .bind(now)
+                .bind(target_value)
+                .fetch_one(&mut *conn)
+                .await?
+            };
+
+            // Atomically update habit's denormalized streak when habit reaches completed state
+            if log.is_completed && !was_already_completed {
+                let last_completed_date: Option<NaiveDate> = sqlx::query_scalar(
+                    r"
+                    SELECT log_date
+                    FROM habit_logs
+                    WHERE habit_id = ? AND log_date < ? AND is_completed = 1
+                    ORDER BY log_date DESC
+                    LIMIT 1
+                    ",
+                )
+                .bind(habit_id)
+                .bind(date)
+                .fetch_optional(&mut *conn)
+                .await?;
+
+                let (new_current_streak, new_longest_streak) =
+                    StreakCalculator::update_streak_incremental(
+                        habit.current_streak,
+                        habit.longest_streak,
+                        last_completed_date,
+                        date,
+                        habit.frequency_days,
+                    );
+
+                sqlx::query(
+                    r"
+                    UPDATE habits
+                    SET current_streak = ?, longest_streak = ?, updated_at = ?
+                    WHERE id = ? AND user_id = ?
+                    ",
+                )
+                .bind(new_current_streak)
+                .bind(new_longest_streak)
+                .bind(now)
+                .bind(habit_id)
+                .bind(user_id)
+                .execute(&mut *conn)
+                .await?;
+            }
+
+            Ok(log)
         }
+        .await;
 
-        tx.commit().await?;
-
-        Ok(log)
+        match res {
+            Ok(log) => {
+                sqlx::query("COMMIT").execute(&mut *conn).await?;
+                Ok(log)
+            }
+            Err(e) => {
+                let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+                Err(e)
+            }
+        }
     }
 
     async fn get_logs_for_habit(

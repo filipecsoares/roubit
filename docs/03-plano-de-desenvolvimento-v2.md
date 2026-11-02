@@ -64,9 +64,9 @@ flowchart TD
 - [x] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
   - [x] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
   - [x] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).
-- [ ] **7.4 Benchmarks de Regressão e Validação de Throughput**
-  - [ ] Atualizar suíte de testes de carga em `api/tests/load_p99_benchmark.rs`.
-  - [ ] Comprovar redução no consumo de CPU e tempo de resposta em check-in com base histórica de 10.000 logs por usuário.
+- [x] **7.4 Benchmarks de Regressão e Validação de Throughput**
+  - [x] Atualizar suíte de testes de carga em `api/tests/load_p99_benchmark.rs`.
+  - [x] Comprovar redução no consumo de CPU e tempo de resposta em check-in com base histórica de 10.000 logs por usuário.
 
 ---
 
