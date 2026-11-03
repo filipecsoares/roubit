@@ -61,7 +61,7 @@ export const useHabitStore = defineStore('habit', () => {
       })
       // Update local habit streak in-place
       const idx = habits.value.findIndex((h) => h.habit.id === habitId)
-      if (idx !== -1) {
+      if (idx !== -1 && data?.streak) {
         habits.value[idx].streak = data.streak
       }
       return data
