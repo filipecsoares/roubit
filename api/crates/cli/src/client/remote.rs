@@ -13,7 +13,7 @@ use roubit_core::domain::{
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
-use super::{credentials::CredentialsManager, ClientError, RoubitClient};
+use super::{ClientError, RoubitClient};
 
 /// Client implementation connecting remotely to an Axum REST API over HTTP/HTTPS.
 #[derive(Debug, Clone)]
@@ -30,11 +30,10 @@ impl HttpClient {
     #[must_use]
     pub fn new(base_url: impl Into<String>, auth_token: Option<String>) -> Self {
         let trimmed_url = base_url.into().trim_end_matches('/').to_string();
-        let token = auth_token.or_else(CredentialsManager::load_token);
 
         Self {
             base_url: trimmed_url,
-            auth_token: token,
+            auth_token,
             client: Client::builder().build().unwrap_or_default(),
         }
     }

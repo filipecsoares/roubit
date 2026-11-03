@@ -195,6 +195,13 @@ roubit journal write --mood 5 --tags "focus,shipping"
 roubit journal read
 roubit journal delete --date 2026-10-30
 
+# 🌐 Remote Mode & Authentication (Feature 15)
+roubit auth login --url http://127.0.0.1:8080 --email user@example.com
+roubit auth status
+roubit habit list --remote http://127.0.0.1:8080
+roubit habit checkin <HABIT_ID> --value 1.0 --remote http://127.0.0.1:8080
+roubit auth logout
+
 # ⚙️ Migrate SQLite data to PostgreSQL
 roubit admin migrate-to-postgres \
   --from sqlite://roubit.db \
