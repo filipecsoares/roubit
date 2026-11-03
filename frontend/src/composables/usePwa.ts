@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { pendingSyncCount, isSyncing, syncOfflineQueue } from '@/services/offlineQueue'
 import { apiClient } from '@/services/api'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
@@ -12,12 +12,63 @@ export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
 }
 
-// Global deferred prompt captured across composable instances
+// Global shared state across composable instances
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null)
 const isInstallable = ref(false)
 const isInstalled = ref(false)
 const isOnline = ref(typeof window !== 'undefined' ? window.navigator.onLine : true)
 const recentlySynced = ref(false)
+
+function handleOnline() {
+  isOnline.value = true
+  syncOfflineQueue(apiClient).then((res) => {
+    if (res.synced > 0) {
+      recentlySynced.value = true
+      setTimeout(() => {
+        recentlySynced.value = false
+      }, 4000)
+    }
+  })
+}
+
+function handleOffline() {
+  isOnline.value = false
+}
+
+function handleBeforeInstallPrompt(e: Event) {
+  e.preventDefault()
+  deferredInstallPrompt.value = e as BeforeInstallPromptEvent
+  isInstallable.value = true
+}
+
+function handleAppInstalled() {
+  isInstalled.value = true
+  isInstallable.value = false
+  deferredInstallPrompt.value = null
+}
+
+let listenersAttached = false
+
+function initPwaWindowListeners(): void {
+  if (listenersAttached || typeof window === 'undefined') return
+  listenersAttached = true
+
+  // Check if running in standalone mode (installed PWA)
+  const isStandalone =
+    window.matchMedia?.('(display-mode: standalone)')?.matches ||
+    (window.navigator as any).standalone === true
+  if (isStandalone) {
+    isInstalled.value = true
+  }
+
+  window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.addEventListener('appinstalled', handleAppInstalled)
+}
+
+// Attach listeners immediately when module is loaded
+initPwaWindowListeners()
 
 export function usePwa() {
   const { needRefresh, updateServiceWorker } = useRegisterSW({
@@ -28,59 +79,6 @@ export function usePwa() {
     onOfflineReady() {
       // Offline cache ready
     },
-  })
-
-  function handleOnline() {
-    isOnline.value = true
-    syncOfflineQueue(apiClient).then((res) => {
-      if (res.synced > 0) {
-        recentlySynced.value = true
-        setTimeout(() => {
-          recentlySynced.value = false
-        }, 4000)
-      }
-    })
-  }
-
-  function handleOffline() {
-    isOnline.value = false
-  }
-
-  function handleBeforeInstallPrompt(e: Event) {
-    e.preventDefault()
-    deferredInstallPrompt.value = e as BeforeInstallPromptEvent
-    isInstallable.value = true
-  }
-
-  function handleAppInstalled() {
-    isInstalled.value = true
-    isInstallable.value = false
-    deferredInstallPrompt.value = null
-  }
-
-  onMounted(() => {
-    if (typeof window === 'undefined') return
-
-    // Check if running in standalone mode (installed PWA)
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true
-    if (isStandalone) {
-      isInstalled.value = true
-    }
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.addEventListener('appinstalled', handleAppInstalled)
-  })
-
-  onUnmounted(() => {
-    if (typeof window === 'undefined') return
-    window.removeEventListener('online', handleOnline)
-    window.removeEventListener('offline', handleOffline)
-    window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.removeEventListener('appinstalled', handleAppInstalled)
   })
 
   /**

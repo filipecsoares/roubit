@@ -75,8 +75,8 @@ export async function enqueueMutation(
     const store = tx.objectStore(STORE_NAME)
     const request = store.add(queued)
 
-    request.onsuccess = () => {
-      updatePendingCount()
+    request.onsuccess = async () => {
+      await updatePendingCount()
       resolve(queued)
     }
     request.onerror = () => reject(request.error)
@@ -107,8 +107,8 @@ export async function removeMutation(id: string): Promise<void> {
     const store = tx.objectStore(STORE_NAME)
     const request = store.delete(id)
 
-    request.onsuccess = () => {
-      updatePendingCount()
+    request.onsuccess = async () => {
+      await updatePendingCount()
       resolve()
     }
     request.onerror = () => reject(request.error)
@@ -141,8 +141,8 @@ export async function clearQueue(): Promise<void> {
     const store = tx.objectStore(STORE_NAME)
     const request = store.clear()
 
-    request.onsuccess = () => {
-      updatePendingCount()
+    request.onsuccess = async () => {
+      await updatePendingCount()
       resolve()
     }
     request.onerror = () => reject(request.error)
