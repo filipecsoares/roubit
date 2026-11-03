@@ -2,6 +2,7 @@
 
 use sqlx::SqlitePool;
 
+use super::credentials::CredentialsManager;
 use super::{ClientError, HttpClient, LocalClient, RoubitClient};
 
 /// Execution mode of the client.
@@ -30,23 +31,29 @@ impl ClientFactory {
     #[must_use]
     #[allow(clippy::option_if_let_else)]
     pub fn resolve_mode(remote_flag: Option<&str>, db_flag: Option<&str>) -> ClientMode {
+        let auth_token = || {
+            std::env::var("ROUBIT_AUTH_TOKEN")
+                .ok()
+                .or_else(CredentialsManager::load_token)
+        };
+
         if let Some(remote_url) = remote_flag.filter(|s| !s.trim().is_empty()) {
-            let auth_token = std::env::var("ROUBIT_AUTH_TOKEN").ok();
             ClientMode::Remote {
                 base_url: remote_url.to_string(),
-                auth_token,
+                auth_token: auth_token(),
             }
-        } else if let Ok(env_remote) = std::env::var("ROUBIT_REMOTE_URL") {
+        } else if let Ok(env_remote) =
+            std::env::var("ROUBIT_API_URL").or_else(|_| std::env::var("ROUBIT_REMOTE_URL"))
+        {
             let trimmed = env_remote.trim();
             if trimmed.is_empty() {
                 ClientMode::Local {
                     db_url: db_flag.map(ToString::to_string),
                 }
             } else {
-                let auth_token = std::env::var("ROUBIT_AUTH_TOKEN").ok();
                 ClientMode::Remote {
                     base_url: trimmed.to_string(),
-                    auth_token,
+                    auth_token: auth_token(),
                 }
             }
         } else {

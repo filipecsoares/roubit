@@ -3,29 +3,29 @@
 use anyhow::{Context, Result};
 use chrono::{Local, NaiveDate};
 use roubit_core::domain::{HabitRepository, SqliteHabitRepository, StreakCalculator};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::args::{HabitArgs, HabitSubcommands};
+use crate::client::RoubitClient;
 
 /// Executes habit commands.
 ///
 /// # Errors
-/// Returns an error if database access or serialization fails.
+/// Returns an error if client operation or serialization fails.
 #[allow(clippy::too_many_lines, clippy::option_if_let_else)]
-pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()> {
-    let repo = SqliteHabitRepository::new(pool.clone());
-
+pub async fn handle(args: HabitArgs, json: bool, client: &dyn RoubitClient) -> Result<()> {
     match args.action {
         HabitSubcommands::List { all } => {
             let habits = if all {
-                repo.list_all_habits(roubit_core::LOCAL_USER_ID)
+                client
+                    .list_habits()
                     .await
-                    .context("failed to list habits from database")?
+                    .context("failed to list habits")?
             } else {
-                repo.list_active_habits(roubit_core::LOCAL_USER_ID)
+                client
+                    .list_active_habits()
                     .await
-                    .context("failed to list habits from database")?
+                    .context("failed to list habits")?
             };
 
             if json {
@@ -40,7 +40,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                     .map(|h| {
                         let unit_str = h.unit.as_deref().unwrap_or("");
                         let target_desc = format!("{:.1} {unit_str}", h.target_value);
-                        (h.name.clone(), target_desc, 0, !h.is_archived)
+                        let streak_u32 = u32::try_from(h.current_streak.max(0)).unwrap_or(0);
+                        (h.name.clone(), target_desc, streak_u32, !h.is_archived)
                     })
                     .collect();
                 crate::ui::TerminalUi::render_habits_table(&rows);
@@ -60,24 +61,14 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 _ => roubit_core::HabitType::Binary,
             };
 
-            let habit = roubit_core::Habit {
-                id: Uuid::new_v4(),
-                user_id: Some(roubit_core::LOCAL_USER_ID),
-                name,
-                description,
-                habit_type,
-                target_value: target.unwrap_or(1.0),
-                unit,
-                frequency_days: 0b0111_1111,
-                is_archived: false,
-                current_streak: 0,
-                longest_streak: 0,
-                color_hex: "#10B981".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            };
-
-            repo.create_habit(roubit_core::LOCAL_USER_ID, &habit)
+            let habit = client
+                .create_habit(
+                    &name,
+                    habit_type,
+                    target.unwrap_or(1.0),
+                    unit.as_deref(),
+                    description.as_deref(),
+                )
                 .await
                 .context("failed to create habit")?;
 
@@ -94,7 +85,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
         HabitSubcommands::Archive { habit_id } => {
             let id = Uuid::parse_str(&habit_id)
                 .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
-            repo.archive_habit(id, roubit_core::LOCAL_USER_ID)
+            client
+                .archive_habit(id)
                 .await
                 .context("failed to archive habit")?;
             if json {
@@ -110,7 +102,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
         HabitSubcommands::Delete { habit_id } => {
             let id = Uuid::parse_str(&habit_id)
                 .with_context(|| format!("Invalid UUID: '{habit_id}'"))?;
-            repo.delete_habit(id, roubit_core::LOCAL_USER_ID)
+            client
+                .delete_habit(id)
                 .await
                 .context("failed to delete habit")?;
             if json {
@@ -130,14 +123,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
             let target_date = parse_date_or_today(date.as_deref())?;
             let checkin_val = value.unwrap_or(1.0);
 
-            let log = repo
-                .record_check_in(
-                    habit_uuid,
-                    roubit_core::LOCAL_USER_ID,
-                    target_date,
-                    checkin_val,
-                    false,
-                )
+            let log = client
+                .habit_checkin(habit_uuid, target_date, checkin_val)
                 .await
                 .context("failed to record habit check-in")?;
 
@@ -153,8 +140,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
         }
 
         HabitSubcommands::Streaks => {
-            let habits = repo
-                .list_active_habits(roubit_core::LOCAL_USER_ID)
+            let habits = client
+                .list_active_habits()
                 .await
                 .context("failed to list active habits for streaks")?;
 
@@ -162,13 +149,22 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
             let mut results = Vec::new();
 
             for h in &habits {
-                let start_date = today - chrono::Duration::days(365);
-                let logs = repo
-                    .get_logs_for_habit(h.id, roubit_core::LOCAL_USER_ID, start_date, today)
-                    .await
-                    .unwrap_or_default();
+                let metrics = if let Some(pool) = client.local_pool() {
+                    let repo = SqliteHabitRepository::new(pool.clone());
+                    let start_date = today - chrono::Duration::days(365);
+                    let logs = repo
+                        .get_logs_for_habit(h.id, roubit_core::LOCAL_USER_ID, start_date, today)
+                        .await
+                        .unwrap_or_default();
 
-                let metrics = StreakCalculator::calculate_for_habit(h, &logs, today);
+                    StreakCalculator::calculate_for_habit(h, &logs, today)
+                } else {
+                    roubit_core::StreakMetrics {
+                        current_streak: u32::try_from(h.current_streak.max(0)).unwrap_or(0),
+                        longest_streak: u32::try_from(h.longest_streak.max(0)).unwrap_or(0),
+                        is_active_today: false,
+                    }
+                };
                 results.push((h, metrics));
             }
 
