@@ -130,3 +130,12 @@ This directory organizes all engineering features for the Roubit project. Each f
 3. [Activity 03: Remote CLI Idempotency-Key & JWT Headers Injection](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt)
 4. [Activity 04: CLI Remote Mode Automated End-to-End Test Suite](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt)
 
+---
+
+### [16. Progressive Web App (PWA) & Offline-First App Shell](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell)
+1. [Activity 01: Web App Manifest & Service Worker Precaching](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-01-web-app-manifest-service-worker.prompt)
+2. [Activity 02: Offline Mutation Queue & Idempotent Sync Engine](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-02-offline-mutation-queue-idempotent-sync.prompt)
+3. [Activity 03: PWA UI, Network Status Indicator & Install Prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt)
+4. [Activity 04: PWA Offline Vitest Suite & Service Worker E2E Mocking](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-04-pwa-offline-vitest-suite.prompt)
+
+
