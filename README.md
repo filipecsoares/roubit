@@ -16,6 +16,24 @@
 
 ---
 
+## 📸 Screenshots & Main Flows
+
+<div align="center">
+
+| ⏱️ **Daily Focus & Routine Timeline** | ⚡ **Smart Habits, Streaks & 52-Week Heatmap** |
+| :---: | :---: |
+| ![Daily Focus Dashboard](docs/images/01_dashboard.png) | ![Habits & Consistency Heatmap](docs/images/02_habitos.png) |
+| *Chronological time blocks with real-time progress score* | *Atomic streaks, active counters and year-round momentum* |
+
+| 🔒 **Zero-Knowledge Encrypted Journal** | 📱 **PWA Authentication & Offline Engine** |
+| :---: | :---: |
+| ![Encrypted Journal Vault](docs/images/03_diario_vault.png) | ![PWA Login & Install](docs/images/00_login.png) |
+| *Client-side AES-256-GCM + Argon2id memory-safe vault* | *Installable PWA with automatic offline sync and Argon2id* |
+
+</div>
+
+---
+
 ## 🎯 Why Roubit?
 
 Most productivity setups are fragmented: a to-do list in one app, habit tracking in another, quarterly goals buried in spreadsheets, and private thoughts scattered across text files. This fragmentation creates friction, context-switching, and a disconnect between what you do each day and what you want to achieve long-term.
