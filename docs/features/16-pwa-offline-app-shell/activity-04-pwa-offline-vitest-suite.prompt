@@ -1,0 +1,34 @@
+# Activity: PWA Offline Queue Vitest Suite & Build Validation
+
+## 1. Objective & Context
+Construct an automated test suite verifying the offline mutation queue, FIFO replay sequence, zero-knowledge storage security invariants, and PWA composable reactivity in Vitest. Validate production build bundle size and Service Worker generation.
+
+- **Prerequisites:** Activities 16.1 through 16.3.
+- **Target Location:** `frontend/src/services/__tests__/offlineQueue.spec.ts`, `frontend/src/composables/__tests__/usePwa.spec.ts`.
+
+## 2. Technical Scope & Specifications
+- **Test Scenarios (`offlineQueue.spec.ts`):**
+  1. `enqueueMutation`: Correctly persists mutation in IndexedDB with original `Idempotency-Key` and timestamps.
+  2. `FIFO Replay`: Verifies that multiple queued mutations are drained in the exact chronological order they were recorded.
+  3. `Zero-Knowledge Security Invariant`: Scans IndexedDB records during encrypted journal saving to assert 0 plaintext bytes exist in the storage record.
+  4. `Network Error Interception`: Asserts that Axios network failures seamlessly transition into optimistic queue items instead of crashing UI.
+  5. `Queue Purging on Success`: Asserts items are cleanly removed from IndexedDB upon HTTP 200/201 response.
+- **Test Scenarios (`usePwa.spec.ts`):**
+  1. Detects `window.navigator.onLine` transitions between online and offline events.
+  2. Captures `beforeinstallprompt` event and exposes `installApp()`.
+  3. Updates `pendingSyncCount` reactively when items are enqueued or drained.
+- **Build & Bundle Validation:**
+  - `npm run build` runs `vue-tsc -b && vite build`.
+  - Confirms `dist/sw.js` and `dist/manifest.webmanifest` are emitted.
+  - Confirms Argon2id `.wasm` is included in the precache manifest.
+
+## 3. Implementation Steps
+1. Create `frontend/src/services/__tests__/offlineQueue.spec.ts` using `fake-indexeddb` or in-memory IDB mock.
+2. Create `frontend/src/composables/__tests__/usePwa.spec.ts`.
+3. Verify test runs with `npm run test`.
+4. Validate production build with `npm run build`.
+
+## 4. Definition of Done (DoD)
+- [ ] 100% of PWA and offline queue tests pass in Vitest.
+- [ ] Zero-knowledge security invariant is tested and mathematically verified in test suite.
+- [ ] Production build succeeds without TypeScript or bundling warnings.

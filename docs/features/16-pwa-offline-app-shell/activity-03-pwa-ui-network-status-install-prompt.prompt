@@ -1,0 +1,43 @@
+# Activity: PWA UI, Network Status Pill & Install Prompt
+
+## 1. Objective & Context
+Provide clear, premium user feedback for network connectivity changes, pending offline sync queues, available Service Worker updates, and native PWA installation prompts. Integrate the App Badging API to display pending daily habits on the application icon.
+
+- **Prerequisites:** Activities 16.1 and 16.2.
+- **Target Location:** `frontend/src/composables/usePwa.ts`, `frontend/src/components/pwa/`, `frontend/src/components/layout/AppNavbar.vue`.
+
+## 2. Technical Scope & Specifications
+- **Composable `usePwa`:**
+  - Reactive properties:
+    - `isOnline: Ref<boolean>`
+    - `isInstallable: Ref<boolean>`
+    - `isInstalled: Ref<boolean>`
+    - `needRefresh: Ref<boolean>`
+    - `pendingSyncCount: Ref<number>`
+  - Actions:
+    - `installApp(): Promise<boolean>` (triggers deferred `beforeinstallprompt`)
+    - `updateServiceWorker(): Promise<void>` (triggers Workbox `skipWaiting` / reload)
+    - `updateAppBadge(count: number): void` (`navigator.setAppBadge`)
+- **UI Components:**
+  1. **Network Status Pill in Navbar:**
+     - When offline or when `pendingSyncCount > 0`: Displays subtle amber pill: `Offline (3 pendentes)` with sync spinner when actively replaying.
+     - When back online and sync complete: briefly flashes green `Sincronizado`.
+  2. **Install Banner / Modal (`PwaInstallPrompt.vue`):**
+     - Elegantly designed card offering "Instalar Aplicativo Roubit" with benefits (Acesso offline, Notificações na tela inicial).
+     - Remember dismissal in `localStorage` to avoid nag fatigue.
+  3. **Update Notification Toast (`PwaUpdatePrompt.vue`):**
+     - Non-intrusive floating toast: `Nova versão disponível. [Atualizar agora]` invoking `updateServiceWorker()`.
+- **App Badging Integration:**
+  - In `HabitsView.vue` and `useHabitStore`: compute today's uncompleted habits and call `navigator.setAppBadge(uncompletedCount)`.
+
+## 3. Implementation Steps
+1. Create `frontend/src/composables/usePwa.ts`.
+2. Implement `frontend/src/components/pwa/PwaInstallPrompt.vue` and `PwaUpdatePrompt.vue`.
+3. Integrate network pill and install prompt trigger into `AppNavbar.vue` and `App.vue`.
+4. Connect habit store state changes to `navigator.setAppBadge`.
+
+## 4. Definition of Done (DoD)
+- [ ] Offline status pill displays accurately when network is disconnected.
+- [ ] App installation prompt triggers and handles user choice smoothly.
+- [ ] Service worker updates present non-blocking refresh toast.
+- [ ] App badge updates with pending habit counts on supported platforms.

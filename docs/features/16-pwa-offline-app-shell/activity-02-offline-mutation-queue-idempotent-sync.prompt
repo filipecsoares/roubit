@@ -1,0 +1,45 @@
+# Activity: Offline Mutation Queue & Idempotent Sync Engine
+
+## 1. Objective & Context
+Enable offline state mutations for habit check-ins, routine block completions, and encrypted reflections. When the client is offline or network fails, mutations are enqueued in an IndexedDB storage queue with their unique `Idempotency-Key`. When connectivity restores, mutations are replayed sequentially in FIFO order without duplicating logs or records.
+
+- **Prerequisites:** Activity 16.1 (Service Worker) and Feature 08 (Idempotency middleware).
+- **Target Location:** `frontend/src/services/offlineQueue.ts`, `frontend/src/services/api.ts`.
+
+## 2. Technical Scope & Specifications
+- **Queue Schema (IndexedDB: `roubit_offline_db` / store `mutation_queue`):**
+  ```typescript
+  interface QueuedMutation {
+    id: string             // UUIDv4 primary key in IndexedDB
+    url: string            // Relative API endpoint (e.g., '/habits/uuid/checkin')
+    method: 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+    payload: any           // JSON payload
+    idempotencyKey: string // Captured UUIDv4 Idempotency-Key
+    createdAt: string      // ISO-8601 timestamp
+    retryCount: number     // Retries attempted
+  }
+  ```
+- **Zero-Knowledge Security Invariant:**
+  - Journal reflections MUST be encrypted in memory *before* being enqueued.
+  - The payload for `/journal` stored in IndexedDB must strictly contain `{ entry_date, ciphertext_base64, salt_base64, nonce_base64, mood, tags }`.
+  - Plaintext reflection content must NEVER be saved to IndexedDB or localStorage.
+- **Axios Interceptor Integration:**
+  - In `frontend/src/services/api.ts`, intercept network errors (`!window.navigator.onLine` or `error.code === 'ERR_NETWORK'`).
+  - If error is network-related and request has an `Idempotency-Key`: enqueue mutation and return an optimistic response.
+- **Replay & Drain Workflow:**
+  - Listen to `window.addEventListener('online')` and document visibility changes.
+  - Sequentially send each queued request in FIFO order with its original `Idempotency-Key`.
+  - On HTTP 200/201/409 (duplicate handled), remove item from IndexedDB queue.
+  - On permanent failure (400 validation error), purge item and dispatch notification.
+
+## 3. Implementation Steps
+1. Create `frontend/src/services/offlineQueue.ts` managing IndexedDB operations.
+2. Hook into `frontend/src/services/api.ts` response error interceptor for automatic enqueuing.
+3. Implement `syncOfflineQueue()` to drain items sequentially upon network restoration.
+4. Export reactive queue size for UI badge indicators.
+
+## 4. Definition of Done (DoD)
+- [ ] Offline habit check-ins and routine logs are preserved in IndexedDB when disconnected.
+- [ ] Network restoration automatically replays all queued items with original idempotency keys.
+- [ ] No plaintext journal data is ever stored in IndexedDB.
+- [ ] Server does not duplicate check-in logs upon reconnection replay.
