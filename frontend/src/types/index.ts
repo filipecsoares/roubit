@@ -186,3 +186,18 @@ export interface FocusSession {
   completedCycles: number
 }
 
+// Real-Time Notifications & SSE (Feature 14)
+export type NotificationEventType = 'routine_block_start' | 'routine_block_end' | 'habit_reminder' | 'system'
+
+export interface AppNotification {
+  id: string
+  user_id?: string
+  entity_type: string // 'time_block' | 'habit' | ...
+  entity_id: string
+  title: string
+  message: string
+  scheduled_at: string
+  read: boolean
+  created_at: string
+}
+

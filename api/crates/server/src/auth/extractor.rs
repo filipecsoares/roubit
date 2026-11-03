@@ -42,31 +42,43 @@ where
         };
 
         // 2. Fallback to HttpOnly cookie: roubit_token=<token>
-        let token = if let Some(t) = token_opt {
-            t
-        } else if let Some(cookie_header) = parts.headers.get(header::COOKIE) {
+        let cookie_token_opt = if let Some(cookie_header) = parts.headers.get(header::COOKIE) {
             let cookie_str = cookie_header.to_str().map_err(|_| {
                 ApiError::Unauthorized("Invalid cookie header encoding".to_string())
             })?;
 
-            cookie_str
-                .split(';')
-                .find_map(|pair| {
-                    let mut parts = pair.splitn(2, '=');
-                    let key = parts.next()?.trim();
-                    let val = parts.next()?.trim();
-                    if key == "roubit_token" {
-                        Some(val.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .ok_or_else(|| ApiError::Unauthorized("Missing authentication token".to_string()))?
+            cookie_str.split(';').find_map(|pair| {
+                let mut p = pair.splitn(2, '=');
+                let key = p.next()?.trim();
+                let val = p.next()?.trim();
+                if key == "roubit_token" {
+                    Some(val.to_string())
+                } else {
+                    None
+                }
+            })
         } else {
-            return Err(ApiError::Unauthorized(
-                "Missing authentication token".to_string(),
-            ));
+            None
         };
+
+        // 3. Fallback to URL query parameter (?token=... or ?access_token=...) for SSE EventSource
+        let query_token_opt = parts.uri.query().and_then(|query| {
+            query.split('&').find_map(|pair| {
+                let mut p = pair.splitn(2, '=');
+                let key = p.next()?.trim();
+                let val = p.next()?.trim();
+                if key == "token" || key == "access_token" {
+                    Some(val.to_string())
+                } else {
+                    None
+                }
+            })
+        });
+
+        let token = token_opt
+            .or(cookie_token_opt)
+            .or(query_token_opt)
+            .ok_or_else(|| ApiError::Unauthorized("Missing authentication token".to_string()))?;
 
         let claims = decode_jwt(&token, &app_state.config.jwt_secret)?;
         Ok(Self {

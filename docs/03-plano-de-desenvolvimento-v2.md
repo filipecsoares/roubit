@@ -73,19 +73,19 @@ flowchart TD
 ### Fase 8: Notificações em Tempo Real no Frontend (SSE & Web Notifications)
 *Objetivo: Fechar o ciclo do módulo de Time Blocking tornando o Roubit proativo com alertas em tempo real no navegador via Server-Sent Events e Web Notifications API.*
 
-- [ ] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
-  - [ ] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
-  - [ ] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
-  - [ ] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
-- [ ] **8.2 Integração com a Web Notifications API do Navegador**
-  - [ ] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
-  - [ ] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.
-  - [ ] Síntese de aviso sonoro sutil via Web Audio API integrada (sem carregar arquivos de áudio externos).
-- [ ] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
-  - [ ] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
-  - [ ] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
-- [ ] **8.4 Testes Vitest da Camada de Notificações**
-  - [ ] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
+- [x] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
+  - [x] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
+  - [x] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
+  - [x] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
+- [x] **8.2 Integração com a Web Notifications API do Navegador**
+  - [x] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
+  - [x] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.
+  - [x] Síntese de aviso sonoro sutil via Web Audio API integrada (sem carregar arquivos de áudio externos).
+- [x] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
+  - [x] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
+  - [x] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
+- [x] **8.4 Testes Vitest da Camada de Notificações**
+  - [x] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
 
 ---
 
