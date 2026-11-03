@@ -1,15 +1,17 @@
 # Roubit
 
-> **Routine + Habit** — A high-performance personal operating system that integrates daily time-blocking, habit tracking, OKR goal alignment, and zero-knowledge encrypted journaling.
+> **Routine + Habit** — A high-performance personal operating system integrating daily time-blocking, habit tracking, OKR goal alignment, zero-knowledge encrypted journaling, and offline-first Progressive Web App (PWA) synchronization.
 
-[![Progress](https://img.shields.io/badge/Progress-50%2F50%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
+[![Progress](https://img.shields.io/badge/Progress-70%2F70%20Tasks%20(100%25)-brightgreen)](docs/02-status-atividades.md)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![Vue 3](https://img.shields.io/badge/Vue.js-3.5%2B-4FC08D?logo=vuedotjs)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![PWA Ready](https://img.shields.io/badge/PWA-Offline%20First-5A0FC8?logo=pwa)](frontend/README.md)
 [![Security](https://img.shields.io/badge/Security-Zero--Knowledge%20(AES--256--GCM)-blueviolet)](docs/00-especificacao-tecnica.md#5-segurança--criptografia)
 [![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?logo=docker)](docker-compose.yml)
 [![P99 Latency](https://img.shields.io/badge/P99%20Latency-4.875ms-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
 [![Memory RSS](https://img.shields.io/badge/Memory%20RSS-13.11MB-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
+[![Tests](https://img.shields.io/badge/Tests-200%2B%20Rust%20%7C%2080%20Vitest-success)](docs/02-status-atividades.md)
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 ---
@@ -18,30 +20,32 @@
 
 Most productivity setups are fragmented: a to-do list in one app, habit tracking in another, quarterly goals buried in spreadsheets, and private thoughts scattered across text files. This fragmentation creates friction, context-switching, and a disconnect between what you do each day and what you want to achieve long-term.
 
-**Roubit** brings these four essential pillars together into a cohesive, distraction-free environment:
+**Roubit** unifies these essential pillars into a cohesive, distraction-free environment:
 
-1. **Daily Focus:** Structure your day into clear time blocks, avoiding overbooking and decision fatigue.
-2. **Habits with Purpose:** Your daily habits directly feed into and advance your long-term quarterly goals.
-3. **Uncompromising Privacy:** Your journal entries are encrypted on your device using client-side zero-knowledge encryption before reaching storage.
-4. **Blazing Speed & Safety:** Powered by a Rust backend with sub-5ms tail latency, minimal memory usage, and zero cloud lock-in.
+1. **Daily Focus & Flow:** Structure your day into chronological time blocks and execute them with an integrated Pomodoro Focus Mode.
+2. **Habits with Purpose:** Your daily habits directly advance your quarterly Objectives and Key Results (OKRs).
+3. **Uncompromising Privacy:** Your reflections are encrypted directly on your device using client-side zero-knowledge cryptography before ever touching storage.
+4. **Offline-First Resilience:** Works completely offline as a Progressive Web App (PWA) with background sync and zero data loss.
+5. **Blazing Speed & Safety:** Powered by a clean Rust backend with sub-5ms P99 tail latency, minimal memory usage (~13MB RSS), and zero cloud lock-in.
 
 ---
 
 ## ✨ Core Features
 
-### ⏱️ 1. Time-Blocked Daily Routines & Focus Mode (RF01)
+### ⏱️ 1. Time-Blocked Daily Routines & Focus Mode (RF01 & Feature 11)
 - **Chronological Day Planning:** Build daily schedules with distinct focus blocks (*Deep Work*, *Workout*, *Study*, *Rest*).
 - **Conflict Prevention Engine:** Mathematical non-overlap validation running in $O(N \log N)$ prevents scheduling collisions.
 - **Real-Time Day Tracker:** Follow the active block in real time and log state transitions (`Pending` $\to$ `In Progress` $\to$ `Completed` / `Skipped`).
-- **Integrated Focus Mode & Pomodoro Timer:** Launch distraction-free fullscreen focus sessions directly from routine blocks, featuring animated circular countdowns, cycle tracking, keyboard shortcuts, and native Web Audio API harmonic chime synthesis.
+- **Integrated Pomodoro Focus Mode:** Fullscreen distraction-free focus sessions directly from routine blocks, featuring circular countdown animations, cycle counters, keyboard shortcuts (`Space`, `R`, `Esc`), and native Web Audio harmonic sound synthesis.
 - **Adherence Score:** Automatically calculates your scheduled vs. completed duration percentage at the end of each day.
 
-### ⚡ 2. Smart Habit Tracker & Resilient Streaks (RF02)
+### ⚡ 2. Smart Habit Tracker & High-Performance Streaks (RF02 & Feature 13)
 - **Three Flexible Habit Types:**
   - **Binary Habits:** Simple completion toggles (e.g., *Take vitamins*, *Make bed*).
   - **Numeric Habits:** Incremental daily targets (e.g., *Drink 2500 ml water*, *Read 25 pages*).
   - **Timer Habits:** Integrated stopwatch for duration-based habits (e.g., *Meditate 20 min*, *Practice guitar*).
-- **Smart Streaks:** Rest days and custom schedules (e.g., weekday-only habits) do not break your streaks on scheduled off-days.
+- **Atomic $O(1)$ Streak Engine:** Denormalized streak counters updated atomically upon check-in with scheduled off-day preservation.
+- **Multi-Tiered Caching:** Tiered L1 (in-memory RAM) and L2 (Redis) summary caching with active invalidation for sub-5ms response times.
 - **52-Week Contribution Heatmap:** GitHub-style visual consistency grid tracking your momentum across the entire year.
 
 ### 🎯 3. Goal Alignment & OKRs Engine (RF03)
@@ -53,11 +57,28 @@ Most productivity setups are fragmented: a to-do list in one app, habit tracking
 - **Client-Side Encryption:** Personal reflections are encrypted in your browser or terminal using **AES-256-GCM** with keys derived via **Argon2id**.
 - **Zero Plaintext on Disk/Server:** The server only stores ciphertext envelopes. Even if the database is exposed, your private thoughts remain completely unreadable.
 - **Indexed Search Metadata:** Mood ratings (1–5) and categorical tags remain open for trend analysis without compromising reflection text.
-- **Volatile Memory Scrubbing:** Derived keys and sensitive buffers are zeroed out in memory upon use using Rust's `zeroize` trait.
+- **Volatile Memory Scrubbing:** Ephemeral key buffers implement Rust's `zeroize` trait, wiping sensitive bytes from RAM immediately upon locking or drop.
 
-### 🖥️ 5. Dual Interface: Web SPA & Terminal CLI
-- **Modern Web App:** Responsive Vue 3 Single Page Application with clean aesthetics, dark mode, and interactive modals.
-- **Fast Terminal CLI:** Full-featured command-line interface (`roubit`) for keyboard-centric and offline workflows.
+### 📱 5. Progressive Web App (PWA) & Offline-First Engine (Feature 16)
+- **Installable Desktop & Mobile App:** Fully compliant Web App Manifest (`/manifest.webmanifest`) and Service Worker precaching powered by Workbox.
+- **Offline Mutation Queue:** Queues actions (habit check-ins, routine block completions, OKRs) in **IndexedDB** with monotonic FIFO ordering.
+- **Idempotent Background Synchronization:** Automatically replays queued mutations with unique UUID idempotency keys upon network reconnection, preventing duplicate records.
+- **Native App Badges:** Dynamically updates the application icon badge counter with pending uncompleted habits for the current day.
+- **Reactive Network Status Indicator:** Live visual alerts and synchronization counters during offline operations.
+
+### 🔔 6. Real-Time Push Notifications (Feature 14)
+- **Server-Sent Events (SSE):** Streaming notification pipeline connected to Redis keyspace expiration triggers for scheduled routine and habit reminders.
+- **Web Notifications API:** Native desktop notifications with audio chime synthesis.
+- **In-App Toast Feed:** Interactive notification tray displaying real-time events and reminder history.
+
+### 🖥️ 7. Dual Interface: Web SPA & Hybrid Terminal CLI (RF05 & Feature 15)
+- **Modern Web App:** Responsive Vue 3 Single Page Application with clean aesthetics, glassmorphism design, and dark mode.
+- **Fast Terminal CLI (`roubit`):** Full-featured command-line tool with interactive prompts, tables, and Ratatui widgets.
+- **Hybrid Transport:** Seamlessly switch between local offline SQLite mode and remote authenticated HTTP API access with secure token storage in `~/.roubit/credentials.json`.
+
+### 🛡️ 8. Enterprise Multi-Tenancy & Data Isolation (Feature 12)
+- **Row-Level Tenant Isolation:** Complete user-scoping across all domain repositories, preventing Insecure Direct Object References (IDOR).
+- **Dual Database Engine:** Zero-setup local SQLite in WAL mode or production-ready PostgreSQL 16 with integrated migration tooling.
 
 ---
 
@@ -65,24 +86,25 @@ Most productivity setups are fragmented: a to-do list in one app, habit tracking
 
 ```mermaid
 flowchart TD
-    subgraph Clients["Clients (End-to-End Encryption)"]
-        Web["Vue 3 SPA<br/>(Web Crypto API / Pinia / Tailwind)"]
-        CLI["Terminal CLI<br/>(Clap / Ratatui UI / Zeroize)"]
+    subgraph Clients["Clients (End-to-End Encryption & PWA)"]
+        Web["Vue 3 SPA & PWA<br/>(Service Worker / IndexedDB / Web Crypto / Pinia)"]
+        CLI["Terminal CLI<br/>(Local SQLite WAL / Remote JWT Transport / Ratatui)"]
     end
 
-    subgraph Server["Backend Engine (Rust / Axum)"]
-        API["REST API & SSE Stream<br/>(Axum 0.8 / Tokio / Tracing)"]
-        Idempotency["Idempotency Interceptor<br/>(24h Key Guard)"]
-        Domain["Domain Services<br/>(Routines, Habits, OKRs, Journal)"]
+    subgraph Server["Backend Engine (Rust / Axum 0.8)"]
+        API["REST API & SSE Stream<br/>(Axum / Tokio / Tracing / Problem Details RFC 7807)"]
+        Idempotency["Idempotency Guard<br/>(24h Key Interceptor)"]
+        Domain["Domain Services & Clean Architecture<br/>(Routines, Habits, OKRs, Journal, Users)"]
     end
 
     subgraph Storage["Data & Infrastructure Layer"]
-        Redis[("Redis 7<br/>Locks, TTL Keyspace, Cache")]
+        Redis[("Redis 7<br/>L2 Summary Cache, Distributed Locks, TTL Keyspace")]
         DB[("Dual Database Engine<br/>SQLite WAL & PostgreSQL 16")]
     end
 
     Web -->|HTTP / REST + SSE| API
-    CLI -->|In-Process or HTTP| Domain
+    Web -.->|Offline Mutations| Web
+    CLI -->|Local File or Remote HTTP| Domain
     API --> Idempotency --> Domain
     Domain --> DB
     Domain --> Redis
@@ -91,11 +113,11 @@ flowchart TD
 
 | Layer | Technologies | Key Highlights |
 | :--- | :--- | :--- |
-| **Backend** | Rust 1.85+, Axum 0.8, Tokio, SQLx | Non-blocking asynchronous I/O, compile-time SQL checks, OWASP headers. |
-| **Frontend** | Vue 3.5, TypeScript 5, Vite, Pinia, TailwindCSS | Composition API, responsive layout, Web Crypto API for client encryption. |
-| **Storage** | SQLite (WAL mode) / PostgreSQL 16 | Zero-setup local SQLite for single-user; native PostgreSQL for distributed stack. |
-| **Cache & Queue** | Redis 7 | Distributed mutual exclusion locks, keyspace expiration notifications for SSE reminders. |
-| **Security** | Argon2id & AES-256-GCM, Zeroize | Memory-hard KDF, authenticated ciphertext envelopes, memory wiping on drop. |
+| **Backend** | Rust 1.85+, Axum 0.8, Tokio, SQLx | Clean Architecture (Thin Controllers, Repository Pattern), sub-5ms P99 latency, compile-time SQL verification, OWASP security headers. |
+| **Frontend & PWA**| Vue 3.5, TypeScript 5, Vite, Pinia, TailwindCSS | Composition API, Workbox App Shell, IndexedDB offline mutation queue, Web Crypto API (Argon2id WASM + AES-256-GCM). |
+| **Storage** | SQLite (WAL mode) / PostgreSQL 16 | Zero-setup local SQLite for single-user/CLI; native PostgreSQL for distributed stack with automated migration tool. |
+| **Cache & Queue** | Redis 7 | Tiered L2 caching, distributed mutual exclusion locks, keyspace expiration notifications for SSE reminders. |
+| **Security** | Argon2id & AES-256-GCM, Zeroize | Zero-knowledge client-side encryption, authenticated envelopes, memory sanitization on drop. |
 
 ---
 
@@ -111,7 +133,7 @@ Roubit can be launched in one command via **Docker Compose** or run natively for
 
 ### Option A: 1-Command Stack via Docker Compose (Recommended)
 
-Spins up PostgreSQL 16, Redis 7, Axum REST API, and the Vue 3 SPA behind an Nginx reverse proxy:
+Spins up PostgreSQL 16, Redis 7, Axum REST API, and the Vue 3 PWA behind an Nginx reverse proxy:
 
 ```bash
 # 1. Clone the repository
@@ -126,7 +148,7 @@ docker compose ps
 ```
 
 #### Access Points:
-- 🌐 **Web Application:** [http://localhost](http://localhost) (Port 80)
+- 🌐 **Web Application (PWA):** [http://localhost](http://localhost) (Port 80)
 - 🔌 **REST API Service:** [http://localhost:8080](http://localhost:8080)
 - 📊 **Health Check:** `curl http://localhost:8080/health`
 
@@ -142,28 +164,28 @@ docker compose down
 #### 1. Start the Backend API (Rust)
 By default, the server runs against an embedded local SQLite database (`roubit.db`) with zero setup needed:
 ```bash
-cargo run --bin roubit-server
+cargo run --bin roubit-server --manifest-path api/Cargo.toml
 ```
 *The server starts listening on `http://127.0.0.1:8080`.*
 
-#### 2. Start the Frontend App (Vue 3)
+#### 2. Start the Frontend App (Vue 3 PWA)
 In a separate terminal:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*Open [http://localhost:5173](http://localhost:5173) in your browser. API requests are automatically proxied to the backend.*
+*Open [http://localhost:5173](http://localhost:5173) in your browser. API requests and SSE events are automatically proxied to the backend.*
 
 ---
 
-### Option C: Terminal CLI Standalone Mode
+### Option C: Terminal CLI Standalone & Remote Modes
 
-The command-line interface (`roubit`) can run directly against your local SQLite database without needing the web server:
+The command-line interface (`roubit`) can run directly against your local SQLite database or connect remotely to an authenticated server:
 
 ```bash
 # Compile optimized release binary
-cargo build --release --bin roubit
+cargo build --release --bin roubit --manifest-path api/Cargo.toml
 
 # (Optional) Install to system PATH
 sudo cp target/release/roubit /usr/local/bin/
@@ -194,6 +216,13 @@ roubit okr summary
 roubit journal write --mood 5 --tags "focus,shipping"
 roubit journal read
 roubit journal delete --date 2026-10-30
+
+# 🌐 Remote Mode & Authentication (Features 14 & 15)
+roubit auth login --url http://127.0.0.1:8080 --email user@example.com
+roubit auth status
+roubit habit list --remote http://127.0.0.1:8080
+roubit habit checkin <HABIT_ID> --value 1.0 --remote http://127.0.0.1:8080
+roubit auth logout
 
 # ⚙️ Migrate SQLite data to PostgreSQL
 roubit admin migrate-to-postgres \
@@ -233,20 +262,22 @@ Under concurrent load testing on Linux x86_64 (`release` profile, LTO enabled):
 
 ## 🧪 Testing & Quality Suite
 
-Roubit enforces zero warnings (`-D warnings`), Clippy linter hygiene, and full test coverage:
+Roubit enforces zero warnings (`-D warnings`), Clippy linter hygiene, and comprehensive test coverage:
 
 ```bash
-# Run all Rust workspace unit and integration tests (158 tests)
+# Run all Rust workspace unit and integration tests (200+ tests across core, server, cli)
 cargo test --workspace --manifest-path api/Cargo.toml
 
-# Run NIST SP 800-38D and RFC 9106 crypto vectors
+# Run NIST SP 800-38D and RFC 9106 crypto test vectors
 cargo test --test crypto_vectors --manifest-path api/Cargo.toml
 
 # Run in-process P99 load benchmark
 cargo test --test load_p99_benchmark --manifest-path api/Cargo.toml --release -- --nocapture
 
-# Run frontend Vitest suite (45 tests) & TypeScript build
+# Run frontend Vitest suite (80 unit and integration tests)
 npm test --prefix frontend
+
+# Type-check TypeScript and build production PWA bundle
 npm run build --prefix frontend
 
 # Run complete pre-commit quality gate (fmt, clippy, tests, build)
@@ -260,15 +291,16 @@ npm run build --prefix frontend
 ```text
 roubit/
 ├── api/                     # Rust Multi-Crate Workspace
-│   ├── crates/core/         # Domain engines, SQLite/PostgreSQL repositories & crypto
-│   ├── crates/cli/          # Terminal interface (Clap, Ratatui UI, Prompts)
-│   └── crates/server/       # REST API (Axum 0.8), JWT auth, Idempotency & SSE workers
-├── frontend/                # Vue 3 SPA (Composition API, Pinia, TailwindCSS, Web Crypto)
+│   ├── crates/core/         # Domain engines, SQLite/PostgreSQL repositories, Users, Habits, Crypto
+│   ├── crates/cli/          # Terminal interface (Clap, Ratatui UI, Prompts, Remote Client)
+│   └── crates/server/       # REST API (Axum 0.8), JWT auth, Idempotency, SSE workers & Controllers
+├── frontend/                # Vue 3 PWA (Composition API, Pinia, TailwindCSS, Web Crypto, Workbox)
 ├── docs/                    # Technical specifications, development plans & benchmarks
 │   ├── 00-especificacao-tecnica.md
 │   ├── 01-plano-de-desenvolvimento.md
 │   ├── 02-status-atividades.md
-│   └── benchmarks/01-load-test-p99-memory-report.md
+│   ├── features/            # Feature prompts & engineering activities (16 features)
+│   └── benchmarks/          # P99 latency and RSS load reports
 ├── scripts/                 # Quality assurance scripts (pre-commit.sh)
 ├── tests/load/              # K6 distributed load testing scenarios
 └── docker-compose.yml       # Production stack orchestration (PostgreSQL + Redis + API + SPA)
@@ -280,9 +312,11 @@ roubit/
 
 For in-depth architectural blueprints and activity tracking:
 - 📐 **[Technical Specification & Architecture](docs/00-especificacao-tecnica.md)**
-- 📋 **[Development Plan & WBS (10 Features)](docs/01-plano-de-desenvolvimento.md)**
-- 🚦 **[Activity Status Tracker (48/48 Tasks Completed)](docs/02-status-atividades.md)**
+- 📋 **[Development Plan & WBS (16 Features)](docs/01-plano-de-desenvolvimento.md)**
+- 🚦 **[Activity Status Tracker (70/70 Tasks Completed)](docs/02-status-atividades.md)**
+- 📑 **[Features & Activities Matrix (All 16 Features)](docs/features/README.md)**
 - 📈 **[Official Benchmark & Load Test Report](docs/benchmarks/01-load-test-p99-memory-report.md)**
+- 📱 **[Frontend SPA & PWA Architecture](frontend/README.md)**
 
 ---
 

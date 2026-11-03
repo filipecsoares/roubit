@@ -22,8 +22,9 @@ pub use domain::{
     JournalServiceError, KeyResult, Objective, ObjectiveWithKeyResults, OkrProgressEngine,
     OkrRepository, OkrRepositoryError, OkrSyncService, Routine, RoutineProgressTracker,
     RoutineRepository, RoutineRepositoryError, SqliteHabitRepository, SqliteJournalRepository,
-    SqliteOkrRepository, SqliteRoutineRepository, StreakCalculator, StreakMetrics, TimeBlock,
-    TimeBlockValidationError, TimeBlockValidator, LOCAL_USER_ID, MINIMUM_BLOCK_DURATION_MINUTES,
+    SqliteOkrRepository, SqliteRoutineRepository, SqliteUserRepository, StreakCalculator,
+    StreakMetrics, TimeBlock, TimeBlockValidationError, TimeBlockValidator, User, UserRepository,
+    UserRepositoryError, LOCAL_USER_ID, MINIMUM_BLOCK_DURATION_MINUTES,
 };
 pub use redis::{RedisError, RedisService, ReminderNotification, ReminderScheduler};
 

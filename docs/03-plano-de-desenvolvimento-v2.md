@@ -54,38 +54,38 @@ flowchart TD
 ### Fase 7: Otimização de Performance e Cache dos Streaks de Hábitos
 *Objetivo: Eliminar o gargalo de consultas N+1 e leituras de 365 dias de logs a cada check-in, mantendo a latência P99 < 10ms à medida que o histórico de logs cresce.*
 
-- [ ] **7.1 Desnormalização do Schema de Hábitos (Streaks)**
-  - [ ] Criar migration `0008_habit_streak_denormalization.sql` adicionando colunas `current_streak INTEGER NOT NULL DEFAULT 0` e `longest_streak INTEGER NOT NULL DEFAULT 0` na tabela `habits`.
-  - [ ] Criar script de backfill/migração para calcular e preencher os streaks históricos existentes.
-- [ ] **7.2 Algoritmo de Atualização Incremental Atômica de Streak**
-  - [ ] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
-  - [ ] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.
-  - [ ] Eliminar a consulta `get_logs_for_habit(habit_id, today - 365 days, today)` dos endpoints críticos de check-in e listagem.
-- [ ] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
-  - [ ] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
-  - [ ] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).
-- [ ] **7.4 Benchmarks de Regressão e Validação de Throughput**
-  - [ ] Atualizar suíte de testes de carga em `api/tests/load_p99_benchmark.rs`.
-  - [ ] Comprovar redução no consumo de CPU e tempo de resposta em check-in com base histórica de 10.000 logs por usuário.
+- [x] **7.1 Desnormalização do Schema de Hábitos (Streaks)**
+  - [x] Criar migration `0008_habit_streak_denormalization.sql` adicionando colunas `current_streak INTEGER NOT NULL DEFAULT 0` e `longest_streak INTEGER NOT NULL DEFAULT 0` na tabela `habits`.
+  - [x] Criar script de backfill/migração para calcular e preencher os streaks históricos existentes.
+- [x] **7.2 Algoritmo de Atualização Incremental Atômica de Streak**
+  - [x] Refatorar `StreakCalculator` para suportar modo incremental `update_streak(current, last_date, checkin_date, frequency_days)`.
+  - [x] Atualizar `record_check_in` no repositório para atualizar atomicamente os contadores de streak na tabela `habits` dentro da mesma transação SQL.
+  - [x] Eliminar a consulta `get_logs_for_habit(habit_id, today - 365 days, today)` dos endpoints críticos de check-in e listagem.
+- [x] **7.3 Camada de Cache em Redis para Resumos de Hábitos e Aderência**
+  - [x] Implementar cache no Redis para o sumário diário de hábitos (`roubit:cache:user:{user_id}:habits:summary`) com TTL curto (5 minutos).
+  - [x] Invalidação ativa e atômica da chave de cache no momento da realização de check-in (`POST /api/v1/habits/:id/checkin`).
+- [x] **7.4 Benchmarks de Regressão e Validação de Throughput**
+  - [x] Atualizar suíte de testes de carga em `api/tests/load_p99_benchmark.rs`.
+  - [x] Comprovar redução no consumo de CPU e tempo de resposta em check-in com base histórica de 10.000 logs por usuário.
 
 ---
 
 ### Fase 8: Notificações em Tempo Real no Frontend (SSE & Web Notifications)
 *Objetivo: Fechar o ciclo do módulo de Time Blocking tornando o Roubit proativo com alertas em tempo real no navegador via Server-Sent Events e Web Notifications API.*
 
-- [ ] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
-  - [ ] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
-  - [ ] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
-  - [ ] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
-- [ ] **8.2 Integração com a Web Notifications API do Navegador**
-  - [ ] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
-  - [ ] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.
-  - [ ] Síntese de aviso sonoro sutil via Web Audio API integrada (sem carregar arquivos de áudio externos).
-- [ ] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
-  - [ ] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
-  - [ ] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
-- [ ] **8.4 Testes Vitest da Camada de Notificações**
-  - [ ] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
+- [x] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
+  - [x] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
+  - [x] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
+  - [x] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
+- [x] **8.2 Integração com a Web Notifications API do Navegador**
+  - [x] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
+  - [x] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.
+  - [x] Síntese de aviso sonoro sutil via Web Audio API integrada (sem carregar arquivos de áudio externos).
+- [x] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
+  - [x] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
+  - [x] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
+- [x] **8.4 Testes Vitest da Camada de Notificações**
+  - [x] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
 
 ---
 

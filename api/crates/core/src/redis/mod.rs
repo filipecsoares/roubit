@@ -252,6 +252,73 @@ impl RedisService {
             .await?;
         Ok(deleted > 0)
     }
+
+    /// Key format for user habit dashboard summary cache.
+    #[must_use]
+    pub fn habit_summary_cache_key(user_id: &str) -> String {
+        format!("roubit:cache:user:{user_id}:habits:summary")
+    }
+
+    /// Retrieves the cached habit dashboard summary JSON payload for a user.
+    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    ///
+    /// # Errors
+    /// Returns `RedisError` if retrieving the connection or GET command fails.
+    pub async fn get_cached_habit_summary(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<String>, RedisError> {
+        let mut conn = self.get_connection().await?;
+        let key = Self::habit_summary_cache_key(user_id);
+        let result: Option<String> = conn.get(&key).await?;
+        Ok(result)
+    }
+
+    /// Alias for `get_cached_habit_summary`.
+    ///
+    /// # Errors
+    /// Returns `RedisError` if retrieving the connection or GET command fails.
+    pub async fn get_cached_summary(&self, user_id: &str) -> Result<Option<String>, RedisError> {
+        self.get_cached_habit_summary(user_id).await
+    }
+
+    /// Stores the habit dashboard summary JSON payload in Redis with a TTL.
+    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    ///
+    /// # Errors
+    /// Returns `RedisError` if retrieving the connection or SETEX command fails.
+    pub async fn set_cached_habit_summary(
+        &self,
+        user_id: &str,
+        summary_json: &str,
+        ttl_seconds: u64,
+    ) -> Result<(), RedisError> {
+        let mut conn = self.get_connection().await?;
+        let key = Self::habit_summary_cache_key(user_id);
+        conn.set_ex::<_, _, ()>(&key, summary_json, ttl_seconds)
+            .await?;
+        Ok(())
+    }
+
+    /// Invalidates (evicts) the cached habit dashboard summary for a user.
+    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    ///
+    /// # Errors
+    /// Returns `RedisError` if retrieving the connection or DEL command fails.
+    pub async fn invalidate_user_habits_cache(&self, user_id: &str) -> Result<bool, RedisError> {
+        let mut conn = self.get_connection().await?;
+        let key = Self::habit_summary_cache_key(user_id);
+        let deleted: i64 = redis::cmd("DEL").arg(&key).query_async(&mut conn).await?;
+        Ok(deleted > 0)
+    }
+
+    /// Alias for `invalidate_user_habits_cache`.
+    ///
+    /// # Errors
+    /// Returns `RedisError` if retrieving the connection or DEL command fails.
+    pub async fn invalidate_habit_summary_cache(&self, user_id: &str) -> Result<bool, RedisError> {
+        self.invalidate_user_habits_cache(user_id).await
+    }
 }
 
 /// Notification payload broadcast when a scheduled reminder key expires.
@@ -340,6 +407,16 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Lock acquisition failed: resource is currently busy"
+        );
+    }
+
+    #[test]
+    fn test_habit_summary_cache_key() {
+        let user_id = "550e8400-e29b-41d4-a716-446655440000";
+        let key = RedisService::habit_summary_cache_key(user_id);
+        assert_eq!(
+            key,
+            "roubit:cache:user:550e8400-e29b-41d4-a716-446655440000:habits:summary"
         );
     }
 }

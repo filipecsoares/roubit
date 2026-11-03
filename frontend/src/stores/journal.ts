@@ -46,8 +46,22 @@ export const useJournalStore = defineStore('journal', () => {
     error.value = null
     try {
       const { data } = await apiClient.post<EncryptedJournalResponse>('/journal', payload)
-      currentEntry.value = data
-      await fetchMetadata()
+      try {
+        await fetchMetadata()
+      } catch {
+        // Offline: inject optimistic metadata entry into local reactive list
+        if (!metadataList.value.some((m) => m.entry_date === payload.entry_date)) {
+          metadataList.value.push({
+            id: (data as any)?.id || crypto.randomUUID(),
+            entry_date: payload.entry_date,
+            mood_score: payload.mood_score,
+            tags: payload.tags || [],
+            ciphertext_bytes_len: payload.ciphertext_base64.length,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+        }
+      }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao salvar entrada cifrada'

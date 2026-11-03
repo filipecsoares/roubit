@@ -1,7 +1,7 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (50/66 atividades concluídas — 75.8%)  
-> **Última Atualização:** 2026-11-01  
+> **Status Geral do Projeto:** 🟢 v2.0 Concluído (70/70 atividades concluídas — 100.0%)  
+> **Última Atualização:** 2026-11-03  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
 
@@ -23,10 +23,11 @@
 | **10. Infraestrutura Redis & PostgreSQL** | 5 | 5 | 0 | 0 | 🟢 Concluído |
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
 | **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **13. Habit Streak Performance & Cache** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **14. Real-Time Notifications & SSE** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **54** | **0** | **12** | **81.8%** |
+| **13. Habit Streak Performance & Cache** | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **14. Real-Time Notifications & SSE** | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **15. CLI Hybrid Remote Mode** | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **16. PWA, Offline-First & App Shell** | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **TOTAL** | **70** | **70** | **0** | **0** | **100.0%** |
 
 ---
 
@@ -161,30 +162,38 @@
 ### Feature 13: Habit Streak Performance & Cache
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | ⚪ NÃO INICIADO | — |
-| **13.2** | Motor Incremental Atômico de Streaks | [activity-02-incremental-atomic-streak-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt) | ⚪ NÃO INICIADO | — |
-| **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | ⚪ NÃO INICIADO | — |
-| **13.4** | Benchmark de Carga P99 e Throughput | [activity-04-streak-load-p99-benchmark.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt) | ⚪ NÃO INICIADO | — |
+| **13.1** | Desnormalização de Streaks no Schema | [activity-01-habit-streak-denormalization-schema.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-01-habit-streak-denormalization-schema.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **13.2** | Motor Incremental Atômico de Streaks | [activity-02-incremental-atomic-streak-engine.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-02-incremental-atomic-streak-engine.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **13.3** | Cache Redis de Resumo de Hábitos | [activity-03-redis-habit-summary-cache.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-03-redis-habit-summary-cache.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **13.4** | Benchmark de Carga P99 e Throughput | [activity-04-streak-load-p99-benchmark.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/13-streak-performance-cache/activity-04-streak-load-p99-benchmark.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 
 ---
 
 ### Feature 14: Real-Time Notifications & SSE
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **14.1** | Store Pinia de EventSource SSE | [activity-01-sse-eventsource-pinia-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-01-sse-eventsource-pinia-store.prompt) | ⚪ NÃO INICIADO | — |
-| **14.2** | Integração Web Notifications API & Chime Nativo | [activity-02-web-notifications-audio-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-02-web-notifications-audio-integration.prompt) | ⚪ NÃO INICIADO | — |
-| **14.3** | Componentes de Toast & Feed de Alertas na UI | [activity-03-notification-toast-ui-components.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-03-notification-toast-ui-components.prompt) | ⚪ NÃO INICIADO | — |
-| **14.4** | Suíte de Testes Vitest da Store de Notificações | [activity-04-notification-store-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt) | ⚪ NÃO INICIADO | — |
+| **14.1** | Store Pinia de EventSource SSE | [activity-01-sse-eventsource-pinia-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-01-sse-eventsource-pinia-store.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **14.2** | Integração Web Notifications API & Chime Nativo | [activity-02-web-notifications-audio-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-02-web-notifications-audio-integration.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **14.3** | Componentes de Toast & Feed de Alertas na UI | [activity-03-notification-toast-ui-components.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-03-notification-toast-ui-components.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **14.4** | Suíte de Testes Vitest da Store de Notificações | [activity-04-notification-store-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 
 ---
 
 ### Feature 15: CLI Hybrid Remote Mode
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **15.1** | Abstração de Transporte e Trait RoubitClient | [activity-01-roubit-client-transport-abstraction.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-01-roubit-client-transport-abstraction.prompt) | ⚪ NÃO INICIADO | — |
-| **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | ⚪ NÃO INICIADO | — |
-| **15.3** | Injeção de Headers JWT & Idempotency-Key | [activity-03-cli-remote-idempotency-jwt-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt) | ⚪ NÃO INICIADO | — |
-| **15.4** | Suíte de Testes E2E da CLI em Modo Remoto | [activity-04-cli-remote-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt) | ⚪ NÃO INICIADO | — |
+| **15.1** | Abstração de Transporte e Trait RoubitClient | [activity-01-roubit-client-transport-abstraction.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-01-roubit-client-transport-abstraction.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **15.3** | Injeção de Headers JWT & Idempotency-Key | [activity-03-cli-remote-idempotency-jwt-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+| **15.4** | Suíte de Testes E2E da CLI em Modo Remoto | [activity-04-cli-remote-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+
+### Feature 16: PWA, Offline-First & App Shell
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **16.1** | Web App Manifest, Service Worker & Precaching | [activity-01-web-app-manifest-service-worker.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-01-web-app-manifest-service-worker.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
+| **16.2** | Fila de Mutações Offline & Sincronização Idempotente | [activity-02-offline-mutation-queue-idempotent-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-02-offline-mutation-queue-idempotent-sync.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
+| **16.3** | UI de Conectividade, Banner de Instalação & Badging | [activity-03-pwa-ui-network-status-install-prompt.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
+| **16.4** | Suíte de Testes Vitest Offline & Validação de Build | [activity-04-pwa-offline-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-04-pwa-offline-vitest-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
 
 
 

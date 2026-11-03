@@ -8,12 +8,24 @@ export const useHabitStore = defineStore('habit', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  function updateBadge(): void {
+    if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
+      const pendingCount = habits.value.filter((h) => !h.habit?.is_archived && !h.streak?.is_active_today).length
+      if (pendingCount > 0) {
+        navigator.setAppBadge(pendingCount).catch(() => {})
+      } else {
+        navigator.clearAppBadge().catch(() => {})
+      }
+    }
+  }
+
   async function fetchHabits(): Promise<void> {
     loading.value = true
     error.value = null
     try {
       const { data } = await apiClient.get<HabitWithStreakResponse[]>('/habits')
       habits.value = data
+      updateBadge()
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao listar hábitos'
       throw err
@@ -35,7 +47,11 @@ export const useHabitStore = defineStore('habit', () => {
     error.value = null
     try {
       const { data } = await apiClient.post<Habit>('/habits', payload)
-      await fetchHabits()
+      try {
+        await fetchHabits()
+      } catch {
+        // Offline: preserve optimistic creation
+      }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao criar hábito'
@@ -61,8 +77,9 @@ export const useHabitStore = defineStore('habit', () => {
       })
       // Update local habit streak in-place
       const idx = habits.value.findIndex((h) => h.habit.id === habitId)
-      if (idx !== -1) {
+      if (idx !== -1 && data?.streak) {
         habits.value[idx].streak = data.streak
+        updateBadge()
       }
       return data
     } catch (err: any) {
@@ -79,6 +96,7 @@ export const useHabitStore = defineStore('habit', () => {
     try {
       await apiClient.delete(`/habits/${habitId}`)
       habits.value = habits.value.filter((h) => h.habit.id !== habitId)
+      updateBadge()
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao excluir hábito'
       throw err

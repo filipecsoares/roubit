@@ -7,8 +7,9 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 use uuid::Uuid;
+
+use roubit_core::{SqliteUserRepository, User, UserRepository, UserRepositoryError};
 
 use crate::{
     auth::{
@@ -81,13 +82,13 @@ pub async fn register(
 ) -> Result<Response, ApiError> {
     let (email, password) = validate_registration(&payload)?;
 
-    let existing = sqlx::query("SELECT id FROM users WHERE email = ?")
-        .bind(&email)
-        .fetch_optional(&state.db)
+    let user_repo = SqliteUserRepository::new(state.db.clone());
+    if user_repo
+        .find_by_email(&email)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    if existing.is_some() {
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .is_some()
+    {
         return Err(ApiError::Conflict(
             "User with this email already exists".to_string(),
         ));
@@ -96,20 +97,17 @@ pub async fn register(
     let password_hash = hash_password(password)?;
     let user_id = Uuid::new_v4();
     let created_at = chrono::Utc::now().to_rfc3339();
+    let new_user = User::new(user_id, email.clone(), password_hash, created_at);
 
-    sqlx::query(
-        r"
-        INSERT INTO users (id, email, password_hash, created_at)
-        VALUES (?, ?, ?, ?)
-        ",
-    )
-    .bind(user_id)
-    .bind(&email)
-    .bind(&password_hash)
-    .bind(&created_at)
-    .execute(&state.db)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    user_repo
+        .create_user(&new_user)
+        .await
+        .map_err(|e| match e {
+            UserRepositoryError::AlreadyExists(_) => {
+                ApiError::Conflict("User with this email already exists".to_string())
+            }
+            other => ApiError::Internal(other.into()),
+        })?;
 
     let token = encode_jwt(user_id, &email, &state.config.jwt_secret, 3600)?;
     let user_dto = UserDto { id: user_id, email };
@@ -137,37 +135,29 @@ pub async fn login(
 ) -> Result<Response, ApiError> {
     let email = payload.email.trim().to_lowercase();
 
-    let row = sqlx::query("SELECT id, email, password_hash FROM users WHERE email = ?")
-        .bind(&email)
-        .fetch_optional(&state.db)
+    let user_repo = SqliteUserRepository::new(state.db.clone());
+    let Some(user) = user_repo
+        .find_by_email(&email)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let Some(user_row) = row else {
+        .map_err(|e| ApiError::Internal(e.into()))?
+    else {
         return Err(ApiError::Unauthorized(
             "Invalid email or password".to_string(),
         ));
     };
 
-    let user_id: Uuid = user_row
-        .try_get("id")
-        .or_else(|_| {
-            user_row
-                .try_get::<String, _>("id")
-                .and_then(|s| Uuid::parse_str(&s).map_err(|e| sqlx::Error::Decode(Box::new(e))))
-        })
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Invalid user UUID in DB: {e}")))?;
-    let password_hash: String = user_row.get("password_hash");
-
-    let is_valid = verify_password(&payload.password, &password_hash)?;
+    let is_valid = verify_password(&payload.password, &user.password_hash)?;
     if !is_valid {
         return Err(ApiError::Unauthorized(
             "Invalid email or password".to_string(),
         ));
     }
 
-    let token = encode_jwt(user_id, &email, &state.config.jwt_secret, 3600)?;
-    let user_dto = UserDto { id: user_id, email };
+    let token = encode_jwt(user.id, &user.email, &state.config.jwt_secret, 3600)?;
+    let user_dto = UserDto {
+        id: user.id,
+        email: user.email,
+    };
 
     let body = AuthResponse {
         token: token.clone(),

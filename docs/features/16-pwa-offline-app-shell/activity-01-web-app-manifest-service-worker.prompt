@@ -1,0 +1,48 @@
+# Activity: Web App Manifest, Service Worker & Precaching (vite-plugin-pwa)
+
+## 1. Objective & Context
+Transform the Roubit Vue 3 SPA into an installable, high-performance Progressive Web Application (PWA). Configure `vite-plugin-pwa` with Workbox to precache the App Shell (HTML, CSS, JS chunks, and Argon2id `.wasm` binaries) and provide standalone home-screen installation on Android, iOS, and Desktop.
+
+- **Prerequisites:** Feature 09 (Frontend SPA).
+- **Target Location:** `frontend/vite.config.ts`, `frontend/index.html`, `frontend/public/icons/`.
+
+## 2. Technical Scope & Specifications
+- **PWA Manifest Configuration:**
+  - Name: `Roubit — Rotinas, Hábitos, OKRs & Diário`
+  - Short Name: `Roubit`
+  - Description: `Plataforma pessoal de alta performance para rotinas, hábitos, OKRs e diário criptografado.`
+  - Theme Color: `#020617` (Tailwind `slate-950` / `bg-surface-dark`).
+  - Background Color: `#020617`.
+  - Display: `standalone`.
+  - Start URL: `/`.
+  - Orientation: `portrait-primary` / `any`.
+  - Icons:
+    - 192x192 PNG (`/icons/icon-192x192.png`)
+    - 512x512 PNG (`/icons/icon-512x512.png`)
+    - 512x512 Maskable PNG (`/icons/icon-512x512-maskable.png`)
+    - 180x180 Apple Touch Icon (`/icons/apple-touch-icon-180x180.png`)
+- **iOS Meta Tags in `index.html`:**
+  - `<meta name="apple-mobile-web-app-capable" content="yes" />`
+  - `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />`
+  - `<meta name="apple-mobile-web-app-title" content="Roubit" />`
+- **Workbox Precaching & Runtime Caching Strategy:**
+  - Precache glob patterns: `**/*.{js,css,html,ico,png,svg,wasm}`.
+  - Critical: Include `**/*.wasm` so `hash-wasm` (Argon2id) derivation works 100% offline.
+  - Google Fonts caching:
+    - Stylesheets: `StaleWhileRevalidate` with `google-fonts-stylesheets`.
+    - Webfonts (.woff2): `CacheFirst` with 365-day expiration and `google-fonts-webfonts`.
+  - GET API caching:
+    - `/api/v1/(habits|routines/active|okrs|journal/metadata)`: `NetworkFirst` with 3s network timeout falling back to cache.
+
+## 3. Implementation Steps
+1. Install `vite-plugin-pwa` in `frontend/`.
+2. Configure `VitePWA` in `frontend/vite.config.ts` with manifest and Workbox caching rules.
+3. Generate icon assets in `frontend/public/icons/`.
+4. Update `frontend/index.html` with PWA meta tags and link rels.
+5. Register Service Worker virtual module in `frontend/src/main.ts` or via auto-update.
+
+## 4. Definition of Done (DoD)
+- [ ] Lighthouse PWA audit criteria satisfied (manifest, service worker, icons, standalone).
+- [ ] Application opens offline from cache after initial load.
+- [ ] Argon2id WASM is cached and functions while disconnected from network.
+- [ ] Production build (`npm run build`) generates `dist/sw.js` without errors.

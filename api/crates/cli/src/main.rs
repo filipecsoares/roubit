@@ -9,7 +9,7 @@ pub mod interactive;
 pub mod ui;
 
 use clap::Parser;
-use roubit_core::{create_sqlite_pool, init_telemetry, run_migrations, AppConfig};
+use roubit_core::{init_telemetry, AppConfig};
 
 use crate::args::{CliArgs, Commands};
 use crate::ui::TerminalUi;
@@ -58,26 +58,45 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Auth commands connect directly to remote endpoints or manage credentials
+    if let Commands::Auth(auth_args) = command {
+        commands::auth_cmd::handle(auth_args, args.json, args.remote.as_deref()).await?;
+        return Ok(());
+    }
+
     // Determine database URL override or default
     let db_url = args.db.as_deref().unwrap_or(config.database_url.as_str());
 
-    let pool = create_sqlite_pool(db_url).await?;
-    run_migrations(&pool).await?;
+    let client = client::ClientFactory::create_client(args.remote.as_deref(), Some(db_url), None)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match command {
         Commands::Routine(routine_args) => {
-            commands::routine_cmd::handle(routine_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::routine_cmd::handle(routine_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("Routine command is currently supported in local mode only.");
+            }
         }
         Commands::Habit(habit_args) => {
-            commands::habit_cmd::handle(habit_args, args.json, &pool).await?;
+            commands::habit_cmd::handle(habit_args, args.json, client.as_ref()).await?;
         }
         Commands::Okr(okr_args) => {
-            commands::okr_cmd::handle(okr_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::okr_cmd::handle(okr_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("OKR command is currently supported in local mode only.");
+            }
         }
         Commands::Journal(journal_args) => {
-            commands::journal_cmd::handle(journal_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::journal_cmd::handle(journal_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("Journal command is currently supported in local mode only.");
+            }
         }
-        Commands::Config(_) | Commands::Admin(_) => unreachable!(),
+        Commands::Config(_) | Commands::Admin(_) | Commands::Auth(_) => unreachable!(),
     }
 
     Ok(())
@@ -246,5 +265,53 @@ mod tests {
             },
             _ => panic!("Expected Admin command"),
         }
+    }
+
+    #[test]
+    fn test_clap_parse_auth_commands() {
+        let args_login = CliArgs::try_parse_from([
+            "roubit",
+            "auth",
+            "login",
+            "--url",
+            "http://127.0.0.1:8080",
+            "--email",
+            "test@example.com",
+            "--password",
+            "secret123",
+        ])
+        .unwrap();
+
+        match args_login.command {
+            Some(Commands::Auth(auth_args)) => match auth_args.action {
+                args::AuthSubcommands::Login {
+                    url,
+                    email,
+                    password,
+                } => {
+                    assert_eq!(url.as_deref(), Some("http://127.0.0.1:8080"));
+                    assert_eq!(email.as_deref(), Some("test@example.com"));
+                    assert_eq!(password.as_deref(), Some("secret123"));
+                }
+                _ => panic!("Expected Login subcommand"),
+            },
+            _ => panic!("Expected Auth command"),
+        }
+
+        let args_logout = CliArgs::try_parse_from(["roubit", "auth", "logout"]).unwrap();
+        assert!(matches!(
+            args_logout.command,
+            Some(Commands::Auth(args::AuthArgs {
+                action: args::AuthSubcommands::Logout
+            }))
+        ));
+
+        let args_status = CliArgs::try_parse_from(["roubit", "auth", "status"]).unwrap();
+        assert!(matches!(
+            args_status.command,
+            Some(Commands::Auth(args::AuthArgs {
+                action: args::AuthSubcommands::Status
+            }))
+        ));
     }
 }

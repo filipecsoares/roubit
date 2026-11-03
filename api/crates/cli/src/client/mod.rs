@@ -5,6 +5,7 @@ pub mod factory;
 pub mod local;
 pub mod remote;
 
+pub use credentials::{CredentialsManager, StoredCredentials};
 pub use factory::{ClientFactory, ClientMode};
 pub use local::LocalClient;
 pub use remote::HttpClient;
@@ -57,6 +58,22 @@ pub trait RoubitClient: Send + Sync {
         value: f64,
     ) -> Result<HabitLog, ClientError>;
 
+    /// Creates a new habit definition.
+    async fn create_habit(
+        &self,
+        name: &str,
+        habit_type: roubit_core::HabitType,
+        target_value: f64,
+        unit: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<Habit, ClientError>;
+
+    /// Archives a habit by ID.
+    async fn archive_habit(&self, habit_id: Uuid) -> Result<(), ClientError>;
+
+    /// Deletes a habit by ID.
+    async fn delete_habit(&self, habit_id: Uuid) -> Result<(), ClientError>;
+
     /// Fetches the currently active routine template.
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError>;
 
@@ -86,4 +103,20 @@ pub trait RoubitClient: Send + Sync {
         from: NaiveDate,
         to: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, ClientError>;
+
+    /// Saves an encrypted journal reflection.
+    async fn save_journal(
+        &self,
+        date: NaiveDate,
+        ciphertext_base64: &str,
+        salt_base64: &str,
+        nonce_base64: &str,
+        mood: Option<i32>,
+        tags: &[String],
+    ) -> Result<(), ClientError>;
+
+    /// Returns the underlying SQLite pool if running in local mode.
+    fn local_pool(&self) -> Option<&sqlx::SqlitePool> {
+        None
+    }
 }

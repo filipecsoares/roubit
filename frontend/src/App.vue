@@ -1,10 +1,39 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, watch } from 'vue'
 import { Timer } from 'lucide-vue-next'
 import AppNavbar from '@/components/common/AppNavbar.vue'
+import NotificationToast from '@/components/common/NotificationToast.vue'
 import FocusModeModal from '@/components/dashboard/FocusModeModal.vue'
+import PwaInstallPrompt from '@/components/pwa/PwaInstallPrompt.vue'
+import PwaUpdatePrompt from '@/components/pwa/PwaUpdatePrompt.vue'
 import { useFocusStore } from '@/stores/focus'
+import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 
 const focusStore = useFocusStore()
+const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    notificationStore.startListening()
+  }
+})
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      notificationStore.startListening()
+    } else {
+      notificationStore.stopListening()
+    }
+  }
+)
+
+onUnmounted(() => {
+  notificationStore.stopListening()
+})
 </script>
 
 <template>
@@ -41,6 +70,13 @@ const focusStore = useFocusStore()
 
     <!-- Global Focus Mode Modal -->
     <FocusModeModal />
+
+    <!-- Global Real-Time Notification Toast Stack -->
+    <NotificationToast />
+
+    <!-- PWA Installation Banner & Service Worker Update Toast -->
+    <PwaInstallPrompt />
+    <PwaUpdatePrompt />
   </div>
 </template>
 

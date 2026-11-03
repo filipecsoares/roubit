@@ -74,6 +74,8 @@ async fn test_cli_habit_workflow_in_temp_db() {
         frequency_days: Habit::FREQUENCY_DAILY,
         color_hex: Habit::DEFAULT_COLOR.to_string(),
         is_archived: false,
+        current_streak: 0,
+        longest_streak: 0,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };

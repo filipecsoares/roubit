@@ -2208,6 +2208,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "clap",
  "colored",
@@ -2226,6 +2227,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -2261,10 +2263,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "assert_cmd",
  "axum",
  "base64 0.22.1",
  "chrono",
  "jsonwebtoken",
+ "predicates",
  "redis",
  "reqwest",
  "roubit-core",

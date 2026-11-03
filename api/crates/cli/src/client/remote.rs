@@ -13,7 +13,7 @@ use roubit_core::domain::{
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
-use super::{credentials::CredentialsManager, ClientError, RoubitClient};
+use super::{ClientError, RoubitClient};
 
 /// Client implementation connecting remotely to an Axum REST API over HTTP/HTTPS.
 #[derive(Debug, Clone)]
@@ -30,11 +30,10 @@ impl HttpClient {
     #[must_use]
     pub fn new(base_url: impl Into<String>, auth_token: Option<String>) -> Self {
         let trimmed_url = base_url.into().trim_end_matches('/').to_string();
-        let token = auth_token.or_else(CredentialsManager::load_token);
 
         Self {
             base_url: trimmed_url,
-            auth_token: token,
+            auth_token,
             client: Client::builder().build().unwrap_or_default(),
         }
     }
@@ -77,17 +76,72 @@ impl HttpClient {
         let status = resp.status();
         if status.is_success() {
             resp.json::<T>().await.map_err(ClientError::from)
+        } else if status == reqwest::StatusCode::UNAUTHORIZED {
+            Err(ClientError::Api {
+                status: 401,
+                message: "Unauthorized: Session is invalid or expired. Please run 'roubit auth login' to authenticate.".to_string(),
+            })
         } else {
-            let message = resp
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown API error".into());
+            let text = resp.text().await.unwrap_or_default();
+            let clean_message = Self::extract_error_detail(&text);
             Err(ClientError::Api {
                 status: status.as_u16(),
-                message,
+                message: clean_message,
             })
         }
     }
+
+    async fn handle_empty_response(resp: reqwest::Response) -> Result<(), ClientError> {
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else if status == reqwest::StatusCode::UNAUTHORIZED {
+            Err(ClientError::Api {
+                status: 401,
+                message: "Unauthorized: Session is invalid or expired. Please run 'roubit auth login' to authenticate.".to_string(),
+            })
+        } else {
+            let text = resp.text().await.unwrap_or_default();
+            let clean_message = Self::extract_error_detail(&text);
+            Err(ClientError::Api {
+                status: status.as_u16(),
+                message: clean_message,
+            })
+        }
+    }
+
+    fn extract_error_detail(raw: &str) -> String {
+        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(detail) = json_val.get("detail").and_then(|d| d.as_str()) {
+                return detail.to_string();
+            }
+            if let Some(msg) = json_val.get("message").and_then(|m| m.as_str()) {
+                return msg.to_string();
+            }
+            if let Some(err) = json_val.get("error").and_then(|e| e.as_str()) {
+                return err.to_string();
+            }
+        }
+        if raw.trim().is_empty() {
+            "Unknown API error".to_string()
+        } else {
+            raw.to_string()
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct HabitWithStreakDto {
+    habit: Habit,
+    #[allow(dead_code)]
+    streak: roubit_core::StreakMetrics,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct CheckinResponseDto {
+    log: HabitLog,
+    #[allow(dead_code)]
+    streak: roubit_core::StreakMetrics,
 }
 
 #[async_trait]
@@ -100,7 +154,8 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
-        Self::handle_response(resp).await
+        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
+        Ok(items.into_iter().map(|item| item.habit).collect())
     }
 
     async fn list_active_habits(&self) -> Result<Vec<Habit>, ClientError> {
@@ -111,7 +166,8 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
-        Self::handle_response(resp).await
+        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
+        Ok(items.into_iter().map(|item| item.habit).collect())
     }
 
     async fn habit_checkin(
@@ -136,7 +192,64 @@ impl RoubitClient for HttpClient {
             .send()
             .await?;
 
+        let res: CheckinResponseDto = Self::handle_response(resp).await?;
+        Ok(res.log)
+    }
+
+    async fn create_habit(
+        &self,
+        name: &str,
+        habit_type: roubit_core::HabitType,
+        target_value: f64,
+        unit: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<Habit, ClientError> {
+        let url = format!("{}/api/v1/habits", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "name": name,
+            "description": description,
+            "habit_type": match habit_type {
+                roubit_core::HabitType::Numeric => "numeric",
+                roubit_core::HabitType::Timer => "timer",
+                roubit_core::HabitType::Binary => "binary",
+            },
+            "target_value": target_value,
+            "unit": unit,
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
         Self::handle_response(resp).await
+    }
+
+    async fn archive_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/habits/{habit_id}/archive", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(Uuid::new_v4())))
+            .send()
+            .await?;
+        Self::handle_empty_response(resp).await
+    }
+
+    async fn delete_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/habits/{habit_id}", self.base_url);
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(self.build_headers(Some(Uuid::new_v4())))
+            .send()
+            .await?;
+        Self::handle_empty_response(resp).await
     }
 
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError> {
@@ -188,16 +301,7 @@ impl RoubitClient for HttpClient {
             .send()
             .await?;
 
-        if resp.status().is_success() {
-            Ok(())
-        } else {
-            let status_code = resp.status().as_u16();
-            let msg = resp.text().await.unwrap_or_default();
-            Err(ClientError::Api {
-                status: status_code,
-                message: msg,
-            })
-        }
+        Self::handle_empty_response(resp).await
     }
 
     async fn list_all_objectives(&self) -> Result<Vec<ObjectiveWithKeyResults>, ClientError> {
@@ -238,5 +342,95 @@ impl RoubitClient for HttpClient {
             .send()
             .await?;
         Self::handle_response(resp).await
+    }
+
+    async fn save_journal(
+        &self,
+        date: NaiveDate,
+        ciphertext_base64: &str,
+        salt_base64: &str,
+        nonce_base64: &str,
+        mood: Option<i32>,
+        tags: &[String],
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/journal", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "entry_date": date.to_string(),
+            "ciphertext_base64": ciphertext_base64,
+            "salt_base64": salt_base64,
+            "nonce_base64": nonce_base64,
+            "mood": mood,
+            "tags": tags,
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
+        Self::handle_empty_response(resp).await
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_headers_injects_bearer_and_idempotency_key() {
+        let client = HttpClient::new("http://127.0.0.1:8080", Some("my-secret-jwt".to_string()));
+        let key = Uuid::new_v4();
+
+        let headers = client.build_headers(Some(key));
+        assert_eq!(
+            headers.get("authorization").unwrap().to_str().unwrap(),
+            "Bearer my-secret-jwt"
+        );
+        assert_eq!(
+            headers.get("idempotency-key").unwrap().to_str().unwrap(),
+            key.to_string()
+        );
+    }
+
+    #[test]
+    fn test_build_headers_without_auth_or_key() {
+        let client = HttpClient::new("http://127.0.0.1:8080", None);
+        let headers = client.build_headers(None);
+
+        assert!(!headers.contains_key("authorization"));
+        assert!(!headers.contains_key("idempotency-key"));
+    }
+
+    #[test]
+    fn test_extract_error_detail_rfc7807_and_fallbacks() {
+        let detail_json = r#"{"type":"about:blank","title":"Conflict","status":409,"detail":"Checkin already recorded"}"#;
+        assert_eq!(
+            HttpClient::extract_error_detail(detail_json),
+            "Checkin already recorded"
+        );
+
+        let msg_json = r#"{"message":"Invalid habit payload"}"#;
+        assert_eq!(
+            HttpClient::extract_error_detail(msg_json),
+            "Invalid habit payload"
+        );
+
+        let err_json = r#"{"error":"Resource not found"}"#;
+        assert_eq!(
+            HttpClient::extract_error_detail(err_json),
+            "Resource not found"
+        );
+
+        let plain_txt = "Internal Server Error";
+        assert_eq!(
+            HttpClient::extract_error_detail(plain_txt),
+            "Internal Server Error"
+        );
     }
 }
