@@ -2,9 +2,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LayoutDashboard, CheckCircle2, Target, BookOpen, LogOut, Shield, Timer, Bell, CheckCheck, Calendar, Flame, Play } from 'lucide-vue-next'
+import { LayoutDashboard, CheckCircle2, Target, BookOpen, LogOut, Shield, Timer, Bell, CheckCheck, Calendar, Flame, Play, WifiOff, RefreshCw } from 'lucide-vue-next'
 import { useFocusStore } from '@/stores/focus'
 import { useNotificationStore } from '@/stores/notification'
+import { usePwa } from '@/composables/usePwa'
 import type { AppNotification } from '@/types'
 
 const route = useRoute()
@@ -12,6 +13,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const focusStore = useFocusStore()
 const notificationStore = useNotificationStore()
+const { isOnline, pendingSyncCount, isSyncing, recentlySynced } = usePwa()
 
 const isLoginPage = computed(() => route.name === 'login')
 const isDropdownOpen = ref(false)
@@ -105,6 +107,42 @@ onUnmounted(() => {
 
         <!-- Right Side Actions -->
         <div class="flex items-center gap-2">
+          <!-- PWA Network Status Pill (Visible when Offline, Syncing or Recently Synced) -->
+          <div
+            v-if="!isOnline || pendingSyncCount > 0 || isSyncing || recentlySynced"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all"
+            :class="
+              recentlySynced
+                ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/40'
+                : isSyncing
+                  ? 'bg-sky-950/60 text-sky-400 border-sky-500/40'
+                  : 'bg-amber-950/60 text-amber-400 border-amber-500/40'
+            "
+            :title="
+              recentlySynced
+                ? 'Dados sincronizados com o servidor'
+                : isSyncing
+                  ? 'Sincronizando mutações pendentes...'
+                  : 'Modo offline: alterações serão salvas localmente e sincronizadas quando restabelecer a conexão'
+            "
+          >
+            <RefreshCw v-if="isSyncing" class="w-3.5 h-3.5 animate-spin" />
+            <CheckCircle2 v-else-if="recentlySynced" class="w-3.5 h-3.5 text-emerald-400" />
+            <WifiOff v-else class="w-3.5 h-3.5 text-amber-400" />
+
+            <span class="text-[11px] font-mono">
+              {{
+                recentlySynced
+                  ? 'Sincronizado'
+                  : isSyncing
+                    ? 'Sincronizando...'
+                    : pendingSyncCount > 0
+                      ? `Offline (${pendingSyncCount})`
+                      : 'Offline'
+              }}
+            </span>
+          </div>
+
           <!-- Focus Mode Quick Trigger -->
           <button
             type="button"

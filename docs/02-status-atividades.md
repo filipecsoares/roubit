@@ -26,8 +26,8 @@
 | **13. Habit Streak Performance & Cache** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **14. Real-Time Notifications & SSE** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **15. CLI Hybrid Remote Mode** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **16. PWA, Offline-First & App Shell** | 4 | 2 | 0 | 2 | 🟡 Em Progresso |
-| **TOTAL** | **70** | **68** | **0** | **2** | **97.1%** |
+| **16. PWA, Offline-First & App Shell** | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
+| **TOTAL** | **70** | **69** | **0** | **1** | **98.6%** |
 
 ---
 
@@ -192,7 +192,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **16.1** | Web App Manifest, Service Worker & Precaching | [activity-01-web-app-manifest-service-worker.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-01-web-app-manifest-service-worker.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
 | **16.2** | Fila de Mutações Offline & Sincronização Idempotente | [activity-02-offline-mutation-queue-idempotent-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-02-offline-mutation-queue-idempotent-sync.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
-| **16.3** | UI de Conectividade, Banner de Instalação & Badging | [activity-03-pwa-ui-network-status-install-prompt.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt) | ⚪ NÃO INICIADO | — |
+| **16.3** | UI de Conectividade, Banner de Instalação & Badging | [activity-03-pwa-ui-network-status-install-prompt.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
 | **16.4** | Suíte de Testes Vitest Offline & Validação de Build | [activity-04-pwa-offline-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-04-pwa-offline-vitest-suite.prompt) | ⚪ NÃO INICIADO | — |
 
 
