@@ -25,8 +25,9 @@
 | **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **13. Habit Streak Performance & Cache** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **14. Real-Time Notifications & SSE** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **62** | **0** | **4** | **93.9%** |
+| **15. CLI Hybrid Remote Mode** | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **16. PWA, Offline-First & App Shell** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **TOTAL** | **70** | **66** | **0** | **4** | **94.3%** |
 
 ---
 
@@ -185,6 +186,14 @@
 | **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **15.3** | Injeção de Headers JWT & Idempotency-Key | [activity-03-cli-remote-idempotency-jwt-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **15.4** | Suíte de Testes E2E da CLI em Modo Remoto | [activity-04-cli-remote-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
+
+### Feature 16: PWA, Offline-First & App Shell
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **16.1** | Web App Manifest, Service Worker & Precaching | [activity-01-web-app-manifest-service-worker.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-01-web-app-manifest-service-worker.prompt) | ⚪ NÃO INICIADO | — |
+| **16.2** | Fila de Mutações Offline & Sincronização Idempotente | [activity-02-offline-mutation-queue-idempotent-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-02-offline-mutation-queue-idempotent-sync.prompt) | ⚪ NÃO INICIADO | — |
+| **16.3** | UI de Conectividade, Banner de Instalação & Badging | [activity-03-pwa-ui-network-status-install-prompt.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt) | ⚪ NÃO INICIADO | — |
+| **16.4** | Suíte de Testes Vitest Offline & Validação de Build | [activity-04-pwa-offline-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-04-pwa-offline-vitest-suite.prompt) | ⚪ NÃO INICIADO | — |
 
 
 
