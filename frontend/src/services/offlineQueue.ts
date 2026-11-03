@@ -21,12 +21,15 @@ export interface QueuedMutation {
   payload: any
   idempotencyKey: string
   createdAt: string
+  seq?: number
   retryCount: number
 }
 
 const DB_NAME = 'roubit_offline_db'
 const DB_VERSION = 1
 const STORE_NAME = 'mutation_queue'
+
+let sequenceCounter = 0
 
 export const pendingSyncCount = ref(0)
 export const isSyncing = ref(false)
@@ -60,13 +63,14 @@ export function openDb(): Promise<IDBDatabase> {
 }
 
 export async function enqueueMutation(
-  item: Omit<QueuedMutation, 'id' | 'createdAt' | 'retryCount'>
+  item: Omit<QueuedMutation, 'id' | 'createdAt' | 'retryCount' | 'seq'>
 ): Promise<QueuedMutation> {
   const db = await openDb()
   const queued: QueuedMutation = {
     ...item,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
+    seq: ++sequenceCounter,
     retryCount: 0,
   }
 
@@ -92,8 +96,12 @@ export async function getQueuedMutations(): Promise<QueuedMutation[]> {
 
     request.onsuccess = () => {
       const items: QueuedMutation[] = request.result || []
-      // Sort strictly FIFO by creation timestamp
-      items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      // Sort strictly FIFO by creation timestamp, breaking millisecond ties with monotonic seq
+      items.sort((a, b) => {
+        const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        if (timeDiff !== 0) return timeDiff
+        return (a.seq || 0) - (b.seq || 0)
+      })
       resolve(items)
     }
     request.onerror = () => reject(request.error)
@@ -207,9 +215,14 @@ export async function syncOfflineQueue(apiClientInstance: AxiosInstance): Promis
           await removeMutation(item.id)
           failed++
         } else {
-          // Network error or 5xx: increment retry and pause drain
-          await updateMutationRetry(item.id, item.retryCount + 1)
-          break
+          // If server responded with 5xx repeatedly (>= 5 retries), discard to prevent head-of-line queue blockage
+          if (err.response?.status && err.response.status >= 500 && item.retryCount >= 5) {
+            await removeMutation(item.id)
+            failed++
+          } else {
+            await updateMutationRetry(item.id, item.retryCount + 1)
+            break
+          }
         }
       }
     }

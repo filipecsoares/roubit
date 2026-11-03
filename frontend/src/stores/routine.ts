@@ -43,7 +43,11 @@ export const useRoutineStore = defineStore('routine', () => {
     error.value = null
     try {
       const { data } = await apiClient.post<Routine>('/routines', payload)
-      await fetchActiveRoutine()
+      try {
+        await fetchActiveRoutine()
+      } catch {
+        // Offline: preserve optimistic creation
+      }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao criar rotina'
@@ -58,7 +62,18 @@ export const useRoutineStore = defineStore('routine', () => {
     error.value = null
     try {
       await apiClient.post(`/routines/blocks/${blockId}/complete`, { status, notes })
-      await fetchActiveRoutine()
+      try {
+        await fetchActiveRoutine()
+      } catch {
+        // Offline: update local block status optimistically
+        const block = blocks.value.find((b) => b.id === blockId)
+        if (block && progress.value) {
+          progress.value.completed_blocks += 1
+          if (progress.value.pending_blocks > 0) {
+            progress.value.pending_blocks -= 1
+          }
+        }
+      }
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao atualizar bloco'
       throw err

@@ -10,7 +10,7 @@ export const useHabitStore = defineStore('habit', () => {
 
   function updateBadge(): void {
     if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
-      const pendingCount = habits.value.filter((h) => !h.habit.is_archived && !h.streak.is_active_today).length
+      const pendingCount = habits.value.filter((h) => !h.habit?.is_archived && !h.streak?.is_active_today).length
       if (pendingCount > 0) {
         navigator.setAppBadge(pendingCount).catch(() => {})
       } else {
@@ -47,7 +47,11 @@ export const useHabitStore = defineStore('habit', () => {
     error.value = null
     try {
       const { data } = await apiClient.post<Habit>('/habits', payload)
-      await fetchHabits()
+      try {
+        await fetchHabits()
+      } catch {
+        // Offline: preserve optimistic creation
+      }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao criar hábito'

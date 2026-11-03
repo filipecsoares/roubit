@@ -48,7 +48,11 @@ export const useOkrStore = defineStore('okr', () => {
     error.value = null
     try {
       const { data } = await apiClient.post<ObjectiveWithKeyResults>('/okrs', payload)
-      await fetchOkrs(payload.quarter || quarter.value)
+      try {
+        await fetchOkrs(payload.quarter || quarter.value)
+      } catch {
+        // Offline: preserve optimistic creation
+      }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao criar objetivo'
