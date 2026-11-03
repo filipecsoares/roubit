@@ -9,7 +9,7 @@ pub mod interactive;
 pub mod ui;
 
 use clap::Parser;
-use roubit_core::{create_sqlite_pool, init_telemetry, run_migrations, AppConfig};
+use roubit_core::{init_telemetry, AppConfig};
 
 use crate::args::{CliArgs, Commands};
 use crate::ui::TerminalUi;
@@ -61,21 +61,34 @@ async fn main() -> anyhow::Result<()> {
     // Determine database URL override or default
     let db_url = args.db.as_deref().unwrap_or(config.database_url.as_str());
 
-    let pool = create_sqlite_pool(db_url).await?;
-    run_migrations(&pool).await?;
+    let client = client::ClientFactory::create_client(args.remote.as_deref(), Some(db_url), None)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match command {
         Commands::Routine(routine_args) => {
-            commands::routine_cmd::handle(routine_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::routine_cmd::handle(routine_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("Routine command is currently supported in local mode only.");
+            }
         }
         Commands::Habit(habit_args) => {
-            commands::habit_cmd::handle(habit_args, args.json, &pool).await?;
+            commands::habit_cmd::handle(habit_args, args.json, client.as_ref()).await?;
         }
         Commands::Okr(okr_args) => {
-            commands::okr_cmd::handle(okr_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::okr_cmd::handle(okr_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("OKR command is currently supported in local mode only.");
+            }
         }
         Commands::Journal(journal_args) => {
-            commands::journal_cmd::handle(journal_args, args.json, &pool).await?;
+            if let Some(pool) = client.local_pool() {
+                commands::journal_cmd::handle(journal_args, args.json, pool).await?;
+            } else {
+                anyhow::bail!("Journal command is currently supported in local mode only.");
+            }
         }
         Commands::Config(_) | Commands::Admin(_) => unreachable!(),
     }

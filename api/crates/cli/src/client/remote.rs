@@ -90,6 +90,20 @@ impl HttpClient {
     }
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+struct HabitWithStreakDto {
+    habit: Habit,
+    #[allow(dead_code)]
+    streak: roubit_core::StreakMetrics,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct CheckinResponseDto {
+    log: HabitLog,
+    #[allow(dead_code)]
+    streak: roubit_core::StreakMetrics,
+}
+
 #[async_trait]
 impl RoubitClient for HttpClient {
     async fn list_habits(&self) -> Result<Vec<Habit>, ClientError> {
@@ -100,7 +114,8 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
-        Self::handle_response(resp).await
+        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
+        Ok(items.into_iter().map(|item| item.habit).collect())
     }
 
     async fn list_active_habits(&self) -> Result<Vec<Habit>, ClientError> {
@@ -111,7 +126,8 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
-        Self::handle_response(resp).await
+        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
+        Ok(items.into_iter().map(|item| item.habit).collect())
     }
 
     async fn habit_checkin(
@@ -136,7 +152,78 @@ impl RoubitClient for HttpClient {
             .send()
             .await?;
 
+        let res: CheckinResponseDto = Self::handle_response(resp).await?;
+        Ok(res.log)
+    }
+
+    async fn create_habit(
+        &self,
+        name: &str,
+        habit_type: roubit_core::HabitType,
+        target_value: f64,
+        unit: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<Habit, ClientError> {
+        let url = format!("{}/api/v1/habits", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "name": name,
+            "description": description,
+            "habit_type": match habit_type {
+                roubit_core::HabitType::Numeric => "numeric",
+                roubit_core::HabitType::Timer => "timer",
+                roubit_core::HabitType::Binary => "binary",
+            },
+            "target_value": target_value,
+            "unit": unit,
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
         Self::handle_response(resp).await
+    }
+
+    async fn archive_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/habits/{habit_id}/archive", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(Uuid::new_v4())))
+            .send()
+            .await?;
+
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            let status = resp.status().as_u16();
+            let message = resp.text().await.unwrap_or_default();
+            Err(ClientError::Api { status, message })
+        }
+    }
+
+    async fn delete_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/habits/{habit_id}", self.base_url);
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(self.build_headers(Some(Uuid::new_v4())))
+            .send()
+            .await?;
+
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            let status = resp.status().as_u16();
+            let message = resp.text().await.unwrap_or_default();
+            Err(ClientError::Api { status, message })
+        }
     }
 
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError> {

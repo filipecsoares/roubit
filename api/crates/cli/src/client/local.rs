@@ -71,6 +71,51 @@ impl RoubitClient for LocalClient {
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
+    async fn create_habit(
+        &self,
+        name: &str,
+        habit_type: roubit_core::HabitType,
+        target_value: f64,
+        unit: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<Habit, ClientError> {
+        let repo = SqliteHabitRepository::new(self.pool.clone());
+        let habit = Habit {
+            id: Uuid::new_v4(),
+            user_id: Some(LOCAL_USER_ID),
+            name: name.to_string(),
+            description: description.map(ToString::to_string),
+            habit_type,
+            target_value,
+            unit: unit.map(ToString::to_string),
+            frequency_days: 1,
+            is_archived: false,
+            color_hex: "#10b981".to_string(),
+            current_streak: 0,
+            longest_streak: 0,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        repo.create_habit(LOCAL_USER_ID, &habit)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+        Ok(habit)
+    }
+
+    async fn archive_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let repo = SqliteHabitRepository::new(self.pool.clone());
+        repo.archive_habit(habit_id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn delete_habit(&self, habit_id: Uuid) -> Result<(), ClientError> {
+        let repo = SqliteHabitRepository::new(self.pool.clone());
+        repo.delete_habit(habit_id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError> {
         let repo = SqliteRoutineRepository::new(self.pool.clone());
         repo.get_active_routine(LOCAL_USER_ID)
@@ -123,5 +168,9 @@ impl RoubitClient for LocalClient {
         repo.list_metadata_in_range(LOCAL_USER_ID, from, to)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    fn local_pool(&self) -> Option<&sqlx::SqlitePool> {
+        Some(&self.pool)
     }
 }
