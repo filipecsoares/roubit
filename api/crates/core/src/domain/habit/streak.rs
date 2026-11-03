@@ -37,6 +37,65 @@ impl StreakCalculator {
         (frequency_bitmask & bit) != 0
     }
 
+    /// Incrementally computes the updated `(current_streak, longest_streak)` after a completion event.
+    ///
+    /// # Arguments
+    /// * `current_streak` - Existing consecutive completion count on the habit.
+    /// * `longest_streak` - All-time longest streak recorded on the habit.
+    /// * `last_checkin_date` - Most recent date of completion strictly prior to `new_checkin_date`, if any.
+    /// * `new_checkin_date` - Calendar date of the newly completed check-in.
+    /// * `frequency_bitmask` - 7-day scheduled frequency bitmask.
+    ///
+    /// # Returns
+    /// A tuple `(new_current_streak, new_longest_streak)` computed in O(1) steady-state.
+    #[must_use]
+    #[allow(clippy::option_if_let_else)]
+    pub fn update_streak_incremental(
+        current_streak: i32,
+        longest_streak: i32,
+        last_checkin_date: Option<NaiveDate>,
+        new_checkin_date: NaiveDate,
+        frequency_bitmask: u8,
+    ) -> (i32, i32) {
+        if frequency_bitmask == 0 {
+            return (0, 0);
+        }
+
+        let is_required = Self::is_required_day(new_checkin_date, frequency_bitmask);
+
+        let new_current = match last_checkin_date {
+            None => i32::from(is_required),
+            Some(prev_date) => match new_checkin_date.cmp(&prev_date) {
+                std::cmp::Ordering::Less | std::cmp::Ordering::Equal => current_streak,
+                std::cmp::Ordering::Greater => {
+                    let mut missed_required_day = false;
+                    let mut check_date = prev_date.succ_opt();
+                    while let Some(d) = check_date {
+                        if d >= new_checkin_date {
+                            break;
+                        }
+                        if Self::is_required_day(d, frequency_bitmask) {
+                            missed_required_day = true;
+                            break;
+                        }
+                        check_date = d.succ_opt();
+                    }
+
+                    if missed_required_day {
+                        i32::from(is_required)
+                    } else if is_required {
+                        current_streak + 1
+                    } else {
+                        current_streak
+                    }
+                }
+            },
+        };
+
+        let new_longest = longest_streak.max(new_current);
+        (new_current, new_longest)
+    }
+
     /// Computes current and longest streak given a list of completed dates, habit frequency,
     /// and the reference date (typically today).
     #[must_use]
@@ -291,5 +350,61 @@ mod tests {
         assert_eq!(metrics.current_streak, 1);
         assert_eq!(metrics.longest_streak, 1);
         assert!(metrics.is_active_today);
+    }
+
+    #[test]
+    fn test_update_streak_incremental_first_checkin() {
+        let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap(); // Monday
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(0, 0, None, monday, 127);
+        assert_eq!(current, 1);
+        assert_eq!(longest, 1);
+    }
+
+    #[test]
+    fn test_update_streak_incremental_same_day_reentry() {
+        let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap();
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(3, 5, Some(monday), monday, 127);
+        assert_eq!(current, 3);
+        assert_eq!(longest, 5);
+    }
+
+    #[test]
+    fn test_update_streak_incremental_daily_consecutive() {
+        let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap();
+        let tuesday = NaiveDate::from_ymd_opt(2026, 11, 3).unwrap();
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(2, 4, Some(monday), tuesday, 127);
+        assert_eq!(current, 3);
+        assert_eq!(longest, 4);
+
+        // Surpassing longest streak
+        let wednesday = NaiveDate::from_ymd_opt(2026, 11, 4).unwrap();
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(4, 4, Some(tuesday), wednesday, 127);
+        assert_eq!(current, 5);
+        assert_eq!(longest, 5);
+    }
+
+    #[test]
+    fn test_update_streak_incremental_weekday_skips_weekends() {
+        let friday = NaiveDate::from_ymd_opt(2026, 10, 30).unwrap(); // Friday
+        let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap(); // Monday
+                                                                    // Frequency bitmask 31 = Monday-Friday
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(5, 10, Some(friday), monday, 31);
+        assert_eq!(current, 6);
+        assert_eq!(longest, 10);
+    }
+
+    #[test]
+    fn test_update_streak_incremental_broken_streak_gap() {
+        let monday = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap();
+        let wednesday = NaiveDate::from_ymd_opt(2026, 11, 4).unwrap(); // Missed Tuesday
+        let (current, longest) =
+            StreakCalculator::update_streak_incremental(10, 15, Some(monday), wednesday, 127);
+        assert_eq!(current, 1);
+        assert_eq!(longest, 15);
     }
 }

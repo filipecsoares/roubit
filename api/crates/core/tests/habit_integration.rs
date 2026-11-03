@@ -385,3 +385,95 @@ async fn test_habit_multi_tenant_isolation() {
     .await
     .expect("test timed out");
 }
+
+#[tokio::test]
+async fn test_incremental_atomic_streak_updates_on_checkin() {
+    timeout(TEST_TIMEOUT, async {
+        let (repo, user_id) = setup_test_db().await;
+
+        let habit = Habit::new_binary("Hydration", None).with_user_id(user_id);
+        repo.create_habit(user_id, &habit)
+            .await
+            .expect("create habit");
+
+        let d1 = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap(); // Day 1
+        let d2 = NaiveDate::from_ymd_opt(2026, 11, 3).unwrap(); // Day 2
+        let d4 = NaiveDate::from_ymd_opt(2026, 11, 5).unwrap(); // Day 4 (gap on d3)
+        let d5 = NaiveDate::from_ymd_opt(2026, 11, 6).unwrap(); // Day 5
+        let d6 = NaiveDate::from_ymd_opt(2026, 11, 7).unwrap(); // Day 6
+
+        // 1. Day 1 check-in -> streak = 1, longest = 1
+        repo.record_check_in(habit.id, user_id, d1, 1.0, false)
+            .await
+            .expect("d1");
+        let h1 = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h1.current_streak, 1);
+        assert_eq!(h1.longest_streak, 1);
+
+        // 2. Day 2 check-in -> streak = 2, longest = 2
+        repo.record_check_in(habit.id, user_id, d2, 1.0, false)
+            .await
+            .expect("d2");
+        let h2 = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h2.current_streak, 2);
+        assert_eq!(h2.longest_streak, 2);
+
+        // 3. Same-day re-entry on Day 2 -> streak remains 2, longest remains 2
+        repo.record_check_in(habit.id, user_id, d2, 1.0, true)
+            .await
+            .expect("d2 repeat");
+        let h2_rep = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h2_rep.current_streak, 2);
+        assert_eq!(h2_rep.longest_streak, 2);
+
+        // 4. Day 4 check-in (skipped Day 3) -> streak resets to 1, longest remains 2
+        repo.record_check_in(habit.id, user_id, d4, 1.0, false)
+            .await
+            .expect("d4");
+        let h4 = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h4.current_streak, 1);
+        assert_eq!(h4.longest_streak, 2);
+
+        // 5. Day 5 check-in -> streak = 2, longest remains 2
+        repo.record_check_in(habit.id, user_id, d5, 1.0, false)
+            .await
+            .expect("d5");
+        let h5 = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h5.current_streak, 2);
+        assert_eq!(h5.longest_streak, 2);
+
+        // 6. Day 6 check-in -> streak = 3, longest becomes 3
+        repo.record_check_in(habit.id, user_id, d6, 1.0, false)
+            .await
+            .expect("d6");
+        let h6 = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(h6.current_streak, 3);
+        assert_eq!(h6.longest_streak, 3);
+    })
+    .await
+    .expect("test timed out");
+}

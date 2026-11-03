@@ -70,6 +70,8 @@ pub async fn handle(args: HabitArgs, json: bool, pool: &SqlitePool) -> Result<()
                 unit,
                 frequency_days: 0b0111_1111,
                 is_archived: false,
+                current_streak: 0,
+                longest_streak: 0,
                 color_hex: "#10B981".to_string(),
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
