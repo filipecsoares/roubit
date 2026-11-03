@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import type { AppNotification } from '@/types'
 
+import { playNotificationChime } from '@/services/notificationAudio'
+
 export const useNotificationStore = defineStore('notification', () => {
   const authStore = useAuthStore()
 
@@ -41,6 +43,32 @@ export const useNotificationStore = defineStore('notification', () => {
     recentNotifications.value.unshift(notification)
     if (recentNotifications.value.length > 50) {
       recentNotifications.value.pop()
+    }
+
+    // Play subtle audio chime
+    playNotificationChime()
+
+    // Dispatch native OS Notification when document is hidden and permission is granted
+    if (
+      typeof window !== 'undefined' &&
+      typeof document !== 'undefined' &&
+      document.hidden &&
+      typeof Notification !== 'undefined' &&
+      permissionState.value === 'granted'
+    ) {
+      try {
+        const osNotif = new Notification(notification.title, {
+          body: notification.message,
+          icon: '/favicon.ico',
+          tag: notification.id,
+        })
+        osNotif.onclick = () => {
+          window.focus()
+          osNotif.close()
+        }
+      } catch {
+        // Fallback gracefully if notifications are blocked or failed
+      }
     }
 
     return notification
