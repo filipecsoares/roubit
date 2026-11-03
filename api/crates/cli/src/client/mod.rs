@@ -104,6 +104,17 @@ pub trait RoubitClient: Send + Sync {
         to: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, ClientError>;
 
+    /// Saves an encrypted journal reflection.
+    async fn save_journal(
+        &self,
+        date: NaiveDate,
+        ciphertext_base64: &str,
+        salt_base64: &str,
+        nonce_base64: &str,
+        mood: Option<i32>,
+        tags: &[String],
+    ) -> Result<(), ClientError>;
+
     /// Returns the underlying SQLite pool if running in local mode.
     fn local_pool(&self) -> Option<&sqlx::SqlitePool> {
         None

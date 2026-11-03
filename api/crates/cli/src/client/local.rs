@@ -1,6 +1,7 @@
 //! Local client adapter delegating directly to SQLite repositories.
 
 use async_trait::async_trait;
+use base64::prelude::*;
 use chrono::NaiveDate;
 use roubit_core::{
     domain::{
@@ -168,6 +169,55 @@ impl RoubitClient for LocalClient {
         repo.list_metadata_in_range(LOCAL_USER_ID, from, to)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn save_journal(
+        &self,
+        date: NaiveDate,
+        ciphertext_base64: &str,
+        salt_base64: &str,
+        nonce_base64: &str,
+        mood: Option<i32>,
+        tags: &[String],
+    ) -> Result<(), ClientError> {
+        let repo = SqliteJournalRepository::new(self.pool.clone());
+        let salt = BASE64_STANDARD
+            .decode(salt_base64)
+            .map_err(|e| ClientError::Local(format!("invalid salt base64: {e}")))?;
+        let nonce = BASE64_STANDARD
+            .decode(nonce_base64)
+            .map_err(|e| ClientError::Local(format!("invalid nonce base64: {e}")))?;
+        let ciphertext = BASE64_STANDARD
+            .decode(ciphertext_base64)
+            .map_err(|e| ClientError::Local(format!("invalid ciphertext base64: {e}")))?;
+
+        let mood_u8 = mood.and_then(|m| u8::try_from(m).ok());
+        let metadata = roubit_core::domain::journal::models::JournalMetadata::new(
+            date,
+            mood_u8,
+            tags.to_vec(),
+            ciphertext.len(),
+        )
+        .map_err(|e| ClientError::Local(e.to_string()))?
+        .with_user_id(LOCAL_USER_ID);
+
+        let salt_arr: [u8; 16] = salt
+            .try_into()
+            .map_err(|_| ClientError::Local("salt must be 16 bytes".into()))?;
+        let nonce_arr: [u8; 12] = nonce
+            .try_into()
+            .map_err(|_| ClientError::Local("nonce must be 12 bytes".into()))?;
+
+        let entry = roubit_core::domain::journal::models::EncryptedJournalEntry::new(
+            metadata, salt_arr, nonce_arr, ciphertext,
+        )
+        .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        repo.save_entry(LOCAL_USER_ID, &entry)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        Ok(())
     }
 
     fn local_pool(&self) -> Option<&sqlx::SqlitePool> {
