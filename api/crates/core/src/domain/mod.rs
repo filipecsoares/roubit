@@ -7,6 +7,7 @@ pub mod habit;
 pub mod journal;
 pub mod okr;
 pub mod routine;
+pub mod user;
 
 /// Default system / local user identifier for CLI local operations and fallback context.
 pub const LOCAL_USER_ID: uuid::Uuid = uuid::Uuid::from_u128(1);
@@ -54,3 +55,5 @@ pub use routine::{
     RoutineProgressTracker, RoutineRepository, RoutineRepositoryError, SqliteRoutineRepository,
     TimeBlock, TimeBlockValidationError, TimeBlockValidator, MINIMUM_BLOCK_DURATION_MINUTES,
 };
+
+pub use user::{SqliteUserRepository, User, UserRepository, UserRepositoryError};

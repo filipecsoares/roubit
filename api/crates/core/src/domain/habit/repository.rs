@@ -3,6 +3,8 @@
 //! Provides asynchronous, thread-safe persistence for habits and daily habit logs,
 //! featuring atomic UPSERT check-ins with target completion evaluation.
 
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::SqlitePool;
@@ -10,7 +12,7 @@ use uuid::Uuid;
 
 use super::{
     models::{Habit, HabitLog},
-    streak::StreakCalculator,
+    streak::{StreakCalculator, StreakMetrics},
 };
 
 /// Errors occurring during habit repository operations.
@@ -77,6 +79,27 @@ pub trait HabitRepository: Send + Sync {
     /// Permanently deletes a habit and cascades deletion to all associated logs.
     async fn delete_habit(&self, habit_id: Uuid, user_id: Uuid)
         -> Result<(), HabitRepositoryError>;
+
+    /// Retrieves a set of habit IDs completed by `user_id` on the specified date.
+    async fn get_completed_habit_ids_for_date(
+        &self,
+        user_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<HashSet<Uuid>, HabitRepositoryError>;
+
+    /// Checks if a specific habit has a completed log on the specified date.
+    async fn is_habit_completed_on_date(
+        &self,
+        habit_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<bool, HabitRepositoryError>;
+
+    /// Lists active habits for `user_id` alongside their calculated streak metrics evaluated for `reference_date`.
+    async fn list_active_habits_with_streaks(
+        &self,
+        user_id: Uuid,
+        reference_date: NaiveDate,
+    ) -> Result<Vec<(Habit, StreakMetrics)>, HabitRepositoryError>;
 }
 
 /// SQLite-backed implementation of [`HabitRepository`].
@@ -400,6 +423,68 @@ impl HabitRepository for SqliteHabitRepository {
 
         Ok(())
     }
+
+    async fn get_completed_habit_ids_for_date(
+        &self,
+        user_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<HashSet<Uuid>, HabitRepositoryError> {
+        let habit_ids: Vec<Uuid> = sqlx::query_scalar::<_, Uuid>(
+            r"
+            SELECT hl.habit_id
+            FROM habit_logs hl
+            JOIN habits h ON hl.habit_id = h.id
+            WHERE h.user_id = ? AND hl.log_date = ? AND hl.is_completed = 1
+            ",
+        )
+        .bind(user_id)
+        .bind(date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(habit_ids.into_iter().collect())
+    }
+
+    async fn is_habit_completed_on_date(
+        &self,
+        habit_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<bool, HabitRepositoryError> {
+        let is_completed = sqlx::query_scalar::<_, bool>(
+            r"SELECT is_completed FROM habit_logs WHERE habit_id = ? AND log_date = ?",
+        )
+        .bind(habit_id)
+        .bind(date)
+        .fetch_optional(&self.pool)
+        .await?
+        .unwrap_or(false);
+
+        Ok(is_completed)
+    }
+
+    async fn list_active_habits_with_streaks(
+        &self,
+        user_id: Uuid,
+        reference_date: NaiveDate,
+    ) -> Result<Vec<(Habit, StreakMetrics)>, HabitRepositoryError> {
+        let habits = self.list_active_habits(user_id).await?;
+        let completed_ids = self
+            .get_completed_habit_ids_for_date(user_id, reference_date)
+            .await?;
+
+        let mut result = Vec::with_capacity(habits.len());
+        for habit in habits {
+            let is_active_today = completed_ids.contains(&habit.id);
+            let streak = StreakMetrics {
+                current_streak: u32::try_from(habit.current_streak.max(0)).unwrap_or(0),
+                longest_streak: u32::try_from(habit.longest_streak.max(0)).unwrap_or(0),
+                is_active_today,
+            };
+            result.push((habit, streak));
+        }
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -660,5 +745,52 @@ mod tests {
             .expect("list succeeds");
         assert_eq!(list[0].current_streak, 5);
         assert_eq!(list[0].longest_streak, 12);
+    }
+
+    #[tokio::test]
+    async fn test_habit_active_streaks_and_date_queries() {
+        let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
+
+        let habit1 = Habit::new_binary("Habit One", None).with_user_id(user_id);
+        let habit2 = Habit::new_binary("Habit Two", None).with_user_id(user_id);
+        repo.create_habit(user_id, &habit1).await.unwrap();
+        repo.create_habit(user_id, &habit2).await.unwrap();
+
+        let today = Utc::now().date_naive();
+        // Check-in habit1 today
+        repo.record_check_in(habit1.id, user_id, today, 1.0, false)
+            .await
+            .unwrap();
+
+        // Test get_completed_habit_ids_for_date
+        let completed_ids = repo
+            .get_completed_habit_ids_for_date(user_id, today)
+            .await
+            .unwrap();
+        assert!(completed_ids.contains(&habit1.id));
+        assert!(!completed_ids.contains(&habit2.id));
+
+        // Test is_habit_completed_on_date
+        assert!(repo.is_habit_completed_on_date(habit1.id, today).await.unwrap());
+        assert!(!repo.is_habit_completed_on_date(habit2.id, today).await.unwrap());
+
+        // Test list_active_habits_with_streaks
+        let active_with_streaks = repo
+            .list_active_habits_with_streaks(user_id, today)
+            .await
+            .unwrap();
+        assert_eq!(active_with_streaks.len(), 2);
+        let h1_res = active_with_streaks
+            .iter()
+            .find(|(h, _)| h.id == habit1.id)
+            .unwrap();
+        assert!(h1_res.1.is_active_today);
+        let h2_res = active_with_streaks
+            .iter()
+            .find(|(h, _)| h.id == habit2.id)
+            .unwrap();
+        assert!(!h2_res.1.is_active_today);
     }
 }
