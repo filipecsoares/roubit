@@ -5,6 +5,7 @@ pub mod factory;
 pub mod local;
 pub mod remote;
 
+pub use credentials::{CredentialsManager, StoredCredentials};
 pub use factory::{ClientFactory, ClientMode};
 pub use local::LocalClient;
 pub use remote::HttpClient;

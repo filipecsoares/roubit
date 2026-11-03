@@ -182,7 +182,7 @@
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
 | **15.1** | Abstração de Transporte e Trait RoubitClient | [activity-01-roubit-client-transport-abstraction.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-01-roubit-client-transport-abstraction.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
-| **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | ⚪ NÃO INICIADO | — |
+| **15.2** | Autenticação CLI & Armazenamento em `~/.roubit/` | [activity-02-cli-credentials-token-storage.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-02-cli-credentials-token-storage.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **15.3** | Injeção de Headers JWT & Idempotency-Key | [activity-03-cli-remote-idempotency-jwt-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-03-cli-remote-idempotency-jwt-integration.prompt) | ⚪ NÃO INICIADO | — |
 | **15.4** | Suíte de Testes E2E da CLI em Modo Remoto | [activity-04-cli-remote-e2e-automated-tests.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/15-cli-hybrid-remote/activity-04-cli-remote-e2e-automated-tests.prompt) | ⚪ NÃO INICIADO | — |
 

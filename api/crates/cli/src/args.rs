@@ -70,6 +70,9 @@ pub enum Commands {
 
     /// Administrative utilities (database migrations).
     Admin(AdminArgs),
+
+    /// Authentication and remote session token management.
+    Auth(AuthArgs),
 }
 
 // ---------------------------------------------------------------------------
@@ -421,4 +424,41 @@ pub enum AdminAction {
         #[arg(long, help = "Target PostgreSQL connection URL")]
         to: String,
     },
+}
+
+// ---------------------------------------------------------------------------
+// 7. Auth Subcommands
+// ---------------------------------------------------------------------------
+
+/// Arguments for authentication commands.
+#[derive(Args, Debug, Clone, PartialEq, Eq)]
+pub struct AuthArgs {
+    /// Action to execute on authentication session.
+    #[command(subcommand)]
+    pub action: AuthSubcommands,
+}
+
+/// Supported authentication actions.
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum AuthSubcommands {
+    /// Authenticate against remote API and store token in credentials.json.
+    Login {
+        /// Remote API URL override (defaults to `--remote`, `ROUBIT_API_URL` or `<http://127.0.0.1:8080>`).
+        #[arg(long)]
+        url: Option<String>,
+
+        /// User email address.
+        #[arg(short, long)]
+        email: Option<String>,
+
+        /// User password (if omitted, will be prompted securely).
+        #[arg(short, long)]
+        password: Option<String>,
+    },
+
+    /// Remove stored session token from credentials file.
+    Logout,
+
+    /// Show current authentication status and stored user email.
+    Status,
 }
