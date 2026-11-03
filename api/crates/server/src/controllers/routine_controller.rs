@@ -1,5 +1,7 @@
 //! Routine & Time-Blocking REST API Controllers (RF01)
 
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -95,14 +97,26 @@ pub async fn get_routine(
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     let today = Utc::now().date_naive();
-    let mut block_statuses = Vec::with_capacity(blocks.len());
-    for block in &blocks {
-        let status = match repo.get_daily_log(block.id, user.id, today).await {
-            Ok(Some(log)) => log.status,
-            _ => BlockStatus::Pending,
-        };
-        block_statuses.push((block.clone(), status));
+    let daily_logs = repo
+        .list_daily_logs_for_routine(routine.id, user.id, today)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let mut log_status_map = HashMap::with_capacity(daily_logs.len());
+    for log in daily_logs {
+        log_status_map.insert(log.time_block_id, log.status);
     }
+
+    let block_statuses: Vec<(TimeBlock, BlockStatus)> = blocks
+        .iter()
+        .map(|block| {
+            let status = log_status_map
+                .get(&block.id)
+                .copied()
+                .unwrap_or(BlockStatus::Pending);
+            (block.clone(), status)
+        })
+        .collect();
 
     let progress =
         RoutineProgressTracker::compute_progress(&blocks, &block_statuses, Utc::now().time());
