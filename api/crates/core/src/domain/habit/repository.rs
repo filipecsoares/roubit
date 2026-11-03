@@ -773,8 +773,14 @@ mod tests {
         assert!(!completed_ids.contains(&habit2.id));
 
         // Test is_habit_completed_on_date
-        assert!(repo.is_habit_completed_on_date(habit1.id, today).await.unwrap());
-        assert!(!repo.is_habit_completed_on_date(habit2.id, today).await.unwrap());
+        assert!(repo
+            .is_habit_completed_on_date(habit1.id, today)
+            .await
+            .unwrap());
+        assert!(!repo
+            .is_habit_completed_on_date(habit2.id, today)
+            .await
+            .unwrap());
 
         // Test list_active_habits_with_streaks
         let active_with_streaks = repo

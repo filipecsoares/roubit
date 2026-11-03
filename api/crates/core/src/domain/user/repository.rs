@@ -58,21 +58,20 @@ impl SqliteUserRepository {
 #[async_trait]
 impl UserRepository for SqliteUserRepository {
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, UserRepositoryError> {
-        let row = sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE email = ?")
-            .bind(email)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row =
+            sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE email = ?")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?;
 
         let Some(row) = row else {
             return Ok(None);
         };
 
-        let id: Uuid = row
-            .try_get("id")
-            .or_else(|_| {
-                row.try_get::<String, _>("id")
-                    .and_then(|s| Uuid::parse_str(&s).map_err(|e| sqlx::Error::Decode(Box::new(e))))
-            })?;
+        let id: Uuid = row.try_get("id").or_else(|_| {
+            row.try_get::<String, _>("id")
+                .and_then(|s| Uuid::parse_str(&s).map_err(|e| sqlx::Error::Decode(Box::new(e))))
+        })?;
         let email: String = row.get("email");
         let password_hash: String = row.get("password_hash");
         let created_at: String = row.get("created_at");
@@ -81,10 +80,11 @@ impl UserRepository for SqliteUserRepository {
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, UserRepositoryError> {
-        let row = sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row =
+            sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
 
         let Some(row) = row else {
             return Ok(None);
