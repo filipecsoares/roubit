@@ -1,6 +1,6 @@
 # Roubit — Painel de Estado das Atividades (Activity Tracker)
 
-> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (61/66 atividades concluídas — 92.4%)  
+> **Status Geral do Projeto:** 🟡 v2.0 em Planejamento (62/66 atividades concluídas — 93.9%)  
 > **Última Atualização:** 2026-11-02  
 > **Legenda:**  
 > 🟢 **CONCLUÍDO** | 🟡 **EM PROGRESSO** | ⚪ **NÃO INICIADO**
@@ -24,9 +24,9 @@
 | **11. Modo Foco & Timer Pomodoro** | 2 | 2 | 0 | 0 | 🟢 Concluído |
 | **12. Multi-Tenancy & Data Isolation** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **13. Habit Streak Performance & Cache** | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **14. Real-Time Notifications & SSE** | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
+| **14. Real-Time Notifications & SSE** | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **15. CLI Hybrid Remote Mode** | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL** | **66** | **61** | **0** | **5** | **92.4%** |
+| **TOTAL** | **66** | **62** | **0** | **4** | **93.9%** |
 
 ---
 
@@ -174,7 +174,7 @@
 | **14.1** | Store Pinia de EventSource SSE | [activity-01-sse-eventsource-pinia-store.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-01-sse-eventsource-pinia-store.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **14.2** | Integração Web Notifications API & Chime Nativo | [activity-02-web-notifications-audio-integration.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-02-web-notifications-audio-integration.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 | **14.3** | Componentes de Toast & Feed de Alertas na UI | [activity-03-notification-toast-ui-components.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-03-notification-toast-ui-components.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
-| **14.4** | Suíte de Testes Vitest da Store de Notificações | [activity-04-notification-store-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt) | ⚪ NÃO INICIADO | — |
+| **14.4** | Suíte de Testes Vitest da Store de Notificações | [activity-04-notification-store-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/14-realtime-notifications-sse/activity-04-notification-store-vitest-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-02 |
 
 ---
 

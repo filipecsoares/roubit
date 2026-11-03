@@ -84,8 +84,8 @@ flowchart TD
 - [x] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
   - [x] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
   - [x] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
-- [ ] **8.4 Testes Vitest da Camada de Notificações**
-  - [ ] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
+- [x] **8.4 Testes Vitest da Camada de Notificações**
+  - [x] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
 
 ---
 
