@@ -81,9 +81,9 @@ flowchart TD
   - [x] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
   - [x] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.
   - [x] Síntese de aviso sonoro sutil via Web Audio API integrada (sem carregar arquivos de áudio externos).
-- [ ] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
-  - [ ] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
-  - [ ] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
+- [x] **8.3 Componente Visual de Toasts & Central de Notificações na UI**
+  - [x] Criar componente `NotificationToast.vue` com animação sutil no canto superior direito seguindo o design system escuro e minimalista.
+  - [x] Suporte a ações rápidas no toast (ex: "Iniciar Foco no Bloco" ou "Check-in Rápido").
 - [ ] **8.4 Testes Vitest da Camada de Notificações**
   - [ ] Mock de `EventSource` no Vitest testando recepção de payloads de notificação, fallbacks e tratamento de erros.
 
