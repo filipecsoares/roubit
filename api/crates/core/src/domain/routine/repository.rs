@@ -39,6 +39,9 @@ pub enum RoutineRepositoryError {
 /// - `synchronous = NORMAL` (high durability with low fsync overhead)
 /// - `foreign_keys = ON` (strict relational integrity and cascade deletions)
 /// - `busy_timeout = 5s` (mitigates database lock contention under burst writes)
+/// - `cache_size = -64000` (64MB memory page cache for hot read paths)
+/// - `temp_store = MEMORY` (RAM-backed transient tables and sorting buffers)
+/// - `mmap_size = 256MB` (memory-mapped file I/O for fast access)
 ///
 /// # Errors
 /// Returns [`sqlx::Error`] if connection string parsing or pool connection fails.
@@ -48,7 +51,10 @@ pub async fn create_sqlite_pool(database_url: &str) -> Result<SqlitePool, sqlx::
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
         .foreign_keys(true)
-        .busy_timeout(Duration::from_secs(5));
+        .busy_timeout(Duration::from_secs(5))
+        .pragma("cache_size", "-64000")
+        .pragma("temp_store", "MEMORY")
+        .pragma("mmap_size", "268435456");
 
     SqlitePoolOptions::new()
         .max_connections(5)
@@ -128,6 +134,14 @@ pub trait RoutineRepository: Send + Sync {
         user_id: Uuid,
         date: NaiveDate,
     ) -> Result<Option<DailyRoutineLog>, RoutineRepositoryError>;
+
+    /// Retrieves all daily execution logs for a routine on a specific date for a user in a single batch query.
+    async fn list_daily_logs_for_routine(
+        &self,
+        routine_id: Uuid,
+        user_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<Vec<DailyRoutineLog>, RoutineRepositoryError>;
 
     /// Deletes a routine owned by `user_id` and cascades deletion to all associated time blocks and logs.
     async fn delete_routine(&self, id: Uuid, user_id: Uuid) -> Result<(), RoutineRepositoryError>;
@@ -446,6 +460,30 @@ impl RoutineRepository for SqliteRoutineRepository {
         Ok(log)
     }
 
+    async fn list_daily_logs_for_routine(
+        &self,
+        routine_id: Uuid,
+        user_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<Vec<DailyRoutineLog>, RoutineRepositoryError> {
+        let logs = sqlx::query_as::<_, DailyRoutineLog>(
+            r"
+            SELECT dl.id, dl.time_block_id, dl.date, dl.status, dl.started_at, dl.completed_at, dl.notes
+            FROM daily_routine_logs dl
+            JOIN time_blocks tb ON dl.time_block_id = tb.id
+            JOIN routines r ON tb.routine_id = r.id
+            WHERE r.id = ? AND r.user_id = ? AND dl.date = ?
+            ",
+        )
+        .bind(routine_id)
+        .bind(user_id)
+        .bind(date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(logs)
+    }
+
     async fn delete_routine(&self, id: Uuid, user_id: Uuid) -> Result<(), RoutineRepositoryError> {
         let rows_affected = sqlx::query("DELETE FROM routines WHERE id = ? AND user_id = ?")
             .bind(id)
@@ -710,5 +748,49 @@ mod tests {
             .await
             .expect("get");
         assert!(routine_opt.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_list_daily_logs_for_routine_batch() {
+        let repo = setup_test_repo().await;
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(repo.pool(), user_id)
+            .await
+            .unwrap();
+
+        let routine = Routine::new("Batch Log Routine", None).with_user_id(user_id);
+        let block1 = TimeBlock::new(
+            routine.id,
+            "Block 1",
+            NaiveTime::from_hms_opt(8, 0, 0).expect("valid time"),
+            NaiveTime::from_hms_opt(9, 0, 0).expect("valid time"),
+            1,
+        );
+        let block2 = TimeBlock::new(
+            routine.id,
+            "Block 2",
+            NaiveTime::from_hms_opt(9, 0, 0).expect("valid time"),
+            NaiveTime::from_hms_opt(10, 0, 0).expect("valid time"),
+            2,
+        );
+
+        repo.create_routine_with_blocks(user_id, &routine, &[block1.clone(), block2.clone()])
+            .await
+            .expect("insert routine with blocks");
+
+        let today = chrono::Utc::now().date_naive();
+        repo.log_block_status(block1.id, user_id, today, BlockStatus::Completed, None)
+            .await
+            .expect("log block 1");
+        repo.log_block_status(block2.id, user_id, today, BlockStatus::InProgress, None)
+            .await
+            .expect("log block 2");
+
+        let logs = repo
+            .list_daily_logs_for_routine(routine.id, user_id, today)
+            .await
+            .expect("list batch logs");
+
+        assert_eq!(logs.len(), 2);
     }
 }

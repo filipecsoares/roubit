@@ -297,7 +297,17 @@ pub async fn idempotency_middleware(
         .bind(locked_until.to_rfc3339())
         .execute(&state.db)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .map_err(|e| {
+            if let sqlx::Error::Database(ref db_err) = e {
+                if db_err.is_unique_violation() {
+                    return ApiError::Conflict(
+                        "A request with this idempotency key is currently being processed"
+                            .to_string(),
+                    );
+                }
+            }
+            ApiError::Internal(e.into())
+        })?;
     }
 
     // Reconstruct request with buffered body bytes

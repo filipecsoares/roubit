@@ -1,5 +1,7 @@
 //! Asynchronous SQLite repository for Objectives and Key Results (RF03).
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -281,20 +283,39 @@ impl OkrRepository for SqliteOkrRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut results = Vec::with_capacity(objectives.len());
-        for obj in objectives {
-            let key_results = sqlx::query_as::<_, KeyResult>(
-                "SELECT * FROM key_results WHERE objective_id = ? ORDER BY created_at ASC",
-            )
-            .bind(obj.id)
-            .fetch_all(&self.pool)
-            .await?;
-
-            results.push(ObjectiveWithKeyResults {
-                objective: obj,
-                key_results,
-            });
+        if objectives.is_empty() {
+            return Ok(Vec::new());
         }
+
+        let all_key_results = sqlx::query_as::<_, KeyResult>(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE o.user_id = ? AND o.quarter = ?
+            ORDER BY kr.created_at ASC
+            ",
+        )
+        .bind(user_id)
+        .bind(quarter)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut kr_map: HashMap<Uuid, Vec<KeyResult>> = HashMap::new();
+        for kr in all_key_results {
+            kr_map.entry(kr.objective_id).or_default().push(kr);
+        }
+
+        let results = objectives
+            .into_iter()
+            .map(|obj| {
+                let key_results = kr_map.remove(&obj.id).unwrap_or_default();
+                ObjectiveWithKeyResults {
+                    objective: obj,
+                    key_results,
+                }
+            })
+            .collect();
 
         Ok(results)
     }
@@ -310,20 +331,38 @@ impl OkrRepository for SqliteOkrRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut results = Vec::with_capacity(objectives.len());
-        for obj in objectives {
-            let key_results = sqlx::query_as::<_, KeyResult>(
-                "SELECT * FROM key_results WHERE objective_id = ? ORDER BY created_at ASC",
-            )
-            .bind(obj.id)
-            .fetch_all(&self.pool)
-            .await?;
-
-            results.push(ObjectiveWithKeyResults {
-                objective: obj,
-                key_results,
-            });
+        if objectives.is_empty() {
+            return Ok(Vec::new());
         }
+
+        let all_key_results = sqlx::query_as::<_, KeyResult>(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE o.user_id = ?
+            ORDER BY kr.created_at ASC
+            ",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut kr_map: HashMap<Uuid, Vec<KeyResult>> = HashMap::new();
+        for kr in all_key_results {
+            kr_map.entry(kr.objective_id).or_default().push(kr);
+        }
+
+        let results = objectives
+            .into_iter()
+            .map(|obj| {
+                let key_results = kr_map.remove(&obj.id).unwrap_or_default();
+                ObjectiveWithKeyResults {
+                    objective: obj,
+                    key_results,
+                }
+            })
+            .collect();
 
         Ok(results)
     }

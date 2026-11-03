@@ -35,7 +35,13 @@ impl DatabasePool {
     /// Returns [`sqlx::Error`] if pool connection fails.
     pub async fn from_url(url: &str) -> Result<Self, sqlx::Error> {
         if url.starts_with("postgres://") || url.starts_with("postgresql://") {
-            let pool = PgPool::connect(url).await?;
+            let pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(20)
+                .min_connections(2)
+                .acquire_timeout(std::time::Duration::from_secs(5))
+                .idle_timeout(std::time::Duration::from_secs(600))
+                .connect(url)
+                .await?;
             Ok(Self::Postgres(pool))
         } else {
             let pool = crate::domain::create_sqlite_pool(url).await?;
@@ -172,13 +178,16 @@ pub async fn migrate_sqlite_to_postgres(
 
     // 3. Migrate Routines
     let routines = sqlx::query(
-        "SELECT id, name, description, is_active, created_at, updated_at FROM routines",
+        "SELECT id, user_id, name, description, is_active, created_at, updated_at FROM routines",
     )
     .fetch_all(sqlite)
     .await?;
 
     for row in routines {
         let id: String = row.get("id");
+        let user_id: String = row
+            .get::<Option<String>, _>("user_id")
+            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
         let name: String = row.get("name");
         let description: Option<String> = row.get("description");
         let is_active_int: i64 = row.get("is_active");
@@ -194,11 +203,12 @@ pub async fn migrate_sqlite_to_postgres(
         sqlx::query(
             r"
             INSERT INTO routines (id, user_id, name, description, is_active, created_at, updated_at)
-            VALUES ($1, 'default', $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (id) DO NOTHING
             ",
         )
         .bind(id)
+        .bind(user_id)
         .bind(name)
         .bind(description)
         .bind(is_active)
@@ -307,13 +317,16 @@ pub async fn migrate_sqlite_to_postgres(
 
     // 6. Migrate Habits
     let habits = sqlx::query(
-        "SELECT id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at FROM habits",
+        "SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at FROM habits",
     )
     .fetch_all(sqlite)
     .await?;
 
     for row in habits {
         let id: String = row.get("id");
+        let user_id: String = row
+            .get::<Option<String>, _>("user_id")
+            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
         let name: String = row.get("name");
         let description: Option<String> = row.get("description");
         let habit_type: String = row.get("habit_type");
@@ -323,6 +336,8 @@ pub async fn migrate_sqlite_to_postgres(
         let color_hex: String = row.get("color_hex");
         let is_archived_int: i64 = row.get("is_archived");
         let is_archived = is_archived_int != 0;
+        let current_streak: i64 = row.get("current_streak");
+        let longest_streak: i64 = row.get("longest_streak");
         let created_at: String = row.get("created_at");
         let updated_at: String = row.get("updated_at");
 
@@ -332,15 +347,18 @@ pub async fn migrate_sqlite_to_postgres(
             .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
 
         let freq_i32 = i32::try_from(frequency_days).unwrap_or(127);
+        let curr_i32 = i32::try_from(current_streak).unwrap_or(0);
+        let long_i32 = i32::try_from(longest_streak).unwrap_or(0);
 
         sqlx::query(
             r"
-            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, created_at, updated_at)
-            VALUES ($1, 'default', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             ON CONFLICT (id) DO NOTHING
             ",
         )
         .bind(id)
+        .bind(user_id)
         .bind(name)
         .bind(description)
         .bind(habit_type)
@@ -349,6 +367,8 @@ pub async fn migrate_sqlite_to_postgres(
         .bind(freq_i32)
         .bind(color_hex)
         .bind(is_archived)
+        .bind(curr_i32)
+        .bind(long_i32)
         .bind(p_created)
         .bind(p_updated)
         .execute(&mut *tx)
@@ -401,13 +421,16 @@ pub async fn migrate_sqlite_to_postgres(
 
     // 8. Migrate Objectives
     let objectives = sqlx::query(
-        "SELECT id, title, description, quarter, start_date, end_date, progress_percentage, is_completed, created_at, updated_at FROM objectives",
+        "SELECT id, user_id, title, description, quarter, start_date, end_date, progress_percentage, is_completed, created_at, updated_at FROM objectives",
     )
     .fetch_all(sqlite)
     .await?;
 
     for row in objectives {
         let id: String = row.get("id");
+        let user_id: String = row
+            .get::<Option<String>, _>("user_id")
+            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
         let title: String = row.get("title");
         let description: Option<String> = row.get("description");
         let quarter: String = row.get("quarter");
@@ -432,11 +455,12 @@ pub async fn migrate_sqlite_to_postgres(
         sqlx::query(
             r"
             INSERT INTO objectives (id, user_id, title, description, quarter, start_date, end_date, progress_percentage, is_completed, created_at, updated_at)
-            VALUES ($1, 'default', $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (id) DO NOTHING
             ",
         )
         .bind(id)
+        .bind(user_id)
         .bind(title)
         .bind(description)
         .bind(quarter)
@@ -505,13 +529,16 @@ pub async fn migrate_sqlite_to_postgres(
 
     // 10. Migrate Journal Entries
     let journal_entries = sqlx::query(
-        "SELECT id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at FROM journal_entries",
+        "SELECT id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at FROM journal_entries",
     )
     .fetch_all(sqlite)
     .await?;
 
     for row in journal_entries {
         let id: String = row.get("id");
+        let user_id: String = row
+            .get::<Option<String>, _>("user_id")
+            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
         let entry_date_str: String = row.get("entry_date");
         let mood_score: Option<i64> = row.get("mood_score");
         let tags: String = row.get("tags");
@@ -533,11 +560,12 @@ pub async fn migrate_sqlite_to_postgres(
         sqlx::query(
             r"
             INSERT INTO journal_entries (id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at)
-            VALUES ($1, 'default', $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO NOTHING
             ",
         )
         .bind(id)
+        .bind(user_id)
         .bind(entry_date)
         .bind(mood_i32)
         .bind(tags)
