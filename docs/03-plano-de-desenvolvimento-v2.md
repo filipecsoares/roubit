@@ -73,10 +73,10 @@ flowchart TD
 ### Fase 8: Notificações em Tempo Real no Frontend (SSE & Web Notifications)
 *Objetivo: Fechar o ciclo do módulo de Time Blocking tornando o Roubit proativo com alertas em tempo real no navegador via Server-Sent Events e Web Notifications API.*
 
-- [ ] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
-  - [ ] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
-  - [ ] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
-  - [ ] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
+- [x] **8.1 Store Pinia de Notificações em Tempo Real (`useNotificationStore`)**
+  - [x] Implementar cliente SSE em `frontend/src/stores/notification.ts` consumindo `/api/v1/notifications/stream`.
+  - [x] Lógica de reconexão resiliente com backoff exponencial e recuperação automática de sessão em caso de queda de rede.
+  - [x] Gerenciamento de estado de conexão (`connecting`, `connected`, `disconnected`).
 - [ ] **8.2 Integração com a Web Notifications API do Navegador**
   - [ ] Adicionar pedido explícito de permissão de notificações do sistema operacional (`Notification.requestPermission()`).
   - [ ] Exibir notificações nativas do sistema com título, ícone e mensagem ao receber eventos de início/fim de blocos de rotina ou lembretes de hábitos agendados.

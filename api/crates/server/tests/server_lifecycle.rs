@@ -627,7 +627,7 @@ async fn test_tcp_sse_notification_stream() {
     assert_eq!(hydrated.entity_type, "habit");
     assert!(hydrated.title.contains("Hábito"));
 
-    // Connect to SSE stream
+    // Connect to SSE stream via Authorization header
     let sse_url = format!("http://{local_addr}/api/v1/notifications/stream");
     let sse_res = client
         .get(&sse_url)
@@ -644,8 +644,28 @@ async fn test_tcp_sse_notification_stream() {
         .to_str()
         .expect("Valid utf8");
     assert!(content_type.contains("text/event-stream"));
-
     drop(sse_res);
+
+    // Connect to SSE stream via URL query parameter (for browser EventSource)
+    let sse_query_url = format!(
+        "http://{local_addr}/api/v1/notifications/stream?token={}",
+        auth.token
+    );
+    let sse_query_res = client
+        .get(&sse_query_url)
+        .send()
+        .await
+        .expect("SSE query param request failed");
+
+    assert_eq!(sse_query_res.status(), reqwest::StatusCode::OK);
+    let content_type_query = sse_query_res
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .expect("Content-Type header")
+        .to_str()
+        .expect("Valid utf8");
+    assert!(content_type_query.contains("text/event-stream"));
+    drop(sse_query_res);
 
     let _ = shutdown_tx.send(());
     tokio::time::timeout(Duration::from_secs(3), server_handle)
