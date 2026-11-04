@@ -71,7 +71,7 @@ flowchart TD
   - [x] Atualizar `AppState`, `main.rs`, `server.rs` (`/ready`), `idempotency.rs` e `reminder_worker.rs` para usar `DatabasePool` e trait objects dos repositórios (`Arc<dyn HabitRepository>`, etc.), selecionando SQLite (`sqlite://`) ou PostgreSQL (`postgres://`) via `DATABASE_URL`.
   - [x] Corrigir variáveis em `docker-compose.yml` (`ALLOWED_ORIGINS`, `DATABASE_URL`, healthchecks) e atualizar `.env.example` e `README.md` com instruções detalhadas para rodar em Dev Local (SQLite) vs Prod/Test (PostgreSQL + Docker Compose).
 - [x] **02.4 Suíte de Testes de Integração PostgreSQL & Redis** ([activity-04-postgres-and-redis-integration-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-04-postgres-and-redis-integration-test-suite.prompt))
-  - [ ] Criar testes de integração automatizados para os 5 repositórios PostgreSQL, migrador `SQLite -> Postgres` e locks/cache Redis, documentando sua execução no `README.md`.
+  - [x] Criar testes de integração automatizados para os 5 repositórios PostgreSQL, migrador `SQLite -> Postgres` e locks/cache Redis, documentando sua execução no `README.md`.
 
 ---
 

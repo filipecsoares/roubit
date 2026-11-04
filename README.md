@@ -286,7 +286,12 @@ Under concurrent load testing on Linux x86_64 (`release` profile, LTO enabled):
 Roubit enforces zero warnings (`-D warnings`), Clippy linter hygiene, and comprehensive test coverage:
 
 ```bash
-# Run all Rust workspace unit and integration tests (200+ tests across core, server, cli)
+# Run all Rust workspace unit and integration tests (SQLite in-memory by default)
+cargo test --workspace --manifest-path api/Cargo.toml
+
+# Run PostgreSQL & Redis integration and E2E test suites against active containers
+TEST_POSTGRES_URL=postgres://roubit_user:roubit_secure_password@localhost:5432/roubit \
+TEST_REDIS_URL=redis://127.0.0.1:6379 \
 cargo test --workspace --manifest-path api/Cargo.toml
 
 # Run NIST SP 800-38D and RFC 9106 crypto test vectors

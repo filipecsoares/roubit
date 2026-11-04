@@ -31,8 +31,8 @@ Create an automated integration test suite validating the PostgreSQL domain repo
 4. Update `README.md`, `docs/02-status-atividades.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `postgres_integration.rs` and `postgres_api_e2e.rs` validate all 5 PostgreSQL repositories, `migrate_sqlite_to_postgres`, and REST endpoints.
-- [ ] `.github/workflows/rust-ci.yml` provisions PostgreSQL and Redis service containers during CI test runs.
-- [ ] `README.md` documents how to run integration tests against PostgreSQL and Redis.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+- [x] `postgres_integration.rs` and `postgres_api_e2e.rs` validate all 5 PostgreSQL repositories, `migrate_sqlite_to_postgres`, and REST endpoints.
+- [x] `.github/workflows/rust-ci.yml` provisions PostgreSQL and Redis service containers during CI test runs.
+- [x] `README.md` documents how to run integration tests against PostgreSQL and Redis.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
 

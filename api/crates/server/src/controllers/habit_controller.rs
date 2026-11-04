@@ -250,14 +250,6 @@ pub async fn record_checkin(
         .validate()
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let habit = match state.habit_repo.get_habit_by_id(habit_id, user.id).await {
-        Ok(Some(h)) => h,
-        Ok(None) | Err(HabitRepositoryError::NotFound(_)) => {
-            return Err(ApiError::NotFound(format!("Habit {habit_id} not found")));
-        }
-        Err(e) => return Err(ApiError::Internal(e.into())),
-    };
-
     let is_increment = payload.is_increment.unwrap_or(false);
     let log = match state
         .habit_repo
@@ -301,7 +293,7 @@ pub async fn record_checkin(
         .get_habit_by_id(habit_id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
-        .unwrap_or(habit);
+        .ok_or_else(|| ApiError::NotFound(format!("Habit {habit_id} not found")))?;
 
     let today = Utc::now().date_naive();
     let is_active_today = if log.log_date == today {
