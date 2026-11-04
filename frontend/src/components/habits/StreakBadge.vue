@@ -45,7 +45,7 @@ const isNewRecord = computed(() => {
 
     <span
       v-if="isNewRecord"
-      class="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-amber-400/20 text-amber-300"
+      class="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-400/20 text-amber-300"
       title="Novo recorde pessoal!"
     >
       <Trophy class="w-2.5 h-2.5 text-amber-300" />

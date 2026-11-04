@@ -38,10 +38,10 @@ flowchart TD
 ### 🔴 Fase 01: Correções Críticas de Dados, Cofre, Notificações & Build (`P0 — Bloqueadores Críticos`)
 *Objetivo: Eliminar vazamentos de lock no banco SQLite, perda de acesso às notas criptografadas entre sessões, falha de build TypeScript/Docker e quebra do worker de notificações em tempo real.*
 
-- [ ] **01.1 Restauração do Build TypeScript/Docker & Utilitários Tailwind** ([activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt))
-  - [ ] Criar `frontend/tsconfig.app.json` para restaurar `npm run build` (`vue-tsc -b && vite build`) e o build da imagem Docker `web`.
-  - [ ] Declarar `fontFamily.outfit`, `fontFamily.mono` e animações `animate-fade-in` e `animate-bounce-short` em `frontend/tailwind.config.js`.
-  - [ ] Corrigir classe inválida `py-0.2` para `py-0.5` em `StreakBadge.vue` e atualizar instruções de build no `README.md`.
+- [x] **01.1 Restauração do Build TypeScript/Docker & Utilitários Tailwind** ([activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt))
+  - [x] Criar `frontend/tsconfig.app.json` para restaurar `npm run build` (`vue-tsc -b && vite build`) e o build da imagem Docker `web`.
+  - [x] Declarar `fontFamily.outfit`, `fontFamily.mono` e animações `animate-fade-in` e `animate-bounce-short` em `frontend/tailwind.config.js`.
+  - [x] Corrigir classe inválida `py-0.2` para `py-0.5` em `StreakBadge.vue` e atualizar instruções de build no `README.md`.
 - [ ] **01.2 Segurança Transacional SQLite & Decaimento Real de Streaks** ([activity-02-sqlite-transaction-safety-and-streak-decay.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-02-sqlite-transaction-safety-and-streak-decay.prompt))
   - [ ] Substituir `pool.acquire()` + `BEGIN IMMEDIATE` manual em `SqliteHabitRepository::record_check_in` por `self.pool.begin().await?` (RAII Drop rollback guard, eliminando `SQLITE_BUSY` em cancelamentos/timeouts).
   - [ ] Validar e decair `current_streak` para `0` em `list_active_habits_with_streaks` quando dias programados foram perdidos desde o último check-in.

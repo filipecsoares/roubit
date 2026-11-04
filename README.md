@@ -166,7 +166,7 @@ docker compose ps
 ```
 
 #### Access Points:
-- 🌐 **Web Application (PWA):** [http://localhost](http://localhost) (Port 80)
+- 🌐 **Web Application (PWA):** [http://localhost:3000](http://localhost:3000) (Port 3000)
 - 🔌 **REST API Service:** [http://localhost:8080](http://localhost:8080)
 - 📊 **Health Check:** `curl http://localhost:8080/health`
 
