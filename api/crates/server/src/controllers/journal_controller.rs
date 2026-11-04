@@ -180,6 +180,15 @@ pub async fn save_entry(
 
     // Reuse existing entry ID if saving for the same date without specifying ID
     let entry_id = if let Some(explicit_id) = payload.id {
+        let existing_by_id = repo
+            .get_entry_by_id(explicit_id, user.id)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        if existing_by_id.is_none() {
+            return Err(ApiError::NotFound(format!(
+                "Journal entry {explicit_id} not found"
+            )));
+        }
         explicit_id
     } else if let Ok(Some(existing)) = repo.get_entry_by_date(payload.entry_date, user.id).await {
         existing.metadata.id
@@ -205,7 +214,12 @@ pub async fn save_entry(
 
     repo.save_entry(user.id, &entry)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .map_err(|e| match e {
+            JournalRepositoryError::NotFound(id) => {
+                ApiError::NotFound(format!("Journal entry {id} not found"))
+            }
+            other => ApiError::Internal(other.into()),
+        })?;
 
     Ok((
         StatusCode::CREATED,

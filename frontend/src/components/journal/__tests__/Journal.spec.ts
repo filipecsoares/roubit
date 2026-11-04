@@ -164,5 +164,63 @@ describe('Journal Components & Security Guarantees', () => {
       expect(vaultStore.masterKey).toBeNull()
       expect(vaultStore.currentSalt).toBeNull()
     })
+
+    it('decrypts entries across sessions using pre-existing salt_base64 via getKeyForSalt', async () => {
+      const vaultStore = useVaultStore()
+      const passphrase = 'cross-session-passphrase-2026'
+
+      // Session 1: Unlock vault and encrypt reflection
+      await vaultStore.unlock(passphrase)
+      const session1Salt = vaultStore.currentSalt!
+      const envelope = await WebCryptoService.encrypt(
+        'Reflexão salva na sessão 1 que deve ser decifrada na sessão 2',
+        vaultStore.masterKey!,
+        session1Salt
+      )
+
+      // End of Session 1: Lock vault (wipes masterKey and currentSalt)
+      vaultStore.lock()
+      expect(vaultStore.isUnlocked).toBe(false)
+
+      // Session 2: Unlock vault (without existing salt, generating a different random salt initially)
+      await vaultStore.unlock(passphrase)
+      expect(vaultStore.isUnlocked).toBe(true)
+
+      // Derive/retrieve key for Session 1's entry salt_base64
+      const entryKey1 = await vaultStore.getKeyForSalt(envelope.saltBase64)
+      const decrypted = await WebCryptoService.decrypt(envelope, entryKey1)
+      expect(decrypted).toBe('Reflexão salva na sessão 1 que deve ser decifrada na sessão 2')
+
+      // Subsequent lookup for same saltBase64 hits O(1) in-memory Map cache
+      const entryKey2 = await vaultStore.getKeyForSalt(envelope.saltBase64)
+      expect(entryKey2).toBe(entryKey1)
+    })
+
+    it('auto-locks after 15 minutes of inactivity and resets timer on activity', async () => {
+      const { vi } = await import('vitest')
+      vi.useFakeTimers()
+      try {
+        const vaultStore = useVaultStore()
+        await vaultStore.unlock('timer-test-passphrase')
+        expect(vaultStore.isUnlocked).toBe(true)
+
+        // Advance 10 minutes and simulate user activity
+        vi.advanceTimersByTime(10 * 60 * 1000)
+        expect(vaultStore.isUnlocked).toBe(true)
+        vaultStore.resetInactivityTimer()
+
+        // Advance another 10 minutes (total 20m, but only 10m since last activity) -> still unlocked
+        vi.advanceTimersByTime(10 * 60 * 1000)
+        expect(vaultStore.isUnlocked).toBe(true)
+
+        // Advance remaining 5 minutes of inactivity -> auto-locked
+        vi.advanceTimersByTime(5 * 60 * 1000)
+        expect(vaultStore.isUnlocked).toBe(false)
+        expect(vaultStore.masterKey).toBeNull()
+        expect(vaultStore.currentSalt).toBeNull()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

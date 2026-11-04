@@ -71,6 +71,11 @@ impl<R: JournalRepository> JournalService<R> {
         &self.kdf
     }
 
+    /// Constructs the canonical Associated Authenticated Data (AAD) binding `user_id` and `entry_date`.
+    fn build_aad(user_id: Uuid, date: NaiveDate) -> String {
+        format!("{user_id}:{date}")
+    }
+
     /// Encrypts and persists a journal entry for the specified calendar date.
     ///
     /// If an entry already exists for `date`, its identifier and creation timestamp are preserved,
@@ -98,8 +103,13 @@ impl<R: JournalRepository> JournalService<R> {
         // 2. Derive 256-bit symmetric encryption key from passphrase + salt
         let derived_key = self.kdf.derive_key(passphrase.as_bytes(), &salt)?;
 
-        // 3. Encrypt plaintext reflection via AES-256-GCM
-        let envelope = AesGcmCipher::encrypt(derived_key.as_bytes(), plaintext.as_bytes(), None)?;
+        // 3. Encrypt plaintext reflection via AES-256-GCM bound with AAD (user_id:entry_date)
+        let aad = Self::build_aad(user_id, date);
+        let envelope = AesGcmCipher::encrypt(
+            derived_key.as_bytes(),
+            plaintext.as_bytes(),
+            Some(aad.as_bytes()),
+        )?;
 
         // 4. Resolve entry ID and created_at if updating an existing daily record
         let existing = self.repo.get_entry_by_date(date, user_id).await?;
@@ -158,8 +168,10 @@ impl<R: JournalRepository> JournalService<R> {
             ciphertext: entry.encrypted_payload,
         };
 
-        let plaintext_bytes = AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, None)
-            .map_err(|_| JournalServiceError::DecryptionFailed)?;
+        let aad = Self::build_aad(user_id, entry.metadata.entry_date);
+        let plaintext_bytes =
+            AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, Some(aad.as_bytes()))
+                .map_err(|_| JournalServiceError::DecryptionFailed)?;
 
         let plaintext_content = String::from_utf8(plaintext_bytes)?;
 
@@ -194,8 +206,10 @@ impl<R: JournalRepository> JournalService<R> {
             ciphertext: entry.encrypted_payload,
         };
 
-        let plaintext_bytes = AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, None)
-            .map_err(|_| JournalServiceError::DecryptionFailed)?;
+        let aad = Self::build_aad(user_id, entry.metadata.entry_date);
+        let plaintext_bytes =
+            AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, Some(aad.as_bytes()))
+                .map_err(|_| JournalServiceError::DecryptionFailed)?;
 
         let plaintext_content = String::from_utf8(plaintext_bytes)?;
 
@@ -432,5 +446,66 @@ mod tests {
             decrypted.plaintext_content,
             "Evening reflection: day complete."
         );
+    }
+
+    #[tokio::test]
+    async fn test_journal_service_aad_date_tampering_rejected_and_unique_date_enforced() {
+        let pool = SqlitePoolOptions::new()
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let repo = SqliteJournalRepository::new(pool.clone());
+        let service = JournalService::new(repo, test_kdf());
+        let user_id = Uuid::new_v4();
+        crate::domain::seed_test_user(&pool, user_id).await.unwrap();
+
+        let pass = SecretString::new("aad-pass".to_string());
+        let date = NaiveDate::from_ymd_opt(2026, 10, 29).unwrap();
+
+        let meta = service
+            .create_or_update_entry(
+                user_id,
+                date,
+                Some(5),
+                vec!["aad".to_string()],
+                SecretString::new("Bound to 2026-10-29".to_string()),
+                &pass,
+            )
+            .await
+            .unwrap();
+
+        // 1. Direct duplicate insert with different ID on same (user_id, entry_date) is rejected by unique index
+        let dup_res = sqlx::query(
+            r"
+            INSERT INTO journal_entries (
+                id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 3, '[]', X'000102030405060708090A0B0C0D0E0F', X'000102030405060708090A0B', X'000102030405060708090A0B0C0D0E0F', '2026-10-29T00:00:00Z', '2026-10-29T00:00:00Z')
+            ",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(date)
+        .execute(&pool)
+        .await;
+        assert!(
+            dup_res.is_err(),
+            "Expected UNIQUE(user_id, entry_date) constraint to reject duplicate entry"
+        );
+
+        // 2. Tamper with entry_date in DB (transplant attack) -> AAD verification fails
+        sqlx::query("UPDATE journal_entries SET entry_date = '2026-10-30' WHERE id = ?")
+            .bind(meta.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let err = service
+            .read_and_decrypt_entry(meta.id, user_id, &pass)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, JournalServiceError::DecryptionFailed));
     }
 }

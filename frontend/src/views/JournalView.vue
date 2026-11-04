@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   Lock,
   ChevronLeft,
@@ -31,6 +31,19 @@ const unlockError = ref<string | null>(null)
 const isSaving = ref(false)
 const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
+// Scrub plaintext and metadata state whenever vault locks (manual or inactivity timeout)
+watch(
+  () => vaultStore.isUnlocked,
+  (unlocked) => {
+    if (!unlocked) {
+      plaintextReflection.value = ''
+      moodScore.value = 3
+      tags.value = []
+      journalStore.currentEntry = null
+    }
+  }
+)
+
 function showToast(text: string, type: 'success' | 'error' = 'success') {
   toastMessage.value = { text, type }
   setTimeout(() => {
@@ -56,11 +69,13 @@ function changeDate(daysOffset: number) {
   const d = new Date(parts[0], parts[1] - 1, parts[2])
   d.setDate(d.getDate() + daysOffset)
   entryDate.value = d.toISOString().split('T')[0]
+  vaultStore.resetInactivityTimer()
   loadEntryForDate()
 }
 
 function setToday() {
   entryDate.value = todayStr
+  vaultStore.resetInactivityTimer()
   loadEntryForDate()
 }
 
@@ -73,6 +88,7 @@ async function handleDeleteEntry() {
   if (!meta) return
   if (!confirm(`Tem certeza que deseja excluir a reflexão do dia ${entryDate.value}?`)) return
   try {
+    vaultStore.resetInactivityTimer()
     await journalStore.deleteEntry(meta.id)
     plaintextReflection.value = ''
     moodScore.value = 3
@@ -85,6 +101,7 @@ async function handleDeleteEntry() {
 
 async function loadEntryForDate() {
   if (!vaultStore.isUnlocked) return
+  vaultStore.resetInactivityTimer()
 
   // Find metadata for entryDate
   const meta = journalStore.metadataList.find((m) => m.entry_date === entryDate.value)
@@ -100,17 +117,16 @@ async function loadEntryForDate() {
     moodScore.value = entry.mood_score || 3
     tags.value = entry.tags || []
 
-    if (vaultStore.masterKey) {
-      const decrypted = await WebCryptoService.decrypt(
-        {
-          saltBase64: entry.salt_base64,
-          nonceBase64: entry.nonce_base64,
-          ciphertextBase64: entry.ciphertext_base64,
-        },
-        vaultStore.masterKey
-      )
-      plaintextReflection.value = decrypted
-    }
+    const entryKey = await vaultStore.getKeyForSalt(entry.salt_base64)
+    const decrypted = await WebCryptoService.decrypt(
+      {
+        saltBase64: entry.salt_base64,
+        nonceBase64: entry.nonce_base64,
+        ciphertextBase64: entry.ciphertext_base64,
+      },
+      entryKey
+    )
+    plaintextReflection.value = decrypted
   } catch (err: any) {
     showToast('Falha ao decifrar reflexão para esta data', 'error')
   }
@@ -119,7 +135,28 @@ async function loadEntryForDate() {
 async function handleUnlock(passphrase: string) {
   unlockError.value = null
   try {
-    await vaultStore.unlock(passphrase)
+    if (journalStore.metadataList.length === 0) {
+      try {
+        await journalStore.fetchMetadata()
+      } catch {
+        // Ignore network error during initial metadata check
+      }
+    }
+
+    const targetMeta =
+      journalStore.metadataList.find((m) => m.entry_date === entryDate.value) ||
+      journalStore.metadataList[0]
+    let existingSaltBase64: string | undefined
+    if (targetMeta) {
+      try {
+        const existingEntry = await journalStore.fetchEntry(targetMeta.id)
+        existingSaltBase64 = existingEntry.salt_base64
+      } catch {
+        // Fallback to new salt if entry fetch fails
+      }
+    }
+
+    await vaultStore.unlock(passphrase, existingSaltBase64)
     isUnlockModalOpen.value = false
     showToast('Diário desbloqueado com sucesso! Chave retida estritamente em RAM.')
     await journalStore.fetchMetadata()
@@ -148,6 +185,7 @@ async function handleSave() {
 
   isSaving.value = true
   try {
+    vaultStore.resetInactivityTimer()
     // 1. Client-side encryption via AES-256-GCM
     const salt = vaultStore.currentSalt || WebCryptoService.generateSalt()
     const envelope = await WebCryptoService.encrypt(
@@ -300,9 +338,24 @@ onMounted(async () => {
         :mood-score="moodScore"
         :tags="tags"
         :is-saving="isSaving"
-        @update:plaintext-reflection="(val) => (plaintextReflection = val)"
-        @update:mood-score="(val) => (moodScore = val)"
-        @update:tags="(val) => (tags = val)"
+        @update:plaintext-reflection="
+          (val) => {
+            plaintextReflection = val
+            vaultStore.resetInactivityTimer()
+          }
+        "
+        @update:mood-score="
+          (val) => {
+            moodScore = val
+            vaultStore.resetInactivityTimer()
+          }
+        "
+        @update:tags="
+          (val) => {
+            tags = val
+            vaultStore.resetInactivityTimer()
+          }
+        "
         @save="handleSave"
       />
     </section>
