@@ -112,6 +112,8 @@ export const useAuthStore = defineStore('auth', () => {
       routineStore.routine = null
       routineStore.blocks = []
       routineStore.progress = null
+      routineStore.completedBlockIds = []
+      routineStore.skippedBlockIds = []
     } catch {}
 
     try {

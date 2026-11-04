@@ -9,10 +9,12 @@ import PwaUpdatePrompt from '@/components/pwa/PwaUpdatePrompt.vue'
 import { useFocusStore } from '@/stores/focus'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useRoutineStore } from '@/stores/routine'
 
 const focusStore = useFocusStore()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
+const routineStore = useRoutineStore()
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
@@ -69,7 +71,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Global Focus Mode Modal -->
-    <FocusModeModal />
+    <FocusModeModal @complete-block="(id) => routineStore.completeBlock(id)" />
 
     <!-- Global Real-Time Notification Toast Stack -->
     <NotificationToast />

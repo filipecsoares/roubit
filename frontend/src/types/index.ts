@@ -62,6 +62,8 @@ export interface RoutineWithProgressResponse {
   routine: Routine | null
   blocks: TimeBlock[]
   progress: CurrentRoutineProgress | null
+  completed_block_ids?: string[]
+  skipped_block_ids?: string[]
 }
 
 // Habit Tracking (RF02)

@@ -17,8 +17,8 @@ const focusStore = useFocusStore()
 const now = ref(new Date())
 let timerId: ReturnType<typeof setInterval> | null = null
 
-const completedBlockIds = ref<string[]>([])
-const skippedBlockIds = ref<string[]>([])
+const completedBlockIds = computed(() => routineStore.completedBlockIds)
+const skippedBlockIds = computed(() => routineStore.skippedBlockIds)
 const isRoutineModalOpen = ref(false)
 const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -56,6 +56,9 @@ const activeBlock = computed(() => {
 
 // Adherence & Progress calculations
 const routinePercentage = computed(() => {
+  if (routineStore.progress?.adherence_percentage !== undefined && routineStore.progress !== null) {
+    return Math.round(routineStore.progress.adherence_percentage)
+  }
   const total = routineStore.blocks.length
   if (total === 0) return 0
   const completed = completedBlockIds.value.length
@@ -89,23 +92,9 @@ function showToast(text: string, type: 'success' | 'error' = 'success') {
 
 async function handleCompleteBlock(blockId: string, status: BlockStatusType) {
   try {
-    if (status === 'completed') {
-      if (!completedBlockIds.value.includes(blockId)) {
-        completedBlockIds.value.push(blockId)
-      }
-      skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
-    } else if (status === 'skipped') {
-      if (!skippedBlockIds.value.includes(blockId)) {
-        skippedBlockIds.value.push(blockId)
-      }
-      completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
-    }
     await routineStore.completeBlock(blockId, status)
     showToast(`Bloco atualizado como ${status === 'completed' ? 'concluído' : 'pulado'}`)
   } catch (err: any) {
-    // Revert optimistic update
-    completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
-    skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
     showToast(err.message || 'Erro ao registrar progresso do bloco', 'error')
   }
 }

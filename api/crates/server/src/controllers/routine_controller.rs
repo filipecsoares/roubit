@@ -57,6 +57,10 @@ pub struct RoutineWithProgressResponse {
     pub routine: Option<Routine>,
     pub blocks: Vec<TimeBlock>,
     pub progress: Option<CurrentRoutineProgress>,
+    #[serde(default)]
+    pub completed_block_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub skipped_block_ids: Vec<Uuid>,
 }
 
 fn parse_time(time_str: &str) -> Result<NaiveTime, ApiError> {
@@ -88,6 +92,8 @@ pub async fn get_routine(
             routine: None,
             blocks: Vec::new(),
             progress: None,
+            completed_block_ids: Vec::new(),
+            skipped_block_ids: Vec::new(),
         }));
     };
 
@@ -104,8 +110,15 @@ pub async fn get_routine(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    let mut completed_block_ids = Vec::new();
+    let mut skipped_block_ids = Vec::new();
     let mut log_status_map = HashMap::with_capacity(daily_logs.len());
     for log in daily_logs {
+        match log.status {
+            BlockStatus::Completed => completed_block_ids.push(log.time_block_id),
+            BlockStatus::Skipped => skipped_block_ids.push(log.time_block_id),
+            _ => {}
+        }
         log_status_map.insert(log.time_block_id, log.status);
     }
 
@@ -127,6 +140,8 @@ pub async fn get_routine(
         routine: Some(routine),
         blocks,
         progress: Some(progress),
+        completed_block_ids,
+        skipped_block_ids,
     }))
 }
 
@@ -189,6 +204,12 @@ pub async fn create_routine(
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     if routine.is_active {
+        state
+            .routine_repo
+            .set_active_routine(routine.id, user.id)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
         if let Some(ref redis_svc) = state.redis {
             let scheduler =
                 roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
@@ -247,9 +268,9 @@ pub async fn complete_block(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(block_id): Path<Uuid>,
-    Json(payload): Json<Option<LogBlockStatusRequest>>,
+    payload: Option<Json<LogBlockStatusRequest>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let req = payload.unwrap_or(LogBlockStatusRequest {
+    let req = payload.map(|Json(p)| p).unwrap_or(LogBlockStatusRequest {
         date: None,
         status: None,
         notes: None,

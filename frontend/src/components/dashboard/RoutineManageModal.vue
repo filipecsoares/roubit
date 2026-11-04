@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { X, Clock, Plus, Trash2 } from 'lucide-vue-next'
 import { useModal } from '@/composables/useModal'
+import { useRoutineStore } from '@/stores/routine'
 
 const props = withDefaults(
   defineProps<{
@@ -32,6 +33,8 @@ const emit = defineEmits<{
 
 useModal(() => props.isOpen, () => emit('close'))
 
+const routineStore = useRoutineStore()
+
 const routineName = ref('Rotina Diária de Foco')
 const routineDescription = ref('')
 
@@ -44,7 +47,7 @@ interface BlockDraft {
   color_hex: string
 }
 
-const blocks = ref<BlockDraft[]>([
+const defaultBlocks: BlockDraft[] = [
   {
     id: 'b-1',
     name: 'Foco Profundo / Deep Work',
@@ -69,9 +72,36 @@ const blocks = ref<BlockDraft[]>([
     category: 'Trabalho',
     color_hex: '#3b82f6',
   },
-])
+]
 
+const blocks = ref<BlockDraft[]>([...defaultBlocks])
 const validationError = ref<string | null>(null)
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      validationError.value = null
+      if (routineStore.routine && routineStore.blocks.length > 0) {
+        routineName.value = routineStore.routine.name
+        routineDescription.value = routineStore.routine.description || ''
+        blocks.value = routineStore.blocks.map((b) => ({
+          id: b.id,
+          name: b.name,
+          start_time: b.start_time.slice(0, 5),
+          end_time: b.end_time.slice(0, 5),
+          category: b.category,
+          color_hex: b.color_hex,
+        }))
+      } else {
+        routineName.value = 'Rotina Diária de Foco'
+        routineDescription.value = ''
+        blocks.value = [...defaultBlocks]
+      }
+    }
+  },
+  { immediate: true }
+)
 
 function addBlock() {
   const lastBlock = blocks.value[blocks.value.length - 1]
@@ -124,6 +154,16 @@ function handleSave() {
 
   // Sort blocks chronologically
   validBlocks.sort((a, b) => a.start_time.localeCompare(b.start_time))
+
+  // Validate non-overlapping blocks
+  for (let i = 0; i < validBlocks.length - 1; i++) {
+    const current = validBlocks[i]
+    const next = validBlocks[i + 1]
+    if (current.end_time > next.start_time) {
+      validationError.value = `Conflito de horários: o bloco "${current.name}" termina às ${current.end_time}, sobrepondo "${next.name}" que inicia às ${next.start_time}.`
+      return
+    }
+  }
 
   emit('save', {
     name: routineName.value.trim(),

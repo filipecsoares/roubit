@@ -267,6 +267,7 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .expect("Parse routine with progress");
     assert_eq!(routine_prog.blocks.len(), 2);
     let block1_id = routine_prog.blocks[0].id;
+    let block2_id = routine_prog.blocks[1].id;
 
     // Complete time block
     let complete_url = format!("http://{local_addr}/api/v1/routines/blocks/{block1_id}/complete");
@@ -281,6 +282,84 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("Complete block failed");
     assert_eq!(complete_res.status(), reqwest::StatusCode::OK);
+
+    // Skip second time block
+    let skip_url = format!("http://{local_addr}/api/v1/routines/blocks/{block2_id}/complete");
+    let skip_res = client
+        .post(&skip_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "status": "skipped",
+            "notes": "Skipped due to urgent meeting"
+        }))
+        .send()
+        .await
+        .expect("Skip block failed");
+    assert_eq!(skip_res.status(), reqwest::StatusCode::OK);
+
+    // Verify progress hydration contains both completed and skipped block IDs
+    let get_hydrated_res = client
+        .get(&routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get routine failed");
+    assert_eq!(get_hydrated_res.status(), reqwest::StatusCode::OK);
+    let hydrated_prog: roubit_server::controllers::RoutineWithProgressResponse = get_hydrated_res
+        .json()
+        .await
+        .expect("Parse routine with progress");
+    assert!(hydrated_prog.completed_block_ids.contains(&block1_id));
+    assert!(hydrated_prog.skipped_block_ids.contains(&block2_id));
+
+    // Verify creating another active routine automatically deactivates the previous one
+    let create_second_routine_res = client
+        .post(&routines_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Evening Wind-Down",
+            "is_active": true,
+            "blocks": [
+                {
+                    "name": "Reading",
+                    "start_time": "21:00:00",
+                    "end_time": "22:00:00"
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Create second routine failed");
+    assert_eq!(create_second_routine_res.status(), reqwest::StatusCode::CREATED);
+    let second_routine: roubit_core::Routine =
+        create_second_routine_res.json().await.expect("Parse second routine");
+
+    // Fetch active routine now returns the second routine
+    let get_active2_res = client
+        .get(&routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get active routine 2 failed");
+    let active2_prog: roubit_server::controllers::RoutineWithProgressResponse = get_active2_res
+        .json()
+        .await
+        .expect("Parse active routine 2");
+    assert_eq!(active2_prog.routine.expect("Active routine").id, second_routine.id);
+
+    // List all routines confirms previous routine is_active is false
+    let list_routines_url = format!("http://{local_addr}/api/v1/routines/all");
+    let list_res = client
+        .get(&list_routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List routines failed");
+    let all_routines: Vec<roubit_core::Routine> = list_res.json().await.expect("Parse all routines");
+    let first_in_list = all_routines.iter().find(|r| r.id == created_routine.id).expect("First routine exists");
+    let second_in_list = all_routines.iter().find(|r| r.id == second_routine.id).expect("Second routine exists");
+    assert!(!first_in_list.is_active);
+    assert!(second_in_list.is_active);
 
     // 3. Habits CRUD & Idempotent check-in
     let habits_url = format!("http://{local_addr}/api/v1/habits");
