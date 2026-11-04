@@ -33,7 +33,7 @@ Implement PostgreSQL repositories (`PgUserRepository`, `PgRoutineRepository`, `P
 8. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository` implement their respective domain traits.
-- [ ] All PostgreSQL queries use `$1, $2...` parameters, strict `user_id` isolation, and proper SQLSTATE `"23505"` conflict mapping.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with 0 warnings.
+- [x] `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository` implement their respective domain traits.
+- [x] All PostgreSQL queries use `$1, $2...` parameters, strict `user_id` isolation, and proper SQLSTATE `"23505"` conflict mapping.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with 0 warnings.
 

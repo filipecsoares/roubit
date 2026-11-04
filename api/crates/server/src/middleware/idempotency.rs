@@ -67,6 +67,232 @@ struct CachedIdempotencyPayload {
     request_hash: Vec<u8>,
 }
 
+use roubit_core::DatabasePool;
+
+struct ExistingIdempotencyRecord {
+    request_hash: Vec<u8>,
+    response_status: Option<i64>,
+    response_headers: Option<String>,
+    response_body: Option<Vec<u8>>,
+    locked_until: chrono::DateTime<chrono::Utc>,
+}
+
+async fn fetch_existing_idempotency_key(
+    db: &DatabasePool,
+    user_id: &str,
+    key: &str,
+    fallback_now: chrono::DateTime<chrono::Utc>,
+) -> Result<Option<ExistingIdempotencyRecord>, ApiError> {
+    match db {
+        DatabasePool::Sqlite(pool) => {
+            let row = sqlx::query(
+                r"
+                SELECT response_status, response_headers, response_body, request_hash, locked_until
+                FROM idempotency_keys
+                WHERE user_id = ? AND key = ?
+                ",
+            )
+            .bind(user_id)
+            .bind(key)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            Ok(row.map(|r| {
+                let locked_until_str: String = r.get("locked_until");
+                let locked_until = chrono::DateTime::parse_from_rfc3339(&locked_until_str)
+                    .map_or(fallback_now, |dt| dt.with_timezone(&chrono::Utc));
+                ExistingIdempotencyRecord {
+                    request_hash: r.get("request_hash"),
+                    response_status: r.get("response_status"),
+                    response_headers: r.get("response_headers"),
+                    response_body: r.get("response_body"),
+                    locked_until,
+                }
+            }))
+        }
+        DatabasePool::Postgres(pool) => {
+            let row = sqlx::query(
+                r"
+                SELECT response_status, response_headers, response_body, request_hash, locked_until
+                FROM idempotency_keys
+                WHERE user_id = $1 AND key = $2
+                ",
+            )
+            .bind(user_id)
+            .bind(key)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            Ok(row.map(|r| {
+                let status_i32: Option<i32> = r.get("response_status");
+                ExistingIdempotencyRecord {
+                    request_hash: r.get("request_hash"),
+                    response_status: status_i32.map(i64::from),
+                    response_headers: r.get("response_headers"),
+                    response_body: r.get("response_body"),
+                    locked_until: r.get("locked_until"),
+                }
+            }))
+        }
+    }
+}
+
+async fn reacquire_expired_idempotency_lock(
+    db: &DatabasePool,
+    user_id: &str,
+    key: &str,
+    request_path: &str,
+    request_hash: &[u8],
+    locked_until: chrono::DateTime<chrono::Utc>,
+) -> Result<(), ApiError> {
+    match db {
+        DatabasePool::Sqlite(pool) => {
+            sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET locked_until = ?, request_hash = ?, request_path = ?
+                WHERE user_id = ? AND key = ?
+                ",
+            )
+            .bind(locked_until.to_rfc3339())
+            .bind(request_hash)
+            .bind(request_path)
+            .bind(user_id)
+            .bind(key)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+        DatabasePool::Postgres(pool) => {
+            sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET locked_until = $1, request_hash = $2, request_path = $3
+                WHERE user_id = $4 AND key = $5
+                ",
+            )
+            .bind(locked_until)
+            .bind(request_hash)
+            .bind(request_path)
+            .bind(user_id)
+            .bind(key)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+    }
+    Ok(())
+}
+
+async fn insert_in_flight_idempotency_key(
+    db: &DatabasePool,
+    user_id: &str,
+    key: &str,
+    request_path: &str,
+    request_hash: &[u8],
+    now: chrono::DateTime<chrono::Utc>,
+    locked_until: chrono::DateTime<chrono::Utc>,
+) -> Result<(), ApiError> {
+    let res = match db {
+        DatabasePool::Sqlite(pool) => {
+            sqlx::query(
+                r"
+                INSERT INTO idempotency_keys
+                    (key, user_id, request_path, request_hash, response_status, response_headers, response_body, created_at, locked_until)
+                VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
+                ",
+            )
+            .bind(key)
+            .bind(user_id)
+            .bind(request_path)
+            .bind(request_hash)
+            .bind(now.to_rfc3339())
+            .bind(locked_until.to_rfc3339())
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+        DatabasePool::Postgres(pool) => {
+            sqlx::query(
+                r"
+                INSERT INTO idempotency_keys
+                    (key, user_id, request_path, request_hash, response_status, response_headers, response_body, created_at, locked_until)
+                VALUES ($1, $2, $3, $4, NULL, NULL, NULL, $5, $6)
+                ",
+            )
+            .bind(key)
+            .bind(user_id)
+            .bind(request_path)
+            .bind(request_hash)
+            .bind(now)
+            .bind(locked_until)
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+    };
+
+    res.map_err(|e| {
+        if let sqlx::Error::Database(ref db_err) = e {
+            if db_err.is_unique_violation() {
+                return ApiError::Conflict(
+                    "A request with this idempotency key is currently being processed".to_string(),
+                );
+            }
+        }
+        ApiError::Internal(e.into())
+    })
+}
+
+async fn complete_idempotency_key(
+    db: &DatabasePool,
+    user_id: &str,
+    key: &str,
+    status_code: u16,
+    headers_json: &str,
+    res_slice: &[u8],
+) -> Result<(), ApiError> {
+    match db {
+        DatabasePool::Sqlite(pool) => {
+            sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET response_status = ?, response_headers = ?, response_body = ?
+                WHERE user_id = ? AND key = ?
+                ",
+            )
+            .bind(i64::from(status_code))
+            .bind(headers_json)
+            .bind(res_slice)
+            .bind(user_id)
+            .bind(key)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+        DatabasePool::Postgres(pool) => {
+            sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET response_status = $1, response_headers = $2, response_body = $3
+                WHERE user_id = $4 AND key = $5
+                ",
+            )
+            .bind(i32::from(status_code))
+            .bind(headers_json)
+            .bind(res_slice)
+            .bind(user_id)
+            .bind(key)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+    }
+    Ok(())
+}
+
 /// Idempotency middleware for transactional state mutation endpoints
 ///
 /// # Errors
@@ -149,7 +375,7 @@ pub async fn idempotency_middleware(
             }
             Ok(None) => {}
             Err(e) => {
-                tracing::warn!(error = %e, "Redis get_idempotency_response failed; falling back to SQLite");
+                tracing::warn!(error = %e, "Redis get_idempotency_response failed; falling back to database");
             }
         }
     }
@@ -171,7 +397,7 @@ pub async fn idempotency_middleware(
                 ));
             }
             Err(e) => {
-                tracing::warn!(error = %e, "Redis acquire_idempotency_lock failed; falling back to SQLite");
+                tracing::warn!(error = %e, "Redis acquire_idempotency_lock failed; falling back to database");
             }
         }
     }
@@ -179,27 +405,12 @@ pub async fn idempotency_middleware(
     let now = chrono::Utc::now();
     let locked_until = now + chrono::Duration::seconds(IN_FLIGHT_LOCK_DURATION_SECONDS);
 
-    // Query existing key state for this scoped user in SQLite
-    let existing_row = sqlx::query(
-        r"
-        SELECT response_status, response_headers, response_body, request_hash, locked_until
-        FROM idempotency_keys
-        WHERE user_id = ? AND key = ?
-        ",
-    )
-    .bind(&user_id)
-    .bind(&key)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    // Query existing key state for this scoped user in the active database
+    let existing_row = fetch_existing_idempotency_key(&state.db, &user_id, &key, now).await?;
 
-    if let Some(row) = existing_row {
-        let stored_hash: Vec<u8> = row.get("request_hash");
-        let response_status_opt: Option<i64> = row.get("response_status");
-        let locked_until_str: String = row.get("locked_until");
-
+    if let Some(record) = existing_row {
         // Payload fingerprint verification
-        if stored_hash != request_hash {
+        if record.request_hash != request_hash {
             if redis_locked {
                 if let Some(ref redis) = state.redis {
                     let _ = redis
@@ -214,7 +425,7 @@ pub async fn idempotency_middleware(
         }
 
         // Case 1: Request already completed -> Replay cached response
-        if let Some(status_code) = response_status_opt {
+        if let Some(status_code) = record.response_status {
             if redis_locked {
                 if let Some(ref redis) = state.redis {
                     let _ = redis
@@ -228,14 +439,13 @@ pub async fn idempotency_middleware(
             let status =
                 StatusCode::from_u16(u16_status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
-            let headers_json: Option<String> = row.get("response_headers");
-            let cached_body: Vec<u8> = row.get("response_body");
+            let cached_body = record.response_body.unwrap_or_default();
 
             let mut response = Response::builder()
                 .status(status)
                 .header(X_CACHE_HEADER, HeaderValue::from_static("HIT"));
 
-            if let Some(json_str) = headers_json {
+            if let Some(json_str) = record.response_headers {
                 if let Ok(headers_map) = serde_json::from_str::<HashMap<String, String>>(&json_str)
                 {
                     for (header_name, header_val) in headers_map {
@@ -255,59 +465,34 @@ pub async fn idempotency_middleware(
         }
 
         // Case 2: In-flight request currently running and lock active
-        let locked_until_time = chrono::DateTime::parse_from_rfc3339(&locked_until_str)
-            .map_or(now, |dt| dt.with_timezone(&chrono::Utc));
-
-        if locked_until_time > now {
+        if record.locked_until > now {
             return Err(ApiError::Conflict(
                 "A request with this idempotency key is currently being processed".to_string(),
             ));
         }
 
         // Case 3: Expired lock without completion (worker timed out) -> Re-acquire lock
-        sqlx::query(
-            r"
-            UPDATE idempotency_keys
-            SET locked_until = ?, request_hash = ?, request_path = ?
-            WHERE user_id = ? AND key = ?
-            ",
+        reacquire_expired_idempotency_lock(
+            &state.db,
+            &user_id,
+            &key,
+            &request_path,
+            &request_hash,
+            locked_until,
         )
-        .bind(locked_until.to_rfc3339())
-        .bind(&request_hash)
-        .bind(&request_path)
-        .bind(&user_id)
-        .bind(&key)
-        .execute(&state.db)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .await?;
     } else {
         // Insert new in-flight record
-        sqlx::query(
-            r"
-            INSERT INTO idempotency_keys
-                (key, user_id, request_path, request_hash, response_status, response_headers, response_body, created_at, locked_until)
-            VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
-            ",
+        insert_in_flight_idempotency_key(
+            &state.db,
+            &user_id,
+            &key,
+            &request_path,
+            &request_hash,
+            now,
+            locked_until,
         )
-        .bind(&key)
-        .bind(&user_id)
-        .bind(&request_path)
-        .bind(&request_hash)
-        .bind(now.to_rfc3339())
-        .bind(locked_until.to_rfc3339())
-        .execute(&state.db)
-        .await
-        .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.is_unique_violation() {
-                    return ApiError::Conflict(
-                        "A request with this idempotency key is currently being processed"
-                            .to_string(),
-                    );
-                }
-            }
-            ApiError::Internal(e.into())
-        })?;
+        .await?;
     }
 
     // Reconstruct request with buffered body bytes
@@ -328,26 +513,17 @@ pub async fn idempotency_middleware(
             }
         }
         let headers_json = serde_json::to_string(&headers_to_cache).unwrap_or_default();
-
-        let status_code_i64 = i64::from(res_parts.status.as_u16());
         let res_slice: &[u8] = &res_bytes;
 
-        // Persist to SQLite
-        sqlx::query(
-            r"
-            UPDATE idempotency_keys
-            SET response_status = ?, response_headers = ?, response_body = ?
-            WHERE user_id = ? AND key = ?
-            ",
+        complete_idempotency_key(
+            &state.db,
+            &user_id,
+            &key,
+            res_parts.status.as_u16(),
+            &headers_json,
+            res_slice,
         )
-        .bind(status_code_i64)
-        .bind(&headers_json)
-        .bind(res_slice)
-        .bind(&user_id)
-        .bind(&key)
-        .execute(&state.db)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .await?;
 
         // Cache in Redis with 24-hour TTL (86,400 seconds)
         if let Some(ref redis) = state.redis {
@@ -388,6 +564,34 @@ pub async fn idempotency_middleware(
     Ok(response)
 }
 
+/// Purges idempotency keys older than the specified duration across SQLite or PostgreSQL
+///
+/// # Errors
+/// Returns [`sqlx::Error`] if cleanup query fails.
+pub async fn purge_expired_keys_from_pool(
+    db: &DatabasePool,
+    max_age: chrono::Duration,
+) -> Result<u64, sqlx::Error> {
+    let cutoff_dt = chrono::Utc::now() - max_age;
+    match db {
+        DatabasePool::Sqlite(pool) => {
+            let cutoff = cutoff_dt.to_rfc3339();
+            let result = sqlx::query("DELETE FROM idempotency_keys WHERE created_at < ?")
+                .bind(&cutoff)
+                .execute(pool)
+                .await?;
+            Ok(result.rows_affected())
+        }
+        DatabasePool::Postgres(pool) => {
+            let result = sqlx::query("DELETE FROM idempotency_keys WHERE created_at < $1")
+                .bind(cutoff_dt)
+                .execute(pool)
+                .await?;
+            Ok(result.rows_affected())
+        }
+    }
+}
+
 /// Purges idempotency keys older than the specified duration to conserve storage
 ///
 /// # Errors
@@ -396,12 +600,7 @@ pub async fn purge_expired_keys(
     pool: &sqlx::SqlitePool,
     max_age: chrono::Duration,
 ) -> Result<u64, sqlx::Error> {
-    let cutoff = (chrono::Utc::now() - max_age).to_rfc3339();
-    let result = sqlx::query("DELETE FROM idempotency_keys WHERE created_at < ?")
-        .bind(&cutoff)
-        .execute(pool)
-        .await?;
-    Ok(result.rows_affected())
+    purge_expired_keys_from_pool(&DatabasePool::Sqlite(pool.clone()), max_age).await
 }
 
 #[cfg(test)]

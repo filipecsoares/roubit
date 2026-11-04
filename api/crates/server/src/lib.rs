@@ -20,15 +20,16 @@ pub use controllers::{
 };
 pub use errors::{ApiError, ProblemDetails};
 pub use middleware::{
-    build_cors_layer, idempotency_middleware, purge_expired_keys, security_headers_middleware,
-    IDEMPOTENCY_KEY_HEADER, X_CACHE_HEADER,
+    build_cors_layer, idempotency_middleware, purge_expired_keys, purge_expired_keys_from_pool,
+    security_headers_middleware, IDEMPOTENCY_KEY_HEADER, X_CACHE_HEADER,
 };
 pub use server::{
-    build_router, fallback_handler, health_check, run_server, shutdown_signal, HealthResponse,
-    REQUEST_ID_HEADER,
+    build_router, fallback_handler, health_check, readiness_check, run_server, shutdown_signal,
+    HealthResponse, REQUEST_ID_HEADER,
 };
 pub use state::AppState;
 pub use workers::{
-    catch_up_missed_reminders, hydrate_reminder, notification_stream_handler, parse_reminder_key,
+    catch_up_missed_reminders, catch_up_missed_reminders_from_pool, hydrate_reminder,
+    hydrate_reminder_from_pool, notification_stream_handler, parse_reminder_key,
     start_reminder_worker,
 };

@@ -18,10 +18,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-use roubit_core::{
-    EncryptedJournalEntry, JournalMetadata, JournalRepository, JournalRepositoryError,
-    SqliteJournalRepository,
-};
+use roubit_core::{EncryptedJournalEntry, JournalMetadata, JournalRepositoryError};
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
@@ -73,13 +70,13 @@ pub async fn list_metadata(
     user: AuthenticatedUser,
     Query(query): Query<JournalMetadataQuery>,
 ) -> Result<Json<Vec<JournalMetadata>>, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
     let end_date = query.end_date.unwrap_or_else(|| Utc::now().date_naive());
     let start_date = query
         .start_date
         .unwrap_or_else(|| end_date - Duration::days(365));
 
-    let metadata_list = repo
+    let metadata_list = state
+        .journal_repo
         .list_metadata_in_range(user.id, start_date, end_date)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -98,8 +95,8 @@ pub async fn get_entry(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<EncryptedJournalResponse>, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
-    let entry_opt = repo
+    let entry_opt = state
+        .journal_repo
         .get_entry_by_id(id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -176,11 +173,10 @@ pub async fn save_entry(
     let mut nonce_arr = [0u8; 12];
     nonce_arr.copy_from_slice(&nonce);
 
-    let repo = SqliteJournalRepository::new(state.db);
-
     // Reuse existing entry ID if saving for the same date without specifying ID
     let entry_id = if let Some(explicit_id) = payload.id {
-        let existing_by_id = repo
+        let existing_by_id = state
+            .journal_repo
             .get_entry_by_id(explicit_id, user.id)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
@@ -190,7 +186,11 @@ pub async fn save_entry(
             )));
         }
         explicit_id
-    } else if let Ok(Some(existing)) = repo.get_entry_by_date(payload.entry_date, user.id).await {
+    } else if let Ok(Some(existing)) = state
+        .journal_repo
+        .get_entry_by_date(payload.entry_date, user.id)
+        .await
+    {
         existing.metadata.id
     } else {
         Uuid::new_v4()
@@ -212,7 +212,9 @@ pub async fn save_entry(
     let entry = EncryptedJournalEntry::new(metadata, salt_arr, nonce_arr, ciphertext)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    repo.save_entry(user.id, &entry)
+    state
+        .journal_repo
+        .save_entry(user.id, &entry)
         .await
         .map_err(|e| match e {
             JournalRepositoryError::NotFound(id) => {
@@ -244,8 +246,7 @@ pub async fn delete_entry(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
-    match repo.delete_entry(id, user.id).await {
+    match state.journal_repo.delete_entry(id, user.id).await {
         Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
         Err(JournalRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Journal entry {id} not found")))

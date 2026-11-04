@@ -30,6 +30,8 @@ pub struct HealthResponse {
     pub version: String,
 }
 
+use axum::extract::State;
+
 /// Handler for the `/health` liveness probe
 pub async fn health_check() -> (StatusCode, Json<HealthResponse>) {
     (
@@ -39,6 +41,28 @@ pub async fn health_check() -> (StatusCode, Json<HealthResponse>) {
             version: roubit_core::VERSION.to_string(),
         }),
     )
+}
+
+/// Handler for the `/ready` readiness probe verifying active database connectivity
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if the database health check fails.
+pub async fn readiness_check(
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<HealthResponse>), ApiError> {
+    state
+        .db
+        .health_check()
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Database readiness check failed: {e}")))?;
+
+    Ok((
+        StatusCode::OK,
+        Json(HealthResponse {
+            status: "ready".to_string(),
+            version: roubit_core::VERSION.to_string(),
+        }),
+    ))
 }
 
 /// Fallback 404 handler producing RFC 7807 Problem Details
@@ -95,6 +119,7 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(health_check).layer(timeout_layer))
+        .route("/ready", get(readiness_check).layer(timeout_layer))
         .nest("/api/v1", api_v1)
         .fallback(fallback_handler)
         .layer(from_fn(crate::middleware::security_headers_middleware))
@@ -143,7 +168,7 @@ pub async fn shutdown_signal() {
 /// Returns error if binding TCP socket fails or server encountered runtime failure.
 pub async fn run_server(
     config: roubit_core::AppConfig,
-    pool: sqlx::SqlitePool,
+    pool: roubit_core::DatabasePool,
 ) -> anyhow::Result<()> {
     let addr = format!("{}:{}", config.server_host, config.server_port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -156,13 +181,13 @@ pub async fn run_server(
                 Some(svc)
             }
             Err(e) => {
-                tracing::warn!(error = %e, redis_url = %redis_url, "Failed to initialize Redis pool, falling back to SQLite");
+                tracing::warn!(error = %e, redis_url = %redis_url, "Failed to initialize Redis pool, falling back to database");
                 None
             }
         }
     });
 
-    let mut state = AppState::new(pool, config);
+    let mut state = AppState::from_pool(pool, config);
     if let Some(redis) = redis_service {
         state = state.with_redis(redis);
     }
@@ -247,6 +272,30 @@ mod tests {
         let health: HealthResponse = serde_json::from_slice(&body).expect("Failed to parse json");
         assert_eq!(health.status, "ok");
         assert_eq!(health.version, roubit_core::VERSION);
+    }
+
+    #[tokio::test]
+    async fn test_readiness_check_returns_ready() {
+        let app = setup_test_app().await;
+
+        let request = Request::builder()
+            .uri("/ready")
+            .method("GET")
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let ready: HealthResponse = serde_json::from_slice(&body).expect("Failed to parse json");
+        assert_eq!(ready.status, "ready");
+        assert_eq!(ready.version, roubit_core::VERSION);
     }
 
     #[tokio::test]

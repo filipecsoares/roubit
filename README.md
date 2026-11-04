@@ -149,26 +149,27 @@ Roubit can be launched in one command via **Docker Compose** or run natively for
 
 ---
 
-### Option A: 1-Command Stack via Docker Compose (Recommended)
+### Option A: Production / Test Stack via Docker Compose (PostgreSQL 16 + Redis 7)
 
-Spins up PostgreSQL 16, Redis 7, Axum REST API, and the Vue 3 PWA behind an Nginx reverse proxy:
+In **production and integration test environments**, Roubit runs on **PostgreSQL 16** (automatically selected when `DATABASE_URL=postgres://...`) and **Redis 7** (distributed idempotency locks, L2 summary cache, and SSE keyspace notifications), alongside the Vue 3 PWA behind an Nginx reverse proxy:
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/filipecsoares/roubit.git
 cd roubit
 
-# 2. Start all services in the background
-docker compose up -d
+# 2. Start all services in the background (PostgreSQL 16 + Redis 7 + API + Frontend)
+docker compose up -d --build
 
 # 3. Check running status
 docker compose ps
 ```
 
 #### Access Points:
-- 🌐 **Web Application (PWA):** [http://localhost:3000](http://localhost:3000) (Port 3000)
+- 🌐 **Web Application (PWA):** [http://localhost](http://localhost) (Port 80)
 - 🔌 **REST API Service:** [http://localhost:8080](http://localhost:8080)
-- 📊 **Health Check:** `curl http://localhost:8080/health`
+- 📊 **Liveness Probe:** `curl http://localhost:8080/health`
+- 🗄️ **Readiness Probe (DB Check):** `curl http://localhost:8080/ready`
 
 To stop all services:
 ```bash
@@ -177,14 +178,16 @@ docker compose down
 
 ---
 
-### Option B: Local Native Development
+### Option B: Local Native Development (SQLite WAL — Zero External Dependencies)
+
+In **local development**, Roubit defaults to an embedded **SQLite** database in WAL mode (`DATABASE_URL=sqlite://roubit.db?mode=rwc`), requiring no external database server:
 
 #### 1. Start the Backend API (Rust)
-By default, the server runs against an embedded local SQLite database (`roubit.db`) with zero setup needed:
 ```bash
+# Uses sqlite://roubit.db?mode=rwc by default (or set DATABASE_URL=postgres://... to use PostgreSQL locally)
 cargo run --bin roubit-server --manifest-path api/Cargo.toml
 ```
-*The server starts listening on `http://127.0.0.1:8080`.*
+*The server automatically applies the matching schema migrations (`migrations/` for SQLite or `migrations_pg/` for PostgreSQL) and starts listening on `http://127.0.0.1:8080`.*
 
 #### 2. Start the Frontend App (Vue 3 PWA)
 In a separate terminal:
@@ -283,7 +286,12 @@ Under concurrent load testing on Linux x86_64 (`release` profile, LTO enabled):
 Roubit enforces zero warnings (`-D warnings`), Clippy linter hygiene, and comprehensive test coverage:
 
 ```bash
-# Run all Rust workspace unit and integration tests (200+ tests across core, server, cli)
+# Run all Rust workspace unit and integration tests (SQLite in-memory by default)
+cargo test --workspace --manifest-path api/Cargo.toml
+
+# Run PostgreSQL & Redis integration and E2E test suites against active containers
+TEST_POSTGRES_URL=postgres://roubit_user:roubit_secure_password@localhost:5432/roubit \
+TEST_REDIS_URL=redis://127.0.0.1:6379 \
 cargo test --workspace --manifest-path api/Cargo.toml
 
 # Run NIST SP 800-38D and RFC 9106 crypto test vectors

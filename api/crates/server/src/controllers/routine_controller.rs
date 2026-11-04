@@ -15,8 +15,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    BlockStatus, CurrentRoutineProgress, Routine, RoutineProgressTracker, RoutineRepository,
-    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock, TimeBlockValidator,
+    BlockStatus, CurrentRoutineProgress, Routine, RoutineProgressTracker, RoutineRepositoryError,
+    TimeBlock, TimeBlockValidator,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -77,8 +77,8 @@ pub async fn get_routine(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<RoutineWithProgressResponse>, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
-    let routine_opt = repo
+    let routine_opt = state
+        .routine_repo
         .get_active_routine(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -91,13 +91,15 @@ pub async fn get_routine(
         }));
     };
 
-    let blocks = repo
+    let blocks = state
+        .routine_repo
         .list_blocks_for_routine(routine.id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     let today = Utc::now().date_naive();
-    let daily_logs = repo
+    let daily_logs = state
+        .routine_repo
         .list_daily_logs_for_routine(routine.id, user.id, today)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -180,8 +182,9 @@ pub async fn create_routine(
         updated_at: Utc::now(),
     };
 
-    let repo = SqliteRoutineRepository::new(state.db);
-    repo.create_routine_with_blocks(user.id, &routine, &domain_blocks)
+    state
+        .routine_repo
+        .create_routine_with_blocks(user.id, &routine, &domain_blocks)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -227,8 +230,8 @@ pub async fn list_routines(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<Routine>>, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
-    let routines = repo
+    let routines = state
+        .routine_repo
         .list_routines(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -265,8 +268,8 @@ pub async fn complete_block(
         }
     };
 
-    let repo = SqliteRoutineRepository::new(state.db);
-    match repo
+    match state
+        .routine_repo
         .log_block_status(block_id, user.id, target_date, status, req.notes)
         .await
     {
@@ -294,16 +297,17 @@ pub async fn delete_routine(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
     let blocks_to_cancel = if state.redis.is_some() {
-        repo.list_blocks_for_routine(id, user.id)
+        state
+            .routine_repo
+            .list_blocks_for_routine(id, user.id)
             .await
             .unwrap_or_default()
     } else {
         Vec::new()
     };
 
-    match repo.delete_routine(id, user.id).await {
+    match state.routine_repo.delete_routine(id, user.id).await {
         Ok(()) => {
             if let Some(ref redis_svc) = state.redis {
                 let scheduler =
