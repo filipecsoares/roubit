@@ -128,6 +128,139 @@ impl MigrationReport {
     }
 }
 
+/// Extracts a UUID string (`"xxxxxxxx-xxxx-..."`) from a SQLite row column that may be stored
+/// either as a 16-byte binary `BLOB` (`sqlx::Uuid` default) or as a 36-char UTF-8 `TEXT` string.
+///
+/// # Errors
+/// Returns [`DatabaseError::DataMigration`] if the column cannot be decoded as a valid UUID or non-empty identifier.
+pub fn extract_uuid_str(row: &sqlx::sqlite::SqliteRow, col: &str) -> Result<String, DatabaseError> {
+    if let Ok(u) = row.try_get::<uuid::Uuid, _>(col) {
+        return Ok(u.to_string());
+    }
+    if let Ok(s) = row.try_get::<String, _>(col) {
+        if let Ok(u) = uuid::Uuid::parse_str(&s) {
+            return Ok(u.to_string());
+        }
+        if !s.is_empty() {
+            return Ok(s);
+        }
+    }
+    if let Ok(bytes) = row.try_get::<Vec<u8>, _>(col) {
+        if let Ok(u) = uuid::Uuid::from_slice(&bytes) {
+            return Ok(u.to_string());
+        }
+        if let Ok(s) = String::from_utf8(bytes) {
+            if !s.is_empty() {
+                return Ok(s);
+            }
+        }
+    }
+    Err(DatabaseError::DataMigration(format!(
+        "Failed to decode UUID from SQLite column '{col}'"
+    )))
+}
+
+/// Extracts an optional UUID string from a nullable SQLite column (`BLOB` or `TEXT`).
+#[must_use]
+pub fn extract_opt_uuid_str(row: &sqlx::sqlite::SqliteRow, col: &str) -> Option<String> {
+    if let Ok(Some(u)) = row.try_get::<Option<uuid::Uuid>, _>(col) {
+        return Some(u.to_string());
+    }
+    if let Ok(Some(s)) = row.try_get::<Option<String>, _>(col) {
+        if let Ok(u) = uuid::Uuid::parse_str(&s) {
+            return Some(u.to_string());
+        }
+        if !s.is_empty() {
+            return Some(s);
+        }
+    }
+    if let Ok(Some(bytes)) = row.try_get::<Option<Vec<u8>>, _>(col) {
+        if let Ok(u) = uuid::Uuid::from_slice(&bytes) {
+            return Some(u.to_string());
+        }
+        if let Ok(s) = String::from_utf8(bytes) {
+            if !s.is_empty() {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
+/// Extracts a `DateTime<Utc>` from a SQLite column, supporting `SQLx`'s native SQLite datetime format
+/// (`"YYYY-MM-DD HH:MM:SS.f UTC"`), RFC 3339 (`"YYYY-MM-DDTHH:MM:SSZ"`), and naive ISO strings.
+///
+/// # Errors
+/// Returns [`DatabaseError::DataMigration`] if the timestamp cannot be decoded.
+pub fn extract_datetime(
+    row: &sqlx::sqlite::SqliteRow,
+    col: &str,
+) -> Result<chrono::DateTime<chrono::Utc>, DatabaseError> {
+    if let Ok(dt) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(col) {
+        return Ok(dt);
+    }
+    if let Ok(s) = row.try_get::<String, _>(col) {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+            return Ok(dt.with_timezone(&chrono::Utc));
+        }
+        let trimmed = s.trim_end_matches(" UTC").trim_end_matches('Z');
+        if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f") {
+            return Ok(ndt.and_utc());
+        }
+        if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S%.f") {
+            return Ok(ndt.and_utc());
+        }
+    }
+    Err(DatabaseError::DataMigration(format!(
+        "Failed to decode DateTime<Utc> from SQLite column '{col}'"
+    )))
+}
+
+/// Extracts an optional `DateTime<Utc>` from a nullable SQLite column.
+#[must_use]
+pub fn extract_opt_datetime(
+    row: &sqlx::sqlite::SqliteRow,
+    col: &str,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    if let Ok(Some(dt)) = row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>(col) {
+        return Some(dt);
+    }
+    if let Ok(Some(s)) = row.try_get::<Option<String>, _>(col) {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+            return Some(dt.with_timezone(&chrono::Utc));
+        }
+        let trimmed = s.trim_end_matches(" UTC").trim_end_matches('Z');
+        if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f") {
+            return Some(ndt.and_utc());
+        }
+        if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S%.f") {
+            return Some(ndt.and_utc());
+        }
+    }
+    None
+}
+
+/// Extracts a `NaiveDate` from a SQLite column.
+///
+/// # Errors
+/// Returns [`DatabaseError::DataMigration`] if the date cannot be decoded.
+pub fn extract_date(
+    row: &sqlx::sqlite::SqliteRow,
+    col: &str,
+) -> Result<chrono::NaiveDate, DatabaseError> {
+    if let Ok(d) = row.try_get::<chrono::NaiveDate, _>(col) {
+        return Ok(d);
+    }
+    if let Ok(s) = row.try_get::<String, _>(col) {
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
+            return Ok(d);
+        }
+    }
+    Err(DatabaseError::DataMigration(format!(
+        "Failed to decode NaiveDate from SQLite column '{col}'"
+    )))
+}
+
 /// Migrates all data from an existing SQLite database into a target PostgreSQL database.
 ///
 /// Execution runs inside an atomic PostgreSQL transaction. If any error occurs during
@@ -145,6 +278,7 @@ pub async fn migrate_sqlite_to_postgres(
 
     let mut report = MigrationReport::default();
     let mut tx = postgres.begin().await?;
+    let default_user_id = "00000000-0000-0000-0000-000000000001".to_string();
 
     // 2. Migrate Users
     let users = sqlx::query("SELECT id, email, password_hash, created_at FROM users")
@@ -152,18 +286,16 @@ pub async fn migrate_sqlite_to_postgres(
         .await?;
 
     for row in users {
-        let id: String = row.get("id");
-        let email: String = row.get("email");
-        let password_hash: String = row.get("password_hash");
-        let created_at: String = row.get("created_at");
-        let parsed_created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let email: String = row.try_get("email")?;
+        let password_hash: String = row.try_get("password_hash")?;
+        let parsed_created_at = extract_datetime(&row, "created_at")?;
 
         sqlx::query(
             r"
             INSERT INTO users (id, email, password_hash, created_at)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT DO NOTHING
             ",
         )
         .bind(id)
@@ -184,21 +316,16 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in routines {
-        let id: String = row.get("id");
-        let user_id: String = row
-            .get::<Option<String>, _>("user_id")
-            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
-        let name: String = row.get("name");
-        let description: Option<String> = row.get("description");
-        let is_active_int: i64 = row.get("is_active");
-        let is_active = is_active_int != 0;
-        let created_at: String = row.get("created_at");
-        let updated_at: String = row.get("updated_at");
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_updated = chrono::DateTime::parse_from_rfc3339(&updated_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let user_id =
+            extract_opt_uuid_str(&row, "user_id").unwrap_or_else(|| default_user_id.clone());
+        let name: String = row.try_get("name")?;
+        let description: Option<String> = row.try_get("description")?;
+        let is_active = row
+            .try_get::<bool, _>("is_active")
+            .unwrap_or_else(|_| row.try_get::<i64, _>("is_active").unwrap_or(0) != 0);
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_updated = extract_datetime(&row, "updated_at")?;
 
         sqlx::query(
             r"
@@ -228,19 +355,15 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in time_blocks {
-        let id: String = row.get("id");
-        let routine_id: String = row.get("routine_id");
-        let name: String = row.get("name");
-        let start_time: String = row.get("start_time");
-        let end_time: String = row.get("end_time");
-        let category: String = row.get("category");
-        let color_hex: String = row.get("color_hex");
-        let order_index: i64 = row.get("order_index");
-        let created_at: String = row.get("created_at");
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-
+        let id = extract_uuid_str(&row, "id")?;
+        let routine_id = extract_uuid_str(&row, "routine_id")?;
+        let name: String = row.try_get("name")?;
+        let start_time: String = row.try_get("start_time")?;
+        let end_time: String = row.try_get("end_time")?;
+        let category: String = row.try_get("category")?;
+        let color_hex: String = row.try_get("color_hex")?;
+        let order_index: i64 = row.try_get("order_index")?;
+        let p_created = extract_datetime(&row, "created_at")?;
         let order_i32 = i32::try_from(order_index).unwrap_or(0);
 
         sqlx::query(
@@ -273,33 +396,19 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in daily_logs {
-        let id: String = row.get("id");
-        let time_block_id: String = row.get("time_block_id");
-        let date_str: String = row.get("date");
-        let status: String = row.get("status");
-        let started_at: Option<String> = row.get("started_at");
-        let completed_at: Option<String> = row.get("completed_at");
-        let notes: Option<String> = row.get("notes");
-
-        let log_date = chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-            .unwrap_or_else(|_| chrono::Utc::now().date_naive());
-
-        let p_started = started_at.and_then(|s| {
-            chrono::DateTime::parse_from_rfc3339(&s)
-                .ok()
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-        });
-        let p_completed = completed_at.and_then(|s| {
-            chrono::DateTime::parse_from_rfc3339(&s)
-                .ok()
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-        });
+        let id = extract_uuid_str(&row, "id")?;
+        let time_block_id = extract_uuid_str(&row, "time_block_id")?;
+        let log_date = extract_date(&row, "date")?;
+        let status: String = row.try_get("status")?;
+        let p_started = extract_opt_datetime(&row, "started_at");
+        let p_completed = extract_opt_datetime(&row, "completed_at");
+        let notes: Option<String> = row.try_get("notes")?;
 
         sqlx::query(
             r"
             INSERT INTO daily_routine_logs (id, time_block_id, date, status, started_at, completed_at, notes)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT DO NOTHING
             ",
         )
         .bind(id)
@@ -323,28 +432,23 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in habits {
-        let id: String = row.get("id");
-        let user_id: String = row
-            .get::<Option<String>, _>("user_id")
-            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
-        let name: String = row.get("name");
-        let description: Option<String> = row.get("description");
-        let habit_type: String = row.get("habit_type");
-        let target_value: f64 = row.get("target_value");
-        let unit: Option<String> = row.get("unit");
-        let frequency_days: i64 = row.get("frequency_days");
-        let color_hex: String = row.get("color_hex");
-        let is_archived_int: i64 = row.get("is_archived");
-        let is_archived = is_archived_int != 0;
-        let current_streak: i64 = row.get("current_streak");
-        let longest_streak: i64 = row.get("longest_streak");
-        let created_at: String = row.get("created_at");
-        let updated_at: String = row.get("updated_at");
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_updated = chrono::DateTime::parse_from_rfc3339(&updated_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let user_id =
+            extract_opt_uuid_str(&row, "user_id").unwrap_or_else(|| default_user_id.clone());
+        let name: String = row.try_get("name")?;
+        let description: Option<String> = row.try_get("description")?;
+        let habit_type: String = row.try_get("habit_type")?;
+        let target_value: f64 = row.try_get("target_value")?;
+        let unit: Option<String> = row.try_get("unit")?;
+        let frequency_days: i64 = row.try_get("frequency_days")?;
+        let color_hex: String = row.try_get("color_hex")?;
+        let is_archived = row
+            .try_get::<bool, _>("is_archived")
+            .unwrap_or_else(|_| row.try_get::<i64, _>("is_archived").unwrap_or(0) != 0);
+        let current_streak: i64 = row.try_get("current_streak")?;
+        let longest_streak: i64 = row.try_get("longest_streak")?;
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_updated = extract_datetime(&row, "updated_at")?;
 
         let freq_i32 = i32::try_from(frequency_days).unwrap_or(127);
         let curr_i32 = i32::try_from(current_streak).unwrap_or(0);
@@ -385,25 +489,21 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in habit_logs {
-        let id: String = row.get("id");
-        let habit_id: String = row.get("habit_id");
-        let log_date_str: String = row.get("log_date");
-        let actual_value: f64 = row.get("actual_value");
-        let is_completed_int: i64 = row.get("is_completed");
-        let is_completed = is_completed_int != 0;
-        let notes: Option<String> = row.get("notes");
-        let logged_at: String = row.get("logged_at");
-
-        let log_date = chrono::NaiveDate::parse_from_str(&log_date_str, "%Y-%m-%d")
-            .unwrap_or_else(|_| chrono::Utc::now().date_naive());
-        let p_logged = chrono::DateTime::parse_from_rfc3339(&logged_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let habit_id = extract_uuid_str(&row, "habit_id")?;
+        let log_date = extract_date(&row, "log_date")?;
+        let actual_value: f64 = row.try_get("actual_value")?;
+        let is_completed = row
+            .try_get::<bool, _>("is_completed")
+            .unwrap_or_else(|_| row.try_get::<i64, _>("is_completed").unwrap_or(0) != 0);
+        let notes: Option<String> = row.try_get("notes")?;
+        let p_logged = extract_datetime(&row, "logged_at")?;
 
         sqlx::query(
             r"
             INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT DO NOTHING
             ",
         )
         .bind(id)
@@ -427,30 +527,20 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in objectives {
-        let id: String = row.get("id");
-        let user_id: String = row
-            .get::<Option<String>, _>("user_id")
-            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
-        let title: String = row.get("title");
-        let description: Option<String> = row.get("description");
-        let quarter: String = row.get("quarter");
-        let start_date_str: String = row.get("start_date");
-        let end_date_str: String = row.get("end_date");
-        let progress_percentage: f64 = row.get("progress_percentage");
-        let is_completed_int: i64 = row.get("is_completed");
-        let is_completed = is_completed_int != 0;
-        let created_at: String = row.get("created_at");
-        let updated_at: String = row.get("updated_at");
-
-        let start_date = chrono::NaiveDate::parse_from_str(&start_date_str, "%Y-%m-%d")
-            .unwrap_or_else(|_| chrono::Utc::now().date_naive());
-        let end_date = chrono::NaiveDate::parse_from_str(&end_date_str, "%Y-%m-%d")
-            .unwrap_or_else(|_| chrono::Utc::now().date_naive());
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_updated = chrono::DateTime::parse_from_rfc3339(&updated_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let user_id =
+            extract_opt_uuid_str(&row, "user_id").unwrap_or_else(|| default_user_id.clone());
+        let title: String = row.try_get("title")?;
+        let description: Option<String> = row.try_get("description")?;
+        let quarter: String = row.try_get("quarter")?;
+        let start_date = extract_date(&row, "start_date")?;
+        let end_date = extract_date(&row, "end_date")?;
+        let progress_percentage: f64 = row.try_get("progress_percentage")?;
+        let is_completed = row
+            .try_get::<bool, _>("is_completed")
+            .unwrap_or_else(|_| row.try_get::<i64, _>("is_completed").unwrap_or(0) != 0);
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_updated = extract_datetime(&row, "updated_at")?;
 
         sqlx::query(
             r"
@@ -484,23 +574,18 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in key_results {
-        let id: String = row.get("id");
-        let objective_id: String = row.get("objective_id");
-        let linked_habit_id: Option<String> = row.get("linked_habit_id");
-        let title: String = row.get("title");
-        let initial_value: f64 = row.get("initial_value");
-        let target_value: f64 = row.get("target_value");
-        let current_value: f64 = row.get("current_value");
-        let unit: String = row.get("unit");
-        let weight: f64 = row.get("weight");
-        let progress_percentage: f64 = row.get("progress_percentage");
-        let created_at: String = row.get("created_at");
-        let updated_at: String = row.get("updated_at");
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_updated = chrono::DateTime::parse_from_rfc3339(&updated_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
+        let id = extract_uuid_str(&row, "id")?;
+        let objective_id = extract_uuid_str(&row, "objective_id")?;
+        let linked_habit_id = extract_opt_uuid_str(&row, "linked_habit_id");
+        let title: String = row.try_get("title")?;
+        let initial_value: f64 = row.try_get("initial_value")?;
+        let target_value: f64 = row.try_get("target_value")?;
+        let current_value: f64 = row.try_get("current_value")?;
+        let unit: String = row.try_get("unit")?;
+        let weight: f64 = row.try_get("weight")?;
+        let progress_percentage: f64 = row.try_get("progress_percentage")?;
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_updated = extract_datetime(&row, "updated_at")?;
 
         sqlx::query(
             r"
@@ -535,33 +620,24 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in journal_entries {
-        let id: String = row.get("id");
-        let user_id: String = row
-            .get::<Option<String>, _>("user_id")
-            .unwrap_or_else(|| "00000000-0000-0000-0000-000000000001".to_string());
-        let entry_date_str: String = row.get("entry_date");
-        let mood_score: Option<i64> = row.get("mood_score");
-        let tags: String = row.get("tags");
-        let salt: Vec<u8> = row.get("salt");
-        let nonce: Vec<u8> = row.get("nonce");
-        let encrypted_payload: Vec<u8> = row.get("encrypted_payload");
-        let created_at: String = row.get("created_at");
-        let updated_at: String = row.get("updated_at");
-
-        let entry_date = chrono::NaiveDate::parse_from_str(&entry_date_str, "%Y-%m-%d")
-            .unwrap_or_else(|_| chrono::Utc::now().date_naive());
+        let id = extract_uuid_str(&row, "id")?;
+        let user_id =
+            extract_opt_uuid_str(&row, "user_id").unwrap_or_else(|| default_user_id.clone());
+        let entry_date = extract_date(&row, "entry_date")?;
+        let mood_score: Option<i64> = row.try_get("mood_score")?;
+        let tags: String = row.try_get("tags")?;
+        let salt: Vec<u8> = row.try_get("salt")?;
+        let nonce: Vec<u8> = row.try_get("nonce")?;
+        let encrypted_payload: Vec<u8> = row.try_get("encrypted_payload")?;
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_updated = extract_datetime(&row, "updated_at")?;
         let mood_i32 = mood_score.and_then(|m| i32::try_from(m).ok());
-
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_updated = chrono::DateTime::parse_from_rfc3339(&updated_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
 
         sqlx::query(
             r"
             INSERT INTO journal_entries (id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT DO NOTHING
             ",
         )
         .bind(id)
@@ -588,21 +664,16 @@ pub async fn migrate_sqlite_to_postgres(
     .await?;
 
     for row in idempotency_keys {
-        let key: String = row.get("key");
-        let user_id: String = row.get("user_id");
-        let request_path: String = row.get("request_path");
-        let request_hash: Vec<u8> = row.get("request_hash");
-        let response_status: Option<i64> = row.get("response_status");
-        let response_headers: Option<String> = row.get("response_headers");
-        let response_body: Option<Vec<u8>> = row.get("response_body");
-        let created_at: String = row.get("created_at");
-        let locked_until: String = row.get("locked_until");
-
+        let key: String = row.try_get("key")?;
+        let user_id = extract_uuid_str(&row, "user_id")?;
+        let request_path: String = row.try_get("request_path")?;
+        let request_hash: Vec<u8> = row.try_get("request_hash")?;
+        let response_status: Option<i64> = row.try_get("response_status")?;
+        let response_headers: Option<String> = row.try_get("response_headers")?;
+        let response_body: Option<Vec<u8>> = row.try_get("response_body")?;
+        let p_created = extract_datetime(&row, "created_at")?;
+        let p_locked = extract_datetime(&row, "locked_until")?;
         let p_status = response_status.and_then(|s| i32::try_from(s).ok());
-        let p_created = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
-        let p_locked = chrono::DateTime::parse_from_rfc3339(&locked_until)
-            .map_or_else(|_| chrono::Utc::now(), |dt| dt.with_timezone(&chrono::Utc));
 
         sqlx::query(
             r"
@@ -770,5 +841,56 @@ mod tests {
             count_journal.0, 0,
             "Journal entry should have been cascaded on user delete"
         );
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_row_extraction_helpers_blob_and_text() {
+        let pool = crate::domain::create_sqlite_pool("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE raw_test (
+                blob_uuid BLOB NOT NULL,
+                text_uuid TEXT NOT NULL,
+                opt_uuid TEXT,
+                sqlite_dt TEXT NOT NULL,
+                rfc3339_dt TEXT NOT NULL,
+                opt_dt TEXT,
+                raw_date TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let u1 = uuid::Uuid::new_v4();
+        let u2 = uuid::Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO raw_test (blob_uuid, text_uuid, opt_uuid, sqlite_dt, rfc3339_dt, opt_dt, raw_date)
+             VALUES (?, ?, NULL, '2026-10-29 14:30:00.123 UTC', '2026-10-29T14:30:00Z', NULL, '2026-10-29')",
+        )
+        .bind(u1) // binds as 16-byte BLOB in SQLite
+        .bind(u2.to_string()) // binds as 36-char TEXT in SQLite
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let row = sqlx::query("SELECT * FROM raw_test")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(extract_uuid_str(&row, "blob_uuid").unwrap(), u1.to_string());
+        assert_eq!(extract_uuid_str(&row, "text_uuid").unwrap(), u2.to_string());
+        assert_eq!(extract_opt_uuid_str(&row, "opt_uuid"), None);
+
+        let dt1 = extract_datetime(&row, "sqlite_dt").unwrap();
+        let dt2 = extract_datetime(&row, "rfc3339_dt").unwrap();
+        assert_eq!(dt1.date_naive().to_string(), "2026-10-29");
+        assert_eq!(dt2.to_rfc3339(), "2026-10-29T14:30:00+00:00");
+        assert_eq!(extract_opt_datetime(&row, "opt_dt"), None);
+
+        let d = extract_date(&row, "raw_date").unwrap();
+        assert_eq!(d.to_string(), "2026-10-29");
     }
 }

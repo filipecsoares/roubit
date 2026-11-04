@@ -61,10 +61,10 @@ flowchart TD
 ### 🔴 Fase 02: Suporte Dual de Banco de Dados — SQLite (Dev Local) & PostgreSQL (Prod / Testes) (`P0/P1 — Infraestrutura Prod`)
 *Objetivo: Garantir operação transparente com SQLite no desenvolvimento local e PostgreSQL em produção (`docker-compose.yml`) e ambientes de teste.*
 
-- [ ] **02.1 Correção das Migrations PostgreSQL & Migrador `SQLite -> Postgres`** ([activity-01-postgres-migrations-and-data-migrator-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-01-postgres-migrations-and-data-migrator-fixes.prompt))
-  - [ ] Corrigir `migrations_pg/0008_habit_streak_denormalization.sql` (`is_completed = TRUE` em vez de `= 1`).
-  - [ ] Corrigir `migrations_pg/0007_add_user_id_multi_tenancy.sql` para aplicar `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE` nas tabelas existentes.
-  - [ ] Corrigir `migrate_sqlite_to_postgres` em `api/crates/core/src/db/mod.rs` para ler `Uuid` binário (`BLOB`) do SQLite, preservar timestamps originais e envolver toda a migração em uma transação PostgreSQL.
+- [x] **02.1 Correção das Migrations PostgreSQL & Migrador `SQLite -> Postgres`** ([activity-01-postgres-migrations-and-data-migrator-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-01-postgres-migrations-and-data-migrator-fixes.prompt))
+  - [x] Corrigir `migrations_pg/0008_habit_streak_denormalization.sql` (`is_completed = TRUE` em vez de `= 1`).
+  - [x] Corrigir `migrations_pg/0007_add_user_id_multi_tenancy.sql` para aplicar `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE` nas tabelas existentes.
+  - [x] Corrigir `migrate_sqlite_to_postgres` em `api/crates/core/src/db/mod.rs` para ler `Uuid` binário (`BLOB`) do SQLite, preservar timestamps originais e envolver toda a migração em uma transação PostgreSQL.
 - [ ] **02.2 Implementação dos Repositórios de Domínio PostgreSQL (`roubit-core`)** ([activity-02-postgres-domain-repositories-core.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-02-postgres-domain-repositories-core.prompt))
   - [ ] Implementar `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository` e `PgJournalRepository` implementando as traits assíncronas de domínio com `PgPool`.
 - [ ] **02.3 Roteamento Dinâmico de Banco no Servidor (`roubit-server`), Docker Compose & Guia no `README.md`** ([activity-03-server-dynamic-db-wiring-and-docker-compose.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-03-server-dynamic-db-wiring-and-docker-compose.prompt))
