@@ -51,10 +51,10 @@ flowchart TD
   - [x] Implementar `getKeyForSalt(saltBase64)` com cache em RAM (`Map<string, CryptoKey>`) em `frontend/src/stores/vault.ts` e integrar em `JournalView.vue`, permitindo decifrar entradas de sessões anteriores e reutilizar o `salt` do usuário em novas entradas.
   - [x] Acionar `vaultStore.resetInactivityTimer()` ao digitar/navegar no Diário e limpar `plaintextReflection`, `moodScore` e `tags` via `watch(() => vaultStore.isUnlocked)` quando ocorrer auto-lock.
   - [x] Vincular AAD (`user_id`, `entry_id`, `entry_date`) no AES-256-GCM do `JournalService` (backend/CLI) e adicionar constraint `UNIQUE(user_id, entry_date)` em `journal_entries`.
-- [ ] **01.4 Correção SQL do Reminder Worker, Agendamento Redis, Timeout SSE & Nginx** ([activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt))
-  - [ ] Corrigir queries SQL em `reminder_worker.rs` (`tb.title` -> `tb.name`, bind de `Uuid` em vez de `&str`, e filtro `AND user_id = ?`).
-  - [ ] Integrar `ReminderScheduler` nos controllers de rotinas e hábitos ao criar/excluir blocos ou hábitos.
-  - [ ] Separar a rota SSE `GET /api/v1/notifications/stream` do `TimeoutLayer` de 30s em `server.rs` e adicionar `proxy_buffering off; proxy_cache off; proxy_read_timeout 86400s;` em `frontend/nginx.conf`.
+- [x] **01.4 Correção SQL do Reminder Worker, Agendamento Redis, Timeout SSE & Nginx** ([activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt))
+  - [x] Corrigir queries SQL em `reminder_worker.rs` (`tb.title` -> `tb.name`, bind de `Uuid` em vez de `&str`, e filtro `AND user_id = ?`).
+  - [x] Integrar `ReminderScheduler` nos controllers de rotinas e hábitos ao criar/excluir blocos ou hábitos.
+  - [x] Separar a rota SSE `GET /api/v1/notifications/stream` do `TimeoutLayer` de 30s em `server.rs` e adicionar `proxy_buffering off; proxy_cache off; proxy_read_timeout 86400s;` em `frontend/nginx.conf`.
 
 ---
 

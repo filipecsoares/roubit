@@ -185,6 +185,37 @@ pub async fn create_routine(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    if routine.is_active {
+        if let Some(ref redis_svc) = state.redis {
+            let scheduler =
+                roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+            let now_time = Utc::now().time();
+            let user_id_str = user.id.to_string();
+            for block in &domain_blocks {
+                let diff_secs = block
+                    .start_time
+                    .signed_duration_since(now_time)
+                    .num_seconds();
+                let fire_in_secs = if diff_secs > 0 {
+                    usize::try_from(diff_secs).unwrap_or(60)
+                } else {
+                    usize::try_from(86_400 + diff_secs).unwrap_or(3600)
+                };
+                if let Err(err) = scheduler
+                    .schedule_reminder(
+                        &user_id_str,
+                        "time_block",
+                        &block.id.to_string(),
+                        fire_in_secs.max(1),
+                    )
+                    .await
+                {
+                    tracing::warn!(error = %err, block_id = %block.id, "Failed to schedule time_block reminder in Redis");
+                }
+            }
+        }
+    }
+
     Ok((StatusCode::CREATED, Json(routine)))
 }
 
@@ -264,8 +295,28 @@ pub async fn delete_routine(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let repo = SqliteRoutineRepository::new(state.db);
+    let blocks_to_cancel = if state.redis.is_some() {
+        repo.list_blocks_for_routine(id, user.id)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     match repo.delete_routine(id, user.id).await {
-        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+        Ok(()) => {
+            if let Some(ref redis_svc) = state.redis {
+                let scheduler =
+                    roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+                let user_id_str = user.id.to_string();
+                for block in blocks_to_cancel {
+                    let _ = scheduler
+                        .cancel_reminder(&user_id_str, "time_block", &block.id.to_string())
+                        .await;
+                }
+            }
+            Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+        }
         Err(RoutineRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Routine {id} not found")))
         }

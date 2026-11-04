@@ -37,18 +37,32 @@ pub async fn hydrate_reminder(
     entity_id: &str,
 ) -> ReminderNotification {
     let now = chrono::Utc::now();
+    let entity_uuid = uuid::Uuid::parse_str(entity_id).ok();
+    let user_uuid = uuid::Uuid::parse_str(user_id).ok();
 
     match entity_type {
         "time_block" => {
-            let row = sqlx::query("SELECT title FROM time_blocks WHERE id = ?")
-                .bind(entity_id)
+            let row = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
+                sqlx::query(
+                    r"
+                    SELECT tb.name
+                    FROM time_blocks tb
+                    JOIN routines r ON tb.routine_id = r.id
+                    WHERE tb.id = ? AND r.user_id = ?
+                    ",
+                )
+                .bind(e_id)
+                .bind(u_id)
                 .fetch_optional(db)
                 .await
                 .ok()
-                .flatten();
+                .flatten()
+            } else {
+                None
+            };
 
             let title_str = row
-                .and_then(|r| r.try_get::<String, _>("title").ok())
+                .and_then(|r| r.try_get::<String, _>("name").ok())
                 .unwrap_or_else(|| "Bloco de Rotina".to_string());
 
             ReminderNotification {
@@ -61,12 +75,17 @@ pub async fn hydrate_reminder(
             }
         }
         "habit" => {
-            let row = sqlx::query("SELECT name FROM habits WHERE id = ?")
-                .bind(entity_id)
-                .fetch_optional(db)
-                .await
-                .ok()
-                .flatten();
+            let row = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
+                sqlx::query("SELECT name FROM habits WHERE id = ? AND user_id = ?")
+                    .bind(e_id)
+                    .bind(u_id)
+                    .fetch_optional(db)
+                    .await
+                    .ok()
+                    .flatten()
+            } else {
+                None
+            };
 
             let name_str = row
                 .and_then(|r| r.try_get::<String, _>("name").ok())
@@ -98,11 +117,11 @@ pub async fn catch_up_missed_reminders(
     tx_notification: &broadcast::Sender<ReminderNotification>,
 ) {
     let now = chrono::Utc::now();
-    let current_time_str = now.format("%H:%M").to_string();
+    let current_time_str = now.format("%H:%M:%S").to_string();
 
     let rows = sqlx::query(
         r"
-        SELECT tb.id, tb.routine_id, tb.title, tb.start_time, r.user_id
+        SELECT tb.id, tb.routine_id, tb.name, tb.start_time, r.user_id
         FROM time_blocks tb
         JOIN routines r ON r.id = tb.routine_id
         WHERE r.is_active = 1 AND tb.start_time <= ?
@@ -116,9 +135,17 @@ pub async fn catch_up_missed_reminders(
 
     if let Ok(records) = rows {
         for record in records {
-            let entity_id: String = record.get("id");
-            let user_id: String = record.get("user_id");
-            let title: String = record.get("title");
+            let entity_id = record
+                .try_get::<uuid::Uuid, _>("id")
+                .map(|u| u.to_string())
+                .or_else(|_| record.try_get::<String, _>("id"))
+                .unwrap_or_default();
+            let user_id = record
+                .try_get::<uuid::Uuid, _>("user_id")
+                .map(|u| u.to_string())
+                .or_else(|_| record.try_get::<String, _>("user_id"))
+                .unwrap_or_default();
+            let title: String = record.try_get("name").unwrap_or_default();
 
             let notif = ReminderNotification {
                 user_id,
@@ -257,5 +284,97 @@ mod tests {
         assert_eq!(parse_reminder_key("reminder:usr"), None);
         assert_eq!(parse_reminder_key("reminder:usr:time_block"), None);
         assert_eq!(parse_reminder_key("reminder:::"), None);
+    }
+
+    #[tokio::test]
+    async fn test_hydrate_and_catch_up_reminders_with_real_entities() {
+        use chrono::{NaiveTime, Utc};
+        use roubit_core::{
+            create_sqlite_pool, run_migrations, Habit, HabitRepository, Routine, RoutineRepository,
+            SqliteHabitRepository, SqliteRoutineRepository, TimeBlock,
+        };
+        use uuid::Uuid;
+
+        let pool = create_sqlite_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        let user_id = Uuid::new_v4();
+        let other_user_id = Uuid::new_v4();
+        roubit_core::domain::seed_test_user(&pool, user_id)
+            .await
+            .unwrap();
+        roubit_core::domain::seed_test_user(&pool, other_user_id)
+            .await
+            .unwrap();
+
+        let routine_id = Uuid::new_v4();
+        let block_id = Uuid::new_v4();
+        let routine = Routine {
+            id: routine_id,
+            user_id: Some(user_id),
+            name: "Rotina Matinal".to_string(),
+            description: None,
+            is_active: true,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let block = TimeBlock {
+            id: block_id,
+            routine_id,
+            name: "Deep Work Arquitetura".to_string(),
+            start_time: NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(1, 0, 0).unwrap(),
+            category: "Work".to_string(),
+            color_hex: "#6366F1".to_string(),
+            order_index: 0,
+            created_at: Utc::now(),
+        };
+        let routine_repo = SqliteRoutineRepository::new(pool.clone());
+        routine_repo
+            .create_routine_with_blocks(user_id, &routine, &[block])
+            .await
+            .unwrap();
+
+        let habit = Habit::new_binary("Meditação Mindfulness", None);
+        let habit_id = habit.id;
+        let habit_repo = SqliteHabitRepository::new(pool.clone());
+        habit_repo.create_habit(user_id, &habit).await.unwrap();
+
+        // 1. Hydrate time_block for owner -> returns actual block name
+        let block_notif = hydrate_reminder(
+            &pool,
+            &user_id.to_string(),
+            "time_block",
+            &block_id.to_string(),
+        )
+        .await;
+        assert_eq!(block_notif.title, "Rotina: Deep Work Arquitetura");
+        assert!(block_notif.message.contains("Deep Work Arquitetura"));
+
+        // 2. Hydrate time_block for different user -> tenant isolation prevents leaking block name
+        let foreign_block_notif = hydrate_reminder(
+            &pool,
+            &other_user_id.to_string(),
+            "time_block",
+            &block_id.to_string(),
+        )
+        .await;
+        assert_eq!(foreign_block_notif.title, "Rotina: Bloco de Rotina");
+
+        // 3. Hydrate habit for owner -> returns actual habit name
+        let habit_notif =
+            hydrate_reminder(&pool, &user_id.to_string(), "habit", &habit_id.to_string()).await;
+        assert_eq!(
+            habit_notif.title,
+            "Lembrete de Hábito: Meditação Mindfulness"
+        );
+
+        // 4. Catch-up missed reminders -> decodes BLOB UUIDs and tb.name without error
+        let (tx, mut rx) = broadcast::channel(16);
+        catch_up_missed_reminders(&pool, &tx).await;
+        let caught_up = rx.try_recv().unwrap();
+        assert_eq!(caught_up.user_id, user_id.to_string());
+        assert_eq!(caught_up.entity_id, block_id.to_string());
+        assert_eq!(caught_up.title, "Rotina Ativa: Deep Work Arquitetura");
     }
 }

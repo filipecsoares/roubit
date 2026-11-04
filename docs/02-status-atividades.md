@@ -203,13 +203,13 @@
 
 | Fase de Melhoria (Ordem de Criticidade) | Prioridade | Total | Concluídas | Em Progresso | Não Iniciadas | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
+| **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **Fase 02. Dual DB: SQLite (Dev) & PostgreSQL (Prod/Test)** | 🔴 P0/P1 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
 | **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **Fase 05. Conclusão do Modo Híbrido Remoto da CLI** | 🟡 P2 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
 | **Fase 06. UX, Acessibilidade, Testes de Views & Docs** | 🟢 P3 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL (MELHORIAS v3.0)** | — | **22** | **3** | **0** | **19** | **13.6%** |
+| **TOTAL (MELHORIAS v3.0)** | — | **22** | **4** | **0** | **18** | **18.2%** |
 
 ---
 
@@ -219,7 +219,7 @@
 | **IMP-01.1** | Restauração do Build TS/Docker (`tsconfig.app.json`) & Tailwind | [activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-01.2** | Segurança Transacional SQLite (`RAII`) & Decaimento de Streaks | [activity-02-sqlite-transaction-safety-and-streak-decay.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-02-sqlite-transaction-safety-and-streak-decay.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-01.3** | Derivação por Salt no Cofre do Diário, Auto-Lock & Uniqueness | [activity-03-journal-vault-salt-derivation-and-autolock.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-03-journal-vault-salt-derivation-and-autolock.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
-| **IMP-01.4** | Correção SQL do Reminder Worker, Agendamento Redis, SSE & Nginx | [activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-01.4** | Correção SQL do Reminder Worker, Agendamento Redis, SSE & Nginx | [activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 
 ---
 

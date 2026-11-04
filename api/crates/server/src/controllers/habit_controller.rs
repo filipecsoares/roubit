@@ -222,6 +222,16 @@ pub async fn create_habit(
 
     invalidate_habit_caches(&state, user.id).await;
 
+    if let Some(ref redis_svc) = state.redis {
+        let scheduler = roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+        if let Err(err) = scheduler
+            .schedule_reminder(&user.id.to_string(), "habit", &habit.id.to_string(), 3600)
+            .await
+        {
+            tracing::warn!(error = %err, habit_id = %habit.id, "Failed to schedule habit reminder in Redis");
+        }
+    }
+
     Ok((StatusCode::CREATED, Json(habit)))
 }
 
@@ -308,6 +318,13 @@ pub async fn delete_habit(
     match repo.delete_habit(habit_id, user.id).await {
         Ok(()) => {
             invalidate_habit_caches(&state, user.id).await;
+            if let Some(ref redis_svc) = state.redis {
+                let scheduler =
+                    roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+                let _ = scheduler
+                    .cancel_reminder(&user.id.to_string(), "habit", &habit_id.to_string())
+                    .await;
+            }
             Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
         }
         Err(HabitRepositoryError::NotFound(_)) => {
