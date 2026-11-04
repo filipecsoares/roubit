@@ -35,9 +35,9 @@ Eliminate a critical SQLite database lock leak (`SQLITE_BUSY`) in `SqliteHabitRe
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `record_check_in` uses `sqlx::Transaction` (`pool.begin()`) with automatic rollback on drop.
-- [ ] `list_active_habits_with_streaks` returns `current_streak = 0` when a user misses scheduled days.
-- [ ] Overwriting a completed check-in with an incomplete value or logging a backdated check-in produces accurate `current_streak` and `longest_streak`.
-- [ ] `HabitAnalyticsService::generate_summary` does not penalize habits for days before `habit.created_at`.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+- [x] `record_check_in` uses `sqlx::Transaction` (`pool.begin()`) with automatic rollback on drop.
+- [x] `list_active_habits_with_streaks` returns `current_streak = 0` when a user misses scheduled days.
+- [x] Overwriting a completed check-in with an incomplete value or logging a backdated check-in produces accurate `current_streak` and `longest_streak`.
+- [x] `HabitAnalyticsService::generate_summary` does not penalize habits for days before `habit.created_at`.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
 

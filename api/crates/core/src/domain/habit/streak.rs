@@ -96,6 +96,45 @@ impl StreakCalculator {
         (new_current, new_longest)
     }
 
+    /// Evaluates whether a denormalized `current_streak` is still active on `reference_date`
+    /// given the most recent completed log date (`last_completed_date <= reference_date`)
+    /// and the habit's 7-day `frequency_bitmask`.
+    ///
+    /// If any scheduled required day strictly between `last_completed_date` and `reference_date`
+    /// was missed, the streak has broken and decays to `0`.
+    #[must_use]
+    pub fn effective_current_streak(
+        stored_current_streak: i32,
+        last_completed_date: Option<NaiveDate>,
+        reference_date: NaiveDate,
+        frequency_bitmask: u8,
+    ) -> u32 {
+        if stored_current_streak <= 0 || frequency_bitmask == 0 {
+            return 0;
+        }
+
+        let Some(last_date) = last_completed_date else {
+            return 0;
+        };
+
+        if last_date > reference_date {
+            return u32::try_from(stored_current_streak).unwrap_or(0);
+        }
+
+        let mut check_date = last_date.succ_opt();
+        while let Some(d) = check_date {
+            if d >= reference_date {
+                break;
+            }
+            if Self::is_required_day(d, frequency_bitmask) {
+                return 0;
+            }
+            check_date = d.succ_opt();
+        }
+
+        u32::try_from(stored_current_streak).unwrap_or(0)
+    }
+
     /// Computes current and longest streak given a list of completed dates, habit frequency,
     /// and the reference date (typically today).
     #[must_use]

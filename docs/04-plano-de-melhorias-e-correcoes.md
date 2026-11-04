@@ -42,11 +42,11 @@ flowchart TD
   - [x] Criar `frontend/tsconfig.app.json` para restaurar `npm run build` (`vue-tsc -b && vite build`) e o build da imagem Docker `web`.
   - [x] Declarar `fontFamily.outfit`, `fontFamily.mono` e animações `animate-fade-in` e `animate-bounce-short` em `frontend/tailwind.config.js`.
   - [x] Corrigir classe inválida `py-0.2` para `py-0.5` em `StreakBadge.vue` e atualizar instruções de build no `README.md`.
-- [ ] **01.2 Segurança Transacional SQLite & Decaimento Real de Streaks** ([activity-02-sqlite-transaction-safety-and-streak-decay.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-02-sqlite-transaction-safety-and-streak-decay.prompt))
-  - [ ] Substituir `pool.acquire()` + `BEGIN IMMEDIATE` manual em `SqliteHabitRepository::record_check_in` por `self.pool.begin().await?` (RAII Drop rollback guard, eliminando `SQLITE_BUSY` em cancelamentos/timeouts).
-  - [ ] Validar e decair `current_streak` para `0` em `list_active_habits_with_streaks` quando dias programados foram perdidos desde o último check-in.
-  - [ ] Recalcular streaks corretamente quando um check-in concluído é sobrescrito com valor incompleto ou quando check-ins retroativos (datas passadas) são registrados.
-  - [ ] Corrigir denominador de `HabitAnalyticsService::generate_summary` para iniciar em `max(start_date, habit.created_at.date_naive())`.
+- [x] **01.2 Segurança Transacional SQLite & Decaimento Real de Streaks** ([activity-02-sqlite-transaction-safety-and-streak-decay.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-02-sqlite-transaction-safety-and-streak-decay.prompt))
+  - [x] Substituir `pool.acquire()` + `BEGIN IMMEDIATE` manual em `SqliteHabitRepository::record_check_in` por `self.pool.begin().await?` (RAII Drop rollback guard, eliminando `SQLITE_BUSY` em cancelamentos/timeouts).
+  - [x] Validar e decair `current_streak` para `0` em `list_active_habits_with_streaks` quando dias programados foram perdidos desde o último check-in.
+  - [x] Recalcular streaks corretamente quando um check-in concluído é sobrescrito com valor incompleto ou quando check-ins retroativos (datas passadas) são registrados.
+  - [x] Corrigir denominador de `HabitAnalyticsService::generate_summary` para iniciar em `max(start_date, habit.created_at.date_naive())`.
 - [ ] **01.3 Derivação Determinística por Salt no Cofre do Diário, Auto-Lock & AAD** ([activity-03-journal-vault-salt-derivation-and-autolock.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-03-journal-vault-salt-derivation-and-autolock.prompt))
   - [ ] Implementar `getKeyForSalt(saltBase64)` com cache em RAM (`Map<string, CryptoKey>`) em `frontend/src/stores/vault.ts` e integrar em `JournalView.vue`, permitindo decifrar entradas de sessões anteriores e reutilizar o `salt` do usuário em novas entradas.
   - [ ] Acionar `vaultStore.resetInactivityTimer()` ao digitar/navegar no Diário e limpar `plaintextReflection`, `moodScore` e `tags` via `watch(() => vaultStore.isUnlocked)` quando ocorrer auto-lock.
