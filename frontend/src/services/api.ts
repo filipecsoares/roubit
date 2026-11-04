@@ -126,7 +126,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       try {
         const authStore = useAuthStore()
-        authStore.logout()
+        await authStore.logout()
       } catch {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('roubit_token')

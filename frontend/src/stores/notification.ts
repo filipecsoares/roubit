@@ -224,5 +224,6 @@ export const useNotificationStore = defineStore('notification', () => {
     requestSystemPermission,
     startListening,
     stopListening,
+    disconnectSSE: stopListening,
   }
 })

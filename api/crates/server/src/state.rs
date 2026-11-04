@@ -32,6 +32,8 @@ pub struct AppState {
     pub tx_notification: tokio::sync::broadcast::Sender<roubit_core::ReminderNotification>,
     /// Fast L1 in-memory habit dashboard summary cache: (`cached_at`, `serialized_json`)
     pub summary_cache: Arc<RwLock<HashMap<uuid::Uuid, (Instant, String)>>>,
+    /// In-memory token-bucket rate limiter protecting auth and API endpoints
+    pub rate_limiter: Arc<crate::middleware::RateLimiter>,
 }
 
 impl fmt::Debug for AppState {
@@ -56,6 +58,10 @@ impl AppState {
     pub fn from_pool(db: DatabasePool, config: AppConfig) -> Self {
         let (tx_notification, _) = tokio::sync::broadcast::channel(1024);
         let summary_cache = Arc::new(RwLock::new(HashMap::new()));
+        let rate_limiter = Arc::new(crate::middleware::RateLimiter::new(
+            config.auth_rate_limit,
+            config.general_rate_limit,
+        ));
 
         match &db {
             DatabasePool::Sqlite(pool) => Self {
@@ -69,6 +75,7 @@ impl AppState {
                 redis: None,
                 tx_notification,
                 summary_cache,
+                rate_limiter,
             },
             DatabasePool::Postgres(pool) => Self {
                 user_repo: Arc::new(PgUserRepository::new(pool.clone())),
@@ -81,6 +88,7 @@ impl AppState {
                 redis: None,
                 tx_notification,
                 summary_cache,
+                rate_limiter,
             },
         }
     }
@@ -89,6 +97,13 @@ impl AppState {
     #[must_use]
     pub fn with_redis(mut self, redis: roubit_core::redis::RedisService) -> Self {
         self.redis = Some(redis);
+        self
+    }
+
+    /// Overrides the rate limiter with a custom instance (useful for unit and benchmark tests).
+    #[must_use]
+    pub fn with_rate_limiter(mut self, rate_limiter: Arc<crate::middleware::RateLimiter>) -> Self {
+        self.rate_limiter = rate_limiter;
         self
     }
 }

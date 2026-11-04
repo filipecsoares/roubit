@@ -262,6 +262,12 @@ Roubit ensures confidentiality using a **zero-knowledge cryptographic pipeline**
 3. **Dual Storage Isolation:** Searchable metadata (mood score 1–5, tags, dates) is indexed for fast timeline navigation, while reflection contents remain strictly ciphertext.
 4. **Memory Hygiene:** Ephemeral key buffers implement Rust's `Zeroize` trait, wiping sensitive bytes from RAM immediately after encryption or decryption.
 
+### Backend Authentication Hardening & Anti-DoS Protections
+- **Argon2id Thread Isolation:** Password hashing and verification are offloaded to `tokio::task::spawn_blocking`, preventing heavy 64 MiB cryptographic derivations from starving Tokio async I/O worker threads.
+- **Timing Attack Defense:** Login execution against nonexistent emails executes an identical Argon2id dummy verification in constant time, preventing account enumeration.
+- **Payload & Secret Constraints:** Passwords are capped at 128 characters to thwart algorithmic complexity attacks, and `JWT_SECRET` must be at least 32 characters long (insecure default secret is strictly rejected in production or remote PostgreSQL).
+- **Log Header Redaction:** Sensitive `Authorization` and `Cookie` headers are stripped from request trace logging.
+
 ---
 
 ## 📊 Performance Benchmarks (RNF04)

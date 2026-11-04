@@ -232,6 +232,7 @@ async fn test_load_p99_latency_and_memory_footprint() {
         server_host: "127.0.0.1".to_string(),
         server_port: 0,
         jwt_secret: jwt_secret.clone(),
+        rate_limit_enabled: false,
         ..Default::default()
     };
 

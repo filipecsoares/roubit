@@ -25,8 +25,8 @@ const navItems = [
   { name: 'Diário', path: '/journal', icon: BookOpen },
 ]
 
-function handleLogout() {
-  authStore.logout()
+async function handleLogout() {
+  await authStore.logout()
   router.push('/login')
 }
 

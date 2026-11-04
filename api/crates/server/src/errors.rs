@@ -33,6 +33,12 @@ pub enum ApiError {
     #[error("Conflict: {0}")]
     Conflict(String),
 
+    #[error("Payload too large: {0}")]
+    PayloadTooLarge(String),
+
+    #[error("Too many requests: {0}")]
+    TooManyRequests(String),
+
     #[error("Internal server error")]
     Internal(#[from] anyhow::Error),
 }
@@ -44,6 +50,16 @@ impl IntoResponse for ApiError {
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, "Bad Request", msg.clone()),
             Self::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "Unauthorized", msg.clone()),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "Conflict", msg.clone()),
+            Self::PayloadTooLarge(msg) => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Payload Too Large",
+                msg.clone(),
+            ),
+            Self::TooManyRequests(msg) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "Too Many Requests",
+                msg.clone(),
+            ),
             Self::Internal(err) => {
                 tracing::error!(error = ?err, "Internal unhandled error");
                 (
@@ -155,5 +171,21 @@ mod tests {
         // Detail must be sanitized and NOT leak sensitive inner error!
         assert_eq!(problem.detail, "An unexpected error occurred");
         assert!(!format!("{problem:?}").contains("postgres://"));
+    }
+
+    #[tokio::test]
+    async fn test_too_many_requests_problem_details() {
+        let err = ApiError::TooManyRequests("Rate limit exceeded".into());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read body");
+        let problem: ProblemDetails = serde_json::from_slice(&body).expect("Failed to parse JSON");
+
+        assert_eq!(problem.status, 429);
+        assert_eq!(problem.title, "Too Many Requests");
+        assert_eq!(problem.detail, "Rate limit exceeded");
     }
 }

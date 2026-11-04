@@ -76,7 +76,7 @@ pub fn build_router(state: AppState) -> Router {
         .make_span_with(
             DefaultMakeSpan::new()
                 .level(Level::INFO)
-                .include_headers(true),
+                .include_headers(false),
         )
         .on_response(
             DefaultOnResponse::new()
@@ -98,6 +98,7 @@ pub fn build_router(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/register", post(crate::auth::register))
         .route("/login", post(crate::auth::login))
+        .route("/logout", post(crate::auth::logout))
         .route("/me", get(crate::auth::me));
 
     let api_v1_rest = Router::new()
@@ -122,6 +123,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(readiness_check).layer(timeout_layer))
         .nest("/api/v1", api_v1)
         .fallback(fallback_handler)
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit_middleware,
+        ))
         .layer(from_fn(crate::middleware::security_headers_middleware))
         .layer(cors_layer)
         .layer(observability_stack)
@@ -198,6 +203,30 @@ pub async fn run_server(
         state.db.clone(),
         state.tx_notification.clone(),
     );
+
+    // Spawn background cleanup task for expired idempotency keys (runs every hour)
+    let purge_db = state.db.clone();
+    let _idempotency_purge_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            match crate::middleware::idempotency::purge_expired_keys_from_pool(
+                &purge_db,
+                chrono::Duration::hours(24),
+            )
+            .await
+            {
+                Ok(count) => {
+                    if count > 0 {
+                        tracing::info!(purged_keys = count, "Purged expired idempotency keys");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to purge expired idempotency keys");
+                }
+            }
+        }
+    });
 
     let app = build_router(state);
 
@@ -431,8 +460,46 @@ mod tests {
             ))
             .expect("Failed to build request");
 
-        let res = app.oneshot(req_short_pw).await.expect("Failed to execute");
+        let res = app
+            .clone()
+            .oneshot(req_short_pw)
+            .await
+            .expect("Failed to execute");
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Long password (> 128 chars) on register
+        let long_password = "a".repeat(129);
+        let req_long_reg = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"email": "test@roubit.app", "password": "{long_password}"}}"#
+            )))
+            .expect("Failed to build request");
+
+        let res_reg = app
+            .clone()
+            .oneshot(req_long_reg)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res_reg.status(), StatusCode::BAD_REQUEST);
+
+        // Long password (> 128 chars) on login
+        let req_long_login = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"email": "test@roubit.app", "password": "{long_password}"}}"#
+            )))
+            .expect("Failed to build request");
+
+        let res_login = app
+            .oneshot(req_long_login)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res_login.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -495,7 +562,23 @@ mod tests {
             .expect("Failed to execute");
         assert_eq!(dup_res.status(), StatusCode::CONFLICT);
 
-        // 3. Login with incorrect password -> 401 Unauthorized
+        // 3. Login with nonexistent user -> 401 Unauthorized (runs dummy Argon2id verification)
+        let unk_login_req = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "unknown_user@roubit.app", "password": "wrongpassword!"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let unk_login_res = build_router(state.clone())
+            .oneshot(unk_login_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(unk_login_res.status(), StatusCode::UNAUTHORIZED);
+
+        // 4. Login with incorrect password -> 401 Unauthorized
         let wrong_login_req = Request::builder()
             .uri("/api/v1/auth/login")
             .method("POST")
@@ -588,20 +671,49 @@ mod tests {
         let config = AppConfig::default();
         let state = AppState::new(pool, config);
 
-        let idempotency_key = "test-key-uuid-123456";
-        let payload1 = serde_json::to_string(&crate::auth::RegisterRequest {
+        // Register user to obtain auth token
+        let reg_payload = serde_json::to_string(&crate::auth::RegisterRequest {
             email: "idempotent_user@roubit.app".to_string(),
             password: "supersecurepassword123".to_string(),
         })
         .expect("Valid JSON");
 
-        // First call: initial execution -> 201 Created, X-Cache: MISS
-        let req1 = Request::builder()
+        let reg_req = Request::builder()
             .uri("/api/v1/auth/register")
             .method("POST")
             .header("content-type", "application/json")
+            .body(Body::from(reg_payload))
+            .expect("Build register");
+
+        let reg_res = build_router(state.clone())
+            .oneshot(reg_req)
+            .await
+            .expect("Execute register");
+        assert_eq!(reg_res.status(), StatusCode::CREATED);
+
+        let reg_body = to_bytes(reg_res.into_body(), usize::MAX)
+            .await
+            .expect("Read body");
+        let auth_res: crate::auth::AuthResponse =
+            serde_json::from_slice(&reg_body).expect("Valid JSON");
+        let token = auth_res.token;
+
+        let idempotency_key = "test-key-uuid-123456";
+        let payload1 = serde_json::json!({
+            "name": "Daily Walk",
+            "habit_type": "binary",
+            "target_value": 1.0
+        });
+        let payload1_bytes = serde_json::to_vec(&payload1).expect("Valid JSON");
+
+        // First call: initial execution -> 201 Created, X-Cache: MISS
+        let req1 = Request::builder()
+            .uri("/api/v1/habits")
+            .method("POST")
+            .header("authorization", format!("Bearer {token}"))
+            .header("content-type", "application/json")
             .header("idempotency-key", idempotency_key)
-            .body(Body::from(payload1.clone()))
+            .body(Body::from(payload1_bytes.clone()))
             .expect("Failed to build request");
 
         let res1 = build_router(state.clone())
@@ -617,15 +729,16 @@ mod tests {
         let body1 = to_bytes(res1.into_body(), usize::MAX)
             .await
             .expect("Failed to read body");
-        let auth1: crate::auth::AuthResponse = serde_json::from_slice(&body1).expect("Valid JSON");
+        let habit1: roubit_core::Habit = serde_json::from_slice(&body1).expect("Valid JSON");
 
         // Second call with EXACT SAME key and payload -> returns cached response (201 Created, X-Cache: HIT)
         let req2 = Request::builder()
-            .uri("/api/v1/auth/register")
+            .uri("/api/v1/habits")
             .method("POST")
+            .header("authorization", format!("Bearer {token}"))
             .header("content-type", "application/json")
             .header("idempotency-key", idempotency_key)
-            .body(Body::from(payload1))
+            .body(Body::from(payload1_bytes))
             .expect("Failed to build request");
 
         let res2 = build_router(state.clone())
@@ -641,22 +754,24 @@ mod tests {
         let body2 = to_bytes(res2.into_body(), usize::MAX)
             .await
             .expect("Failed to read body");
-        let auth2: crate::auth::AuthResponse = serde_json::from_slice(&body2).expect("Valid JSON");
-        assert_eq!(auth1, auth2);
+        let habit2: roubit_core::Habit = serde_json::from_slice(&body2).expect("Valid JSON");
+        assert_eq!(habit1.id, habit2.id);
 
         // Third call with SAME key but DIFFERENT payload -> 409 Conflict
-        let payload_different = serde_json::to_string(&crate::auth::RegisterRequest {
-            email: "different_user@roubit.app".to_string(),
-            password: "anotherpassword123".to_string(),
-        })
-        .expect("Valid JSON");
+        let payload_different = serde_json::json!({
+            "name": "Different Habit",
+            "habit_type": "binary",
+            "target_value": 1.0
+        });
+        let payload_different_bytes = serde_json::to_vec(&payload_different).expect("Valid JSON");
 
         let req3 = Request::builder()
-            .uri("/api/v1/auth/register")
+            .uri("/api/v1/habits")
             .method("POST")
+            .header("authorization", format!("Bearer {token}"))
             .header("content-type", "application/json")
             .header("idempotency-key", idempotency_key)
-            .body(Body::from(payload_different))
+            .body(Body::from(payload_different_bytes))
             .expect("Failed to build request");
 
         let res3 = build_router(state.clone())
@@ -668,8 +783,9 @@ mod tests {
         // Fourth call with key > 64 chars -> 400 Bad Request
         let long_key = "a".repeat(65);
         let req_long_key = Request::builder()
-            .uri("/api/v1/auth/register")
+            .uri("/api/v1/habits")
             .method("POST")
+            .header("authorization", format!("Bearer {token}"))
             .header("content-type", "application/json")
             .header("idempotency-key", long_key)
             .body(Body::from("{}"))
