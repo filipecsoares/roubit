@@ -205,11 +205,11 @@
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **Fase 02. Dual DB: SQLite (Dev) & PostgreSQL (Prod/Test)** | 🔴 P0/P1 | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
+| **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 1 | 0 | 2 | 🟡 Em Progresso |
 | **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
 | **Fase 05. Conclusão do Modo Híbrido Remoto da CLI** | 🟡 P2 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
 | **Fase 06. UX, Acessibilidade, Testes de Views & Docs** | 🟢 P3 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL (MELHORIAS v3.0)** | — | **22** | **8** | **0** | **14** | **36.4%** |
+| **TOTAL (MELHORIAS v3.0)** | — | **22** | **9** | **0** | **13** | **40.9%** |
 
 ---
 
@@ -229,14 +229,14 @@
 | **IMP-02.1** | Correção das Migrations PG & Migrador `SQLite -> Postgres` | [activity-01-postgres-migrations-and-data-migrator-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-01-postgres-migrations-and-data-migrator-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-02.2** | Implementação dos Repositórios de Domínio PostgreSQL (`roubit-core`) | [activity-02-postgres-domain-repositories-core.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-02-postgres-domain-repositories-core.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-02.3** | Roteamento Dinâmico no Servidor, Docker Compose & Guia no `README.md` | [activity-03-server-dynamic-db-wiring-and-docker-compose.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-03-server-dynamic-db-wiring-and-docker-compose.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
-| **IMP-02.4** | Suíte de Testes de Integração Automatizados PostgreSQL & Redis | [activity-04-postgres-and-redis-integration-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-04-postgres-and-redis-integration-test-suite.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-02.4** | Suíte de Testes de Integração Automatizados PostgreSQL & Redis | [activity-04-postgres-and-redis-integration-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-04-postgres-and-redis-integration-test-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 
 ---
 
 ### Fase 03 (P1): Blindagem de Segurança, Autenticação & Idempotência
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **IMP-03.1** | Hardening de Idempotência (Body Limit 2MB, Path Validation & Locks) | [activity-01-idempotency-middleware-security-hardening.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-01-idempotency-middleware-security-hardening.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-03.1** | Hardening de Idempotência (Body Limit 2MB, Path Validation & Locks) | [activity-01-idempotency-middleware-security-hardening.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-01-idempotency-middleware-security-hardening.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-03.2** | Argon2id `spawn_blocking`, Timing Attack Defense & Redação de Logs | [activity-02-auth-argon2-blocking-and-timing-defense.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-02-auth-argon2-blocking-and-timing-defense.prompt) | ⚪ NÃO INICIADO | — |
 | **IMP-03.3** | Rate Limiting, Cookies Seguros & Logout Completo (Backend + Frontend) | [activity-03-rate-limiting-secure-cookies-and-logout.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-03-rate-limiting-secure-cookies-and-logout.prompt) | ⚪ NÃO INICIADO | — |
 

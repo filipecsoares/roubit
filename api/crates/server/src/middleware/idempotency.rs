@@ -25,6 +25,8 @@ use crate::{
 /// Header indicating whether response was served from cache
 pub const X_CACHE_HEADER: HeaderName = HeaderName::from_static("x-cache");
 
+/// Maximum size allowed for idempotent request and response bodies (2 MiB)
+pub const MAX_IDEMPOTENT_BODY_BYTES: usize = 2 * 1024 * 1024;
 const MAX_IDEMPOTENCY_KEY_LENGTH: usize = 64;
 const IN_FLIGHT_LOCK_DURATION_SECONDS: i64 = 30;
 
@@ -61,6 +63,7 @@ fn extract_user_id(parts: &axum::http::request::Parts, jwt_secret: &str) -> Stri
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct CachedIdempotencyPayload {
+    request_path: String,
     status: u16,
     headers: HashMap<String, String>,
     body: Vec<u8>,
@@ -70,6 +73,7 @@ struct CachedIdempotencyPayload {
 use roubit_core::DatabasePool;
 
 struct ExistingIdempotencyRecord {
+    request_path: String,
     request_hash: Vec<u8>,
     response_status: Option<i64>,
     response_headers: Option<String>,
@@ -87,7 +91,7 @@ async fn fetch_existing_idempotency_key(
         DatabasePool::Sqlite(pool) => {
             let row = sqlx::query(
                 r"
-                SELECT response_status, response_headers, response_body, request_hash, locked_until
+                SELECT request_path, response_status, response_headers, response_body, request_hash, locked_until
                 FROM idempotency_keys
                 WHERE user_id = ? AND key = ?
                 ",
@@ -103,6 +107,7 @@ async fn fetch_existing_idempotency_key(
                 let locked_until = chrono::DateTime::parse_from_rfc3339(&locked_until_str)
                     .map_or(fallback_now, |dt| dt.with_timezone(&chrono::Utc));
                 ExistingIdempotencyRecord {
+                    request_path: r.get("request_path"),
                     request_hash: r.get("request_hash"),
                     response_status: r.get("response_status"),
                     response_headers: r.get("response_headers"),
@@ -114,7 +119,7 @@ async fn fetch_existing_idempotency_key(
         DatabasePool::Postgres(pool) => {
             let row = sqlx::query(
                 r"
-                SELECT response_status, response_headers, response_body, request_hash, locked_until
+                SELECT request_path, response_status, response_headers, response_body, request_hash, locked_until
                 FROM idempotency_keys
                 WHERE user_id = $1 AND key = $2
                 ",
@@ -128,6 +133,7 @@ async fn fetch_existing_idempotency_key(
             Ok(row.map(|r| {
                 let status_i32: Option<i32> = r.get("response_status");
                 ExistingIdempotencyRecord {
+                    request_path: r.get("request_path"),
                     request_hash: r.get("request_hash"),
                     response_status: status_i32.map(i64::from),
                     response_headers: r.get("response_headers"),
@@ -145,20 +151,72 @@ async fn reacquire_expired_idempotency_lock(
     key: &str,
     request_path: &str,
     request_hash: &[u8],
-    locked_until: chrono::DateTime<chrono::Utc>,
+    expected_locked_until: chrono::DateTime<chrono::Utc>,
+    new_locked_until: chrono::DateTime<chrono::Utc>,
+) -> Result<(), ApiError> {
+    let rows_affected = match db {
+        DatabasePool::Sqlite(pool) => {
+            let res = sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET locked_until = ?, request_hash = ?, request_path = ?
+                WHERE user_id = ? AND key = ? AND locked_until = ? AND response_status IS NULL
+                ",
+            )
+            .bind(new_locked_until.to_rfc3339())
+            .bind(request_hash)
+            .bind(request_path)
+            .bind(user_id)
+            .bind(key)
+            .bind(expected_locked_until.to_rfc3339())
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+            res.rows_affected()
+        }
+        DatabasePool::Postgres(pool) => {
+            let res = sqlx::query(
+                r"
+                UPDATE idempotency_keys
+                SET locked_until = $1, request_hash = $2, request_path = $3
+                WHERE user_id = $4 AND key = $5 AND locked_until = $6 AND response_status IS NULL
+                ",
+            )
+            .bind(new_locked_until)
+            .bind(request_hash)
+            .bind(request_path)
+            .bind(user_id)
+            .bind(key)
+            .bind(expected_locked_until)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+            res.rows_affected()
+        }
+    };
+
+    if rows_affected == 0 {
+        return Err(ApiError::Conflict(
+            "A request with this idempotency key is currently being processed".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+async fn delete_pending_idempotency_key(
+    db: &DatabasePool,
+    user_id: &str,
+    key: &str,
 ) -> Result<(), ApiError> {
     match db {
         DatabasePool::Sqlite(pool) => {
             sqlx::query(
                 r"
-                UPDATE idempotency_keys
-                SET locked_until = ?, request_hash = ?, request_path = ?
-                WHERE user_id = ? AND key = ?
+                DELETE FROM idempotency_keys
+                WHERE user_id = ? AND key = ? AND response_status IS NULL
                 ",
             )
-            .bind(locked_until.to_rfc3339())
-            .bind(request_hash)
-            .bind(request_path)
             .bind(user_id)
             .bind(key)
             .execute(pool)
@@ -168,14 +226,10 @@ async fn reacquire_expired_idempotency_lock(
         DatabasePool::Postgres(pool) => {
             sqlx::query(
                 r"
-                UPDATE idempotency_keys
-                SET locked_until = $1, request_hash = $2, request_path = $3
-                WHERE user_id = $4 AND key = $5
+                DELETE FROM idempotency_keys
+                WHERE user_id = $1 AND key = $2 AND response_status IS NULL
                 ",
             )
-            .bind(locked_until)
-            .bind(request_hash)
-            .bind(request_path)
             .bind(user_id)
             .bind(key)
             .execute(pool)
@@ -293,20 +347,43 @@ async fn complete_idempotency_key(
     Ok(())
 }
 
+async fn release_redis_lock(
+    redis: Option<&roubit_core::redis::RedisService>,
+    user_id: &str,
+    key: &str,
+    token: &str,
+) {
+    if let Some(r) = redis {
+        if let Err(e) = r.release_idempotency_lock(user_id, key, token).await {
+            tracing::warn!(error = %e, "Failed to release Redis idempotency lock");
+        }
+    }
+}
+
 /// Idempotency middleware for transactional state mutation endpoints
 ///
 /// # Errors
-/// Returns [`ApiError::BadRequest`] on invalid key, [`ApiError::Conflict`] on payload mismatch
-/// or concurrent execution, or [`ApiError::Internal`] on database failure.
+/// Returns [`ApiError::BadRequest`] on invalid key, [`ApiError::PayloadTooLarge`] if body exceeds 2 MiB,
+/// [`ApiError::Conflict`] on payload mismatch, path mismatch, or concurrent execution, or [`ApiError::Internal`]
+/// on database failure.
 #[allow(clippy::too_many_lines)]
 pub async fn idempotency_middleware(
     State(state): State<AppState>,
     req: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
-    // Only intercept state-mutating HTTP methods
-    if req.method() != Method::POST && req.method() != Method::PUT && req.method() != Method::PATCH
+    // Only intercept state-mutating HTTP methods (POST, PUT, PATCH, DELETE)
+    if req.method() != Method::POST
+        && req.method() != Method::PUT
+        && req.method() != Method::PATCH
+        && req.method() != Method::DELETE
     {
+        return Ok(next.run(req).await);
+    }
+
+    // Bypass idempotency caching for unauthenticated /api/v1/auth/* routes to avoid caching JWT responses
+    let req_path = req.uri().path();
+    if req_path.starts_with("/api/v1/auth") || req_path.starts_with("/auth") {
         return Ok(next.run(req).await);
     }
 
@@ -329,13 +406,26 @@ pub async fn idempotency_middleware(
 
     let (parts, body) = req.into_parts();
     let user_id = extract_user_id(&parts, &state.config.jwt_secret);
-    let request_path = parts.uri.path().to_string();
+    let request_path = format!("{} {}", parts.method, parts.uri.path());
 
-    // Read body bytes and compute SHA-256 fingerprint
-    let body_bytes = to_bytes(body, usize::MAX)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Failed to read request body: {e}")))?;
-    let request_hash = Sha256::digest(&body_bytes).to_vec();
+    // Read body bytes with strict upper limit (2 MiB)
+    let body_bytes = match to_bytes(body, MAX_IDEMPOTENT_BODY_BYTES).await {
+        Ok(b) => b,
+        Err(e) => {
+            return Err(ApiError::PayloadTooLarge(format!(
+                "Request body exceeds maximum allowed size of {MAX_IDEMPOTENT_BODY_BYTES} bytes: {e}"
+            )));
+        }
+    };
+
+    // Fingerprint: SHA-256(method:path:body_bytes)
+    let mut hasher = Sha256::new();
+    hasher.update(parts.method.as_str().as_bytes());
+    hasher.update(b":");
+    hasher.update(parts.uri.path().as_bytes());
+    hasher.update(b":");
+    hasher.update(&body_bytes);
+    let request_hash = hasher.finalize().to_vec();
 
     // Fast path: Check Redis cache first if configured
     if let Some(ref redis) = state.redis {
@@ -344,9 +434,9 @@ pub async fn idempotency_middleware(
                 if let Ok(cached) =
                     serde_json::from_slice::<CachedIdempotencyPayload>(&cached_bytes)
                 {
-                    if cached.request_hash != request_hash {
+                    if cached.request_path != request_path || cached.request_hash != request_hash {
                         return Err(ApiError::Conflict(
-                            "Idempotency key payload mismatch: request body differs from original request"
+                            "Idempotency-Key already used with a different request path or payload"
                                 .to_string(),
                         ));
                     }
@@ -406,32 +496,32 @@ pub async fn idempotency_middleware(
     let locked_until = now + chrono::Duration::seconds(IN_FLIGHT_LOCK_DURATION_SECONDS);
 
     // Query existing key state for this scoped user in the active database
-    let existing_row = fetch_existing_idempotency_key(&state.db, &user_id, &key, now).await?;
+    let existing_row = fetch_existing_idempotency_key(&state.db, &user_id, &key, now).await;
+    let existing_row = match existing_row {
+        Ok(row) => row,
+        Err(e) => {
+            if redis_locked {
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
+            }
+            return Err(e);
+        }
+    };
 
     if let Some(record) = existing_row {
-        // Payload fingerprint verification
-        if record.request_hash != request_hash {
+        // Path and payload fingerprint verification
+        if record.request_path != request_path || record.request_hash != request_hash {
             if redis_locked {
-                if let Some(ref redis) = state.redis {
-                    let _ = redis
-                        .release_idempotency_lock(&user_id, &key, &redis_lock_token)
-                        .await;
-                }
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
             }
             return Err(ApiError::Conflict(
-                "Idempotency key payload mismatch: request body differs from original request"
-                    .to_string(),
+                "Idempotency-Key already used with a different request path or payload".to_string(),
             ));
         }
 
         // Case 1: Request already completed -> Replay cached response
         if let Some(status_code) = record.response_status {
             if redis_locked {
-                if let Some(ref redis) = state.redis {
-                    let _ = redis
-                        .release_idempotency_lock(&user_id, &key, &redis_lock_token)
-                        .await;
-                }
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
             }
 
             let u16_status = u16::try_from(status_code)
@@ -466,24 +556,34 @@ pub async fn idempotency_middleware(
 
         // Case 2: In-flight request currently running and lock active
         if record.locked_until > now {
+            if redis_locked {
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
+            }
             return Err(ApiError::Conflict(
                 "A request with this idempotency key is currently being processed".to_string(),
             ));
         }
 
-        // Case 3: Expired lock without completion (worker timed out) -> Re-acquire lock
-        reacquire_expired_idempotency_lock(
+        // Case 3: Expired lock without completion (worker timed out) -> Re-acquire lock atomically
+        if let Err(e) = reacquire_expired_idempotency_lock(
             &state.db,
             &user_id,
             &key,
             &request_path,
             &request_hash,
+            record.locked_until,
             locked_until,
         )
-        .await?;
+        .await
+        {
+            if redis_locked {
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
+            }
+            return Err(e);
+        }
     } else {
         // Insert new in-flight record
-        insert_in_flight_idempotency_key(
+        if let Err(e) = insert_in_flight_idempotency_key(
             &state.db,
             &user_id,
             &key,
@@ -492,7 +592,13 @@ pub async fn idempotency_middleware(
             now,
             locked_until,
         )
-        .await?;
+        .await
+        {
+            if redis_locked {
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
+            }
+            return Err(e);
+        }
     }
 
     // Reconstruct request with buffered body bytes
@@ -500,12 +606,24 @@ pub async fn idempotency_middleware(
     let downstream_response = next.run(reconstructed_req).await;
 
     let (res_parts, res_body) = downstream_response.into_parts();
-    let res_bytes = to_bytes(res_body, usize::MAX)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Failed to read response body: {e}")))?;
+    let res_bytes = match to_bytes(res_body, MAX_IDEMPOTENT_BODY_BYTES).await {
+        Ok(b) => b,
+        Err(e) => {
+            if redis_locked {
+                release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
+            }
+            return Err(ApiError::Internal(anyhow::anyhow!(
+                "Failed to read response body: {e}"
+            )));
+        }
+    };
 
-    // Store response in cache if not a 5xx server error
-    if res_parts.status.as_u16() < 500 {
+    // If server error (5xx), clean up in-flight lock so clients can retry immediately
+    if res_parts.status.is_server_error() {
+        if let Err(e) = delete_pending_idempotency_key(&state.db, &user_id, &key).await {
+            tracing::warn!(error = %e, "Failed to delete pending idempotency key on 5xx error");
+        }
+    } else {
         let mut headers_to_cache = HashMap::new();
         for (h_name, h_val) in &res_parts.headers {
             if let Ok(val_str) = h_val.to_str() {
@@ -528,6 +646,7 @@ pub async fn idempotency_middleware(
         // Cache in Redis with 24-hour TTL (86,400 seconds)
         if let Some(ref redis) = state.redis {
             let payload = CachedIdempotencyPayload {
+                request_path: request_path.clone(),
                 status: res_parts.status.as_u16(),
                 headers: headers_to_cache,
                 body: res_bytes.to_vec(),
@@ -546,14 +665,7 @@ pub async fn idempotency_middleware(
 
     // Release Redis distributed in-flight lock
     if redis_locked {
-        if let Some(ref redis) = state.redis {
-            if let Err(e) = redis
-                .release_idempotency_lock(&user_id, &key, &redis_lock_token)
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to release Redis in-flight lock");
-            }
-        }
+        release_redis_lock(state.redis.as_ref(), &user_id, &key, &redis_lock_token).await;
     }
 
     let mut response = Response::from_parts(res_parts, Body::from(res_bytes));

@@ -33,6 +33,9 @@ pub enum ApiError {
     #[error("Conflict: {0}")]
     Conflict(String),
 
+    #[error("Payload too large: {0}")]
+    PayloadTooLarge(String),
+
     #[error("Internal server error")]
     Internal(#[from] anyhow::Error),
 }
@@ -44,6 +47,11 @@ impl IntoResponse for ApiError {
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, "Bad Request", msg.clone()),
             Self::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "Unauthorized", msg.clone()),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "Conflict", msg.clone()),
+            Self::PayloadTooLarge(msg) => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Payload Too Large",
+                msg.clone(),
+            ),
             Self::Internal(err) => {
                 tracing::error!(error = ?err, "Internal unhandled error");
                 (

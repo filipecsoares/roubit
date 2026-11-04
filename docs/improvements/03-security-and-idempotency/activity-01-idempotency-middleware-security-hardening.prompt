@@ -34,9 +34,9 @@ Eliminate critical security and concurrency vulnerabilities in `api/crates/serve
 5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `usize::MAX` is removed from `idempotency.rs` and replaced with a 2 MiB limit.
-- [ ] Reusing an `Idempotency-Key` on a different URL path or HTTP method returns `409 Conflict`.
-- [ ] `/api/v1/auth/*` responses are never stored in the idempotency cache.
-- [ ] Redis locks are never leaked on DB conflicts, and `5xx` errors delete pending DB locks immediately.
-- [ ] All integration tests in `idempotency_stress.rs` pass.
+- [x] `usize::MAX` is removed from `idempotency.rs` and replaced with a 2 MiB limit.
+- [x] Reusing an `Idempotency-Key` on a different URL path or HTTP method returns `409 Conflict`.
+- [x] `/api/v1/auth/*` responses are never stored in the idempotency cache.
+- [x] Redis locks are never leaked on DB conflicts, and `5xx` errors delete pending DB locks immediately.
+- [x] All integration tests in `idempotency_stress.rs` pass.
 
