@@ -1,0 +1,42 @@
+# Activity 06.2: Accessibility (ARIA Dialog Semantics, Focus Trap & Keyboard Navigation)
+
+## 1. Objective & Context
+Bring the Roubit Vue 3 SPA into compliance with WAI-ARIA and keyboard accessibility standards across all modals, interactive widgets, form controls, and live toast regions.
+
+- **Priority:** P3 (Accessibility & Keyboard UX)
+- **Target Locations:**
+  - `frontend/src/composables/useModal.ts`
+  - All 6 modals: `FocusModeModal.vue`, `RoutineManageModal.vue`, `HabitManageModal.vue`, `LinkHabitModal.vue`, `OkrManageModal.vue`, `VaultUnlockModal.vue`
+  - `frontend/src/App.vue` (`#L54-L69`)
+  - `frontend/src/components/common/AppNavbar.vue` (`#L165-L242`), `NotificationToast.vue`
+  - `frontend/src/components/habits/HeatmapCalendar.vue` (`#L173-L181`)
+  - `frontend/src/views/LoginView.vue`, `MoodSelector.vue`, `TagInput.vue`
+
+## 2. Technical Scope & Specifications
+1. **Dialog Semantics & Keyboard Focus Trap (`useModal.ts` & All 6 Modals):**
+   - Add `role="dialog"`, `aria-modal="true"`, and `aria-labelledby="..."` pointing to the modal title `<h2>` on all 6 modal containers.
+   - Enhance `useModal.ts` to trap `Tab` / `Shift+Tab` focus inside the active modal container and restore focus to the trigger element when closed.
+   - Add `aria-label="Fechar modal"` on all modal close (`X`) icon buttons.
+2. **Keyboard Accessible Interactive Elements:**
+   - **Floating Focus Pill (`App.vue#L54-L69`):** Change the clickable `<div>` to a `<button type="button">` (or add `role="button" tabindex="0"` and `@keydown.enter.prevent` / `@keydown.space.prevent`).
+   - **Notification Dropdown (`AppNavbar.vue#L165-L242`):** Add `aria-expanded` and `aria-haspopup="true"` on the notification bell button, and make notification items keyboard-activatable.
+   - **Objective Card Toggle (`ObjectiveCard.vue#L94-L100`):** Add `aria-expanded` and `aria-label` on the expand/collapse button.
+   - **Heatmap Cells (`HeatmapCalendar.vue#L173-L181`):** Add `tabindex="0"`, `role="gridcell"`, `aria-label` with formatted date and count, and `@focus`/`@blur` handlers so keyboard and mobile touch users can inspect daily activity tooltips.
+3. **Form Labels & Live Regions:**
+   - Associate `<label for="...">` with input `id="..."` in `LoginView.vue`, `VaultUnlockModal.vue`, `HabitManageModal.vue`, `RoutineManageModal.vue`, `LinkHabitModal.vue`, and `OkrManageModal.vue`.
+   - Add `aria-label` to color swatch buttons in `HabitManageModal.vue`, password show/hide toggle in `VaultUnlockModal.vue`, and tag remove buttons in `TagInput.vue`.
+   - Add `role="status"` and `aria-live="polite"` to toast containers in `NotificationToast.vue` and view toasts.
+
+## 3. Implementation Steps
+1. Add focus trapping to `frontend/src/composables/useModal.ts` and apply `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` to all 6 modals.
+2. Add keyboard navigation and ARIA attributes to `App.vue`, `AppNavbar.vue`, `ObjectiveCard.vue`, and `HeatmapCalendar.vue`.
+3. Add `for`/`id` associations and `aria-label` attributes to form inputs and icon-only buttons, and `role="status" aria-live="polite"` to toasts.
+4. Run `npm run test` and `npm run build` in `frontend/`.
+5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] All 6 modals have `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, and keyboard focus trapping.
+- [ ] Floating Focus Pill, Notification items, and Heatmap cells are operable via keyboard.
+- [ ] All form inputs and icon-only buttons have accessible labels, and toast regions announce via `aria-live="polite"`.
+- [ ] `npm run test` and `npm run build` pass with 0 errors.
+

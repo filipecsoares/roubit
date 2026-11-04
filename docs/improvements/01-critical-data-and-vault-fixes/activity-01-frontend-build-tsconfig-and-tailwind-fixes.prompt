@@ -1,0 +1,45 @@
+# Activity 01.1: Frontend Build (`tsconfig.app.json`) & Tailwind Utilities Restoration
+
+## 1. Objective & Context
+Restore the broken TypeScript and production Vite/Docker build in `frontend/` caused by the missing `tsconfig.app.json` file referenced in `frontend/tsconfig.json`, and configure the missing TailwindCSS font families (`font-outfit`, `font-mono`), keyframe animations (`animate-fade-in`, `animate-bounce-short`), and spacing utilities (`py-0.5` instead of `py-0.2`) used across all views and modals.
+
+- **Priority:** P0 (Critical Build & UI Blocker)
+- **Target Locations:**
+  - `frontend/tsconfig.app.json`
+  - `frontend/tailwind.config.js`
+  - `frontend/src/components/habits/StreakBadge.vue`
+  - `README.md` and `frontend/README.md`
+
+## 2. Technical Scope & Specifications
+1. **TypeScript Application Config (`frontend/tsconfig.app.json`):**
+   - `frontend/tsconfig.json` (`#L4`) references `{ "path": "./tsconfig.app.json" }`, and `frontend/package.json` (`#L8`) runs `"build": "vue-tsc -b && vite build"`.
+   - Create `frontend/tsconfig.app.json` configured for Vue 3 + Vite + DOM + ES2022 (`"composite": true`, `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"strict": true`, `"jsx": "preserve"`, `"types": ["vite/client"]`, `"include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]`, `"exclude": ["src/**/__tests__/*"]`).
+   - Fix any strict TypeScript compilation errors surfaced by `vue-tsc -b` so `npm run build` completes with exit code `0`.
+2. **TailwindCSS Configuration (`frontend/tailwind.config.js`):**
+   - `frontend/index.html` (`#L16`) loads Google Fonts `Inter`, `Outfit`, and `JetBrains Mono`, and 15+ components use `font-outfit`, which currently produces no CSS rule.
+   - Extend `theme.extend.fontFamily` in `frontend/tailwind.config.js` with:
+     - `sans: ['Inter', 'system-ui', 'sans-serif']`
+     - `outfit: ['Outfit', 'system-ui', 'sans-serif']`
+     - `mono: ['JetBrains Mono', 'monospace']`
+   - Define `theme.extend.keyframes` and `theme.extend.animation` for `fade-in` (`animate-fade-in`) and `bounce-short` (`animate-bounce-short`).
+   - Align `theme_color` / `surface.dark` consistency if needed.
+3. **Invalid Utility Fix (`frontend/src/components/habits/StreakBadge.vue`):**
+   - At line `#L48`, replace invalid class `py-0.2` with `py-0.5`.
+4. **Documentation (`README.md` & `frontend/README.md`):**
+   - Verify and update the frontend build and type-check instructions in `README.md` and `frontend/README.md` so any developer cloning the repository knows how to install, type-check, test, and build the SPA.
+
+## 3. Implementation Steps
+1. Create `frontend/tsconfig.app.json` and run `npx vue-tsc -b` inside `frontend/` to verify type checking.
+2. Resolve any type errors caught by `vue-tsc -b`.
+3. Update `frontend/tailwind.config.js` with `outfit` and `mono` font families and `fade-in` / `bounce-short` animations.
+4. Fix `py-0.2` -> `py-0.5` in `frontend/src/components/habits/StreakBadge.vue`.
+5. Run `npm run test` and `npm run build` in `frontend/`.
+6. Update `README.md`, `docs/02-status-atividades.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `frontend/tsconfig.app.json` exists and `npm run build` (`vue-tsc -b && vite build`) succeeds with 0 errors.
+- [ ] `font-outfit`, `font-mono`, `animate-fade-in`, and `animate-bounce-short` generate valid CSS rules in the production bundle.
+- [ ] `StreakBadge.vue` uses `py-0.5` instead of `py-0.2`.
+- [ ] All Vitest unit tests (`npm run test`) pass.
+- [ ] `README.md` build instructions are accurate and up to date.
+

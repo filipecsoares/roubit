@@ -1,0 +1,43 @@
+# Activity 04.4: Local Timezone (`X-Timezone`) Support & PWA Offline Sync Refresh
+
+## 1. Objective & Context
+Fix the timezone bug where `new Date().toISOString().split('T')[0]` in the frontend and `Utc::now()` in backend controllers shift the date to tomorrow after 21:00 in Brazil (`UTC-3`), include the current date in the habit summary cache key so `is_active_today` never stays stale across midnight, fix the Service Worker Workbox `urlPattern` regex in `frontend/vite.config.ts`, and fix the duplicate `online` event listener so Pinia stores refresh after offline mutations are synced.
+
+- **Priority:** P2 (Cross-Cutting Date Accuracy & Offline-First Reliability)
+- **Target Locations:**
+  - `frontend/src/utils/date.ts` (new helper)
+  - `frontend/src/views/DashboardView.vue`, `HabitsView.vue`, `JournalView.vue`
+  - `frontend/src/services/api.ts`
+  - `frontend/src/services/offlineQueue.ts` & `frontend/src/composables/usePwa.ts`
+  - `frontend/vite.config.ts` (`#L72`)
+  - `api/crates/server/src/controllers/*.rs`
+  - `api/crates/core/src/redis/mod.rs`
+
+## 2. Technical Scope & Specifications
+1. **Frontend Local Date Utility (`frontend/src/utils/date.ts`):**
+   - Create `formatLocalDate(date: Date = new Date()): string` returning `YYYY-MM-DD` in the user's local timezone (`getFullYear()`, `getMonth() + 1`, `getDate()`) and `addDaysLocal(dateStr: string, offset: number): string`.
+   - Replace all uses of `new Date().toISOString().split('T')[0]` in `DashboardView.vue#L152`, `HabitsView.vue#L47,L84`, `JournalView.vue#L23,L58`, and `api.ts#L99` with `formatLocalDate()` / `addDaysLocal()`.
+   - In `frontend/src/services/api.ts`, attach `X-Local-Date: formatLocalDate()` and `X-Timezone: Intl.DateTimeFormat().resolvedOptions().timeZone` headers on outgoing requests.
+2. **Backend Local Date / Timezone Support & Date-Scoped Cache Key:**
+   - Extract `X-Local-Date` / `X-Timezone` in `routine_controller.rs`, `habit_controller.rs`, `okr_controller.rs`, and `journal_controller.rs` (falling back to `Utc::now()` when absent) so `today` and current time evaluation match the user's local clock.
+   - Include `today` in the habit summary cache key (`roubit:cache:user:{user_id}:habits:summary:{today}`) and bound `state.summary_cache` (L1 RAM cache) to a maximum of 1,000 entries (evicting expired entries first) so `is_active_today` is never stale after midnight and RAM cannot grow unbounded.
+3. **Fix Workbox Runtime Caching & Offline Queue Replay (`vite.config.ts`, `offlineQueue.ts`, `usePwa.ts`):**
+   - In `frontend/vite.config.ts#L72`, update `urlPattern` from `/\/api\/v1\/(habits|routines\/active|okrs|journal\/metadata)$/i` to `/\/api\/v1\/(habits(\/analytics)?|routines|okrs|journal\/metadata)(\?.*)?$/i` so `/api/v1/routines` and URLs with query parameters (`?quarter=...`, `?start_date=...`) are cached for offline use.
+   - Remove the duplicate `window.addEventListener('online', ...)` in `offlineQueue.ts#L249-L257` so `usePwa.ts#L64` is the single orchestrator of `syncOfflineQueue(apiClient)`.
+   - When `syncOfflineQueue` finishes with `result.synced > 0`, set `recentlySynced.value = true` and trigger background store refreshes (`habitStore.fetchHabits()`, `routineStore.fetchActiveRoutine()`, `okrStore.fetchOkrs()`) to replace optimistic synthetic UUIDs with server state.
+
+## 3. Implementation Steps
+1. Create `frontend/src/utils/date.ts` and replace all `toISOString().split('T')[0]` calls across the frontend.
+2. Send `X-Local-Date` / `X-Timezone` from `frontend/src/services/api.ts` and consume it in the server controllers.
+3. Scope the habit summary cache key by `today` and cap L1 RAM cache size.
+4. Update `urlPattern` in `frontend/vite.config.ts`, remove the duplicate `online` listener in `offlineQueue.ts`, and refresh Pinia stores on sync completion in `usePwa.ts`.
+5. Add unit tests for `formatLocalDate`, `addDaysLocal`, and offline sync store refresh.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] No view or service uses `toISOString().split('T')[0]` for local calendar dates.
+- [ ] Habit summary cache keys include the date (`today`) and L1 RAM cache evicts expired entries.
+- [ ] `vite.config.ts` Workbox regex matches `/api/v1/routines` and query-parameterized endpoints.
+- [ ] Reconnecting from offline replays mutations once, shows `"Sincronizado"`, and refreshes Pinia stores.
+- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+

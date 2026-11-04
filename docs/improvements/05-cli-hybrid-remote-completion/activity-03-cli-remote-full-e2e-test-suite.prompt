@@ -1,0 +1,28 @@
+# Activity 05.3: Full CLI Remote Mode End-to-End Automated Test Suite
+
+## 1. Objective & Context
+Expand `api/crates/server/tests/cli_remote_e2e.rs` to thoroughly test the `roubit` CLI binary in `--remote` mode against a live in-process Axum `roubit-server` across all domain modules (`auth`, `config`, `habit`, `routine`, `okr`, and Zero-Knowledge `journal`).
+
+- **Priority:** P2 (Automated E2E Verification for Hybrid CLI)
+- **Prerequisites:** Activity 05.1 and Activity 05.2.
+- **Target Locations:**
+  - `api/crates/server/tests/cli_remote_e2e.rs`
+
+## 2. Technical Scope & Specifications
+1. **End-to-End Remote CLI Scenarios (`cli_remote_e2e.rs`):**
+   - Spawn `roubit-server` on an ephemeral port (`127.0.0.1:0`) with an isolated `HOME` directory (`tempdir`) for `~/.roubit/`.
+   - **Scenario 1 (`auth` & `config`):** Register/login via `roubit --remote <URL> auth login`, verify `~/.roubit/credentials.json` (`0600` permissions), and test `roubit config set` / `roubit config show`.
+   - **Scenario 2 (`habit`):** Create a habit, list habits, perform check-in, and archive habit via remote CLI.
+   - **Scenario 3 (`routine`):** Create a routine, add a time block, list active routine, and mark block completed via remote CLI.
+   - **Scenario 4 (`okr`):** Create an objective, add a key result linked to the habit, and list OKR tree via remote CLI.
+   - **Scenario 5 (`journal`):** Write an encrypted journal entry with passphrase via remote CLI, verify the database stores ciphertext only (Zero-Knowledge), and read/decrypt the entry via remote CLI.
+
+## 3. Implementation Steps
+1. Expand `api/crates/server/tests/cli_remote_e2e.rs` with end-to-end tests covering all 5 scenarios above.
+2. Run `cargo test --test cli_remote_e2e` and verify 100% pass rate.
+3. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `cli_remote_e2e.rs` exercises `auth`, `config`, `habit`, `routine`, `okr`, and `journal` in remote mode against `roubit-server`.
+- [ ] `cargo test --workspace` passes with 0 failures.
+

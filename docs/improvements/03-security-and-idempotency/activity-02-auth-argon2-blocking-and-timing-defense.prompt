@@ -1,0 +1,42 @@
+# Activity 03.2: Argon2id `spawn_blocking`, Login Timing Attack Defense & Log Header Redaction
+
+## 1. Objective & Context
+Prevent CPU/memory denial-of-service on the Tokio async runtime caused by running 64 MiB Argon2id derivations directly on async worker threads without password length limits, eliminate user email enumeration via login timing attacks, stop logging sensitive `Authorization` and `Cookie` headers in `TraceLayer`, and enforce explicit `JWT_SECRET` configuration outside local development.
+
+- **Priority:** P1 (High — OWASP Authentication & Runtime Security)
+- **Target Locations:**
+  - `api/crates/server/src/auth/handlers.rs` (`#L45-L160`)
+  - `api/crates/server/src/auth/jwt.rs` (`#L25-L60`)
+  - `api/crates/server/src/server.rs` (`#L50-L58`)
+  - `api/crates/core/src/config.rs` (`#L45-L86`)
+  - `.env.example` & `README.md`
+
+## 2. Technical Scope & Specifications
+1. **Offload Argon2id to `tokio::task::spawn_blocking` & Enforce Password Length Limits (`auth/handlers.rs`):**
+   - Enforce a strict maximum password byte length (`MAX_PASSWORD_BYTES = 128`) in both `register` (`validate_registration`) and `login` so attackers cannot submit multi-megabyte passwords into Argon2id.
+   - Wrap `hash_password` and `verify_password` in `tokio::task::spawn_blocking` (or provide async wrappers `hash_password_async` / `verify_password_async` in `auth/jwt.rs`) so 64 MiB / 3-iteration Argon2id computations never block Tokio I/O worker threads.
+2. **Constant-Time Dummy Verification on Unknown Email (`auth/handlers.rs#L88-L102`):**
+   - Currently, if `get_user_by_email` returns `None`, `login` returns `401 Unauthorized` in ~0.1ms, whereas a valid email with wrong password takes ~50–150ms (Argon2id), allowing trivial email enumeration.
+   - When `get_user_by_email` returns `None`, run `verify_password_async` against a precomputed dummy Argon2id PHC hash before returning `ApiError::Unauthorized("Invalid email or password")`.
+3. **Stop Logging Sensitive HTTP Headers (`api/crates/server/src/server.rs#L51-L56`):**
+   - Change `DefaultMakeSpan::new().level(Level::INFO).include_headers(true)` to `.include_headers(false)` (or attach `SetSensitiveRequestHeadersLayer::new([header::AUTHORIZATION, header::COOKIE])`) so JWTs and cookies are never written to stdout/logs.
+4. **Prevent Unsafe Default `JWT_SECRET` in Production (`api/crates/core/src/config.rs` & `main.rs`):**
+   - Ensure `AppConfig::from_env()` validates that `jwt_secret.len() >= 32` and rejects the hardcoded `"development-unsafe-jwt-secret-key-minimum-32-bytes"` if `ROUBIT_ENV=production` or when `DATABASE_URL` is a `postgres://` production URL without an explicit secret.
+   - Document `JWT_SECRET` requirements clearly in `.env.example` and `README.md`.
+
+## 3. Implementation Steps
+1. Add `MAX_PASSWORD_BYTES = 128` validation in `api/crates/server/src/auth/handlers.rs`.
+2. Add `hash_password_async` and `verify_password_async` using `tokio::task::spawn_blocking` in `api/crates/server/src/auth/jwt.rs`.
+3. Add dummy Argon2id verification when `get_user_by_email` returns `None` in `login`.
+4. Set `.include_headers(false)` on `DefaultMakeSpan` in `api/crates/server/src/server.rs`.
+5. Harden `JWT_SECRET` validation in `api/crates/core/src/config.rs` and update `.env.example` and `README.md`.
+6. Add unit/integration tests in `auth/handlers.rs` verifying rejection of passwords > 128 bytes and non-existent user login behavior.
+7. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] Argon2id hashing and verification run inside `tokio::task::spawn_blocking`.
+- [ ] Passwords longer than 128 bytes are rejected with `400 Bad Request`.
+- [ ] `login` performs a dummy Argon2id verification when the email is not found.
+- [ ] `Authorization` and `Cookie` headers are not logged by `TraceLayer`.
+- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

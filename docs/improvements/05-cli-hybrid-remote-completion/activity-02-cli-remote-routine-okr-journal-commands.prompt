@@ -1,0 +1,38 @@
+# Activity 05.2: Remote Mode Support for `routine`, `okr`, `journal` & Persistent `config set`
+
+## 1. Objective & Context
+Remove the `"currently supported in local mode only"` restriction on `roubit routine`, `roubit okr`, and `roubit journal` in `api/crates/cli/src/main.rs` by routing all CLI domain commands through the `RoubitClient` trait, implement real disk persistence (`~/.roubit/config.json`) in `roubit config set`, unify `ROUBIT_API_URL` / `ROUBIT_REMOTE_URL` environment variables, and update `README.md` with complete CLI usage examples.
+
+- **Priority:** P2 (CLI Hybrid Remote Mode Completion)
+- **Prerequisites:** Activity 05.1.
+- **Target Locations:**
+  - `api/crates/cli/src/main.rs` (`#L75-L98`)
+  - `api/crates/cli/src/args.rs` (`#L25-L35`)
+  - `api/crates/cli/src/client/mod.rs`, `local.rs`, `remote.rs`, `factory.rs`
+  - `api/crates/cli/src/commands/routine_cmd.rs`, `okr_cmd.rs`, `journal_cmd.rs`, `config_cmd.rs`
+  - `README.md`
+
+## 2. Technical Scope & Specifications
+1. **Route `routine`, `okr`, and `journal` Commands Through `RoubitClient`:**
+   - Extend `RoubitClient` (`api/crates/cli/src/client/mod.rs`) with any missing methods required by `routine_cmd.rs`, `okr_cmd.rs`, and `journal_cmd.rs` (implemented on both `LocalClient` and `HttpClient`).
+   - Refactor `routine_cmd::handle_routine`, `okr_cmd::handle_okr`, and `journal_cmd::handle_journal` to accept `&dyn RoubitClient` (just like `habit_cmd::handle_habit` at `main.rs#L83`).
+   - In `journal_cmd.rs`: ensure client-side Argon2id + AES-256-GCM encryption/decryption happens locally inside the CLI before sending/receiving the encrypted envelope via `RoubitClient` (preserving Zero-Knowledge in remote mode!).
+2. **Persist Configuration in `roubit config set` (`api/crates/cli/src/commands/config_cmd.rs`):**
+   - Currently `config_cmd.rs#L28-L45` prints `"Configuration updated"` without saving anything.
+   - Persist `database_url`, `api_url`, and `output_format` to `~/.roubit/config.json` (with `0600` permissions on Unix) and load `~/.roubit/config.json` as fallback defaults in `ClientFactory`.
+   - Support both `ROUBIT_API_URL` and `ROUBIT_REMOTE_URL` consistently in `args.rs` and `factory.rs`.
+3. **Update `README.md`:**
+   - Update the CLI documentation in `README.md` (correcting the inaccurate `Ratatui` reference to `comfy-table` / `indicatif` and documenting `roubit auth`, `roubit config`, and `--remote` / `ROUBIT_API_URL` usage).
+
+## 3. Implementation Steps
+1. Extend `RoubitClient`, `LocalClient`, and `HttpClient` for full `routine`, `okr`, and `journal` operations.
+2. Refactor `routine_cmd.rs`, `okr_cmd.rs`, `journal_cmd.rs`, and `main.rs` to use `client.as_ref()`.
+3. Implement `~/.roubit/config.json` read/write in `config_cmd.rs` and `factory.rs`.
+4. Update `README.md`, `docs/02-status-atividades.md`, `docs/03-plano-de-desenvolvimento-v2.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `roubit routine`, `roubit habit`, `roubit okr`, and `roubit journal` all work in both local mode and `--remote` mode.
+- [ ] `roubit config set` persists settings to `~/.roubit/config.json` and `roubit config show` displays the persisted values.
+- [ ] `README.md` accurately documents all CLI commands and environment variables.
+- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

@@ -1,0 +1,39 @@
+# Activity 04.3: Atomic OKR Creation & Key Result Habit-Link Persistence Endpoint
+
+## 1. Objective & Context
+Fix the OKR module's backend and frontend integration: make `Objective` + `KeyResult` creation atomic, validate `start_date <= end_date`, sync initial progress when a Key Result is linked to an existing habit, return the updated `Objective` progress from `POST /api/v1/okrs`, and implement `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` so linking a habit in `OkrsView.vue` (`LinkHabitModal.vue`) actually persists to the database instead of mutating local memory only.
+
+- **Priority:** P2 (Full-Stack Domain Integration)
+- **Target Locations:**
+  - `api/crates/core/src/domain/okr/repository.rs`
+  - `api/crates/server/src/controllers/okr_controller.rs` (`#L80-L235`)
+  - `frontend/src/stores/okr.ts`
+  - `frontend/src/views/OkrsView.vue` (`#L82-L97`)
+
+## 2. Technical Scope & Specifications
+1. **Atomic Creation, Date Validation & Initial Sync (`okr_controller.rs` & `okr/repository.rs`):**
+   - Validate `start_date <= end_date` in `create_objective` (returning `400 Bad Request` if invalid).
+   - Compute dynamic default quarter from current date instead of hardcoding `"2026-Q4"`, and align `frontend/src/stores/okr.ts#L8` (`'2026-Q4'` instead of `'Q4-2026'`).
+   - Ensure `create_objective` returns the `Objective` struct with the recalculated `progress_percentage` (`#L150-L161`) and deletes/rolls back the objective if any initial Key Result fails validation.
+   - When a Key Result is created or updated with a `linked_habit_id`, verify the habit belongs to `user.id` and run `OkrSyncService::sync_habit_progress` so existing habit completions are immediately reflected in the KR.
+2. **Add Key Result Update/Link Endpoint (`PATCH /api/v1/okrs/{id}/key-results/{kr_id}`):**
+   - Add `update_key_result_link_or_value` in `OkrRepository` (both SQLite and Postgres) and expose `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` accepting `{ "linked_habit_id": Option<Uuid>, "current_value": Option<f64> }`.
+   - Recalculate the parent Objective's `progress_percentage` after updating the KR.
+3. **Persist Habit Link in Frontend (`frontend/src/stores/okr.ts` & `OkrsView.vue#L82-L97`):**
+   - Add `async linkHabitToKeyResult(objectiveId: string, krId: string, habitId: string)` to `useOkrStore` calling `PATCH /api/v1/okrs/${objectiveId}/key-results/${krId}`.
+   - Update `handleLinkConfirm` in `OkrsView.vue#L82-L97` to await `okrStore.linkHabitToKeyResult(...)` so the link survives page reloads.
+
+## 3. Implementation Steps
+1. Add KR link/value update support to `OkrRepository` in `roubit-core`.
+2. Update `okr_controller.rs` with date validation, initial habit sync, updated objective response, and `PATCH /api/v1/okrs/{id}/key-results/{kr_id}`.
+3. Implement `linkHabitToKeyResult` in `frontend/src/stores/okr.ts` and wire it in `frontend/src/views/OkrsView.vue`.
+4. Align default quarter format (`YYYY-QN`) in `frontend/src/stores/okr.ts`.
+5. Add backend integration tests and frontend store tests for linking a habit to an existing Key Result.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` persists `linked_habit_id` and `current_value` in the database and recalculates Objective progress.
+- [ ] Linking a habit via `LinkHabitModal.vue` in `OkrsView.vue` persists across page refreshes.
+- [ ] `POST /api/v1/okrs` validates `start_date <= end_date` and returns the Objective with accurate `progress_percentage`.
+- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+

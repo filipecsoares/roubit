@@ -1,0 +1,39 @@
+# Activity 06.3: Vitest Integration Tests for All 5 Views & ESLint CI Pipeline Integration
+
+## 1. Objective & Context
+Close the 0% direct test coverage gap on the 5 top-level Vue views (`LoginView.vue`, `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue`, `JournalView.vue`) and configure ESLint for Vue 3 + TypeScript in `frontend/package.json`, `.github/workflows/vue-ci.yml`, and `scripts/pre-commit.sh` as required by the technical specification.
+
+- **Priority:** P3 (Test Coverage & CI Quality Gate)
+- **Target Locations:**
+  - `frontend/src/views/__tests__/Views.spec.ts` (or per-view spec files)
+  - `frontend/package.json` & `frontend/eslint.config.js`
+  - `.github/workflows/vue-ci.yml`
+  - `scripts/pre-commit.sh`
+
+## 2. Technical Scope & Specifications
+1. **Vitest Integration Tests for All 5 Views (`frontend/src/views/__tests__/`):**
+   - **`LoginView.spec.ts`:** Test login/register mode toggle, form submission calling `authStore.login` / `register`, error banner rendering, and redirect sanitization.
+   - **`DashboardView.spec.ts`:** Test mounting, fetching active routine and habits, hydrated `completedBlockIds` rendering, habit check-in / partial numeric increment, and opening `RoutineManageModal`.
+   - **`HabitsView.spec.ts`:** Test rendering summary stats, real 365-day heatmap data binding, habit creation modal trigger, check-in toggle, and deletion flow.
+   - **`OkrsView.spec.ts`:** Test quarter switching (`2026-Q4`), objective list rendering, `OkrManageModal` creation, and `LinkHabitModal` persistent habit linking (`okrStore.linkHabitToKeyResult`).
+   - **`JournalView.spec.ts`:** Test locked state callout, `VaultUnlockModal` unlock flow, cross-session entry decryption via `getKeyForSalt`, saving an encrypted entry, and reactive plaintext clearing on auto-lock.
+   - Remove the duplicate test file `frontend/tests/journal.spec.ts` (consolidating into `frontend/src/`).
+2. **ESLint Configuration & CI Integration:**
+   - Configure ESLint (`npm run lint`) in `frontend/package.json` for Vue 3 + TypeScript.
+   - Add `npm run lint` and `npx vue-tsc -b` steps to `.github/workflows/vue-ci.yml`.
+   - Update `scripts/pre-commit.sh` to run `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and frontend `npm run lint` + `npm run test`.
+
+## 3. Implementation Steps
+1. Create Vitest test suites for `LoginView`, `DashboardView`, `HabitsView`, `OkrsView`, and `JournalView` in `frontend/src/views/__tests__/`.
+2. Remove the duplicate `frontend/tests/journal.spec.ts`.
+3. Configure ESLint in `frontend/` and add `"lint"` script to `frontend/package.json`.
+4. Update `.github/workflows/vue-ci.yml` and `scripts/pre-commit.sh`.
+5. Run `npm run lint`, `npm run test`, and `npm run build` in `frontend/`.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] All 5 top-level Views have passing Vitest integration tests.
+- [ ] `npm run lint` runs cleanly with 0 errors in `frontend/`.
+- [ ] `.github/workflows/vue-ci.yml` and `scripts/pre-commit.sh` enforce linting, type checking, and tests.
+- [ ] All backend and frontend tests pass.
+

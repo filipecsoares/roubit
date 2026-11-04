@@ -1,0 +1,46 @@
+# Activity 01.4: Reminder Worker SQL Fixes, Redis Scheduling, SSE Timeout & Nginx Buffering
+
+## 1. Objective & Context
+Fix the broken real-time notification pipeline from end to end: correct the non-existent column `title` (`name`) and UUID binding in `reminder_worker.rs`, wire `ReminderScheduler` into the routine and habit controllers so reminders are actually scheduled in Redis, exclude the long-lived SSE stream `/api/v1/notifications/stream` from the 30-second HTTP timeout layer, and disable proxy buffering for SSE in `frontend/nginx.conf`.
+
+- **Priority:** P0 (Critical — Real-Time Notifications & SSE Currently Non-Functional)
+- **Target Locations:**
+  - `api/crates/server/src/workers/reminder_worker.rs` (`#L40-L135`)
+  - `api/crates/server/src/controllers/routine_controller.rs`
+  - `api/crates/server/src/controllers/habit_controller.rs`
+  - `api/crates/server/src/server.rs` (`#L65-L95`)
+  - `frontend/nginx.conf` (`#L18-L27`)
+
+## 2. Technical Scope & Specifications
+1. **Fix SQL Column Name, UUID Binding & Tenant Scoping in `reminder_worker.rs`:**
+   - In `hydrate_reminder` (`#L43-L66`):
+     - Change `SELECT title FROM time_blocks WHERE id = ?` to `SELECT tb.name FROM time_blocks tb JOIN routines r ON tb.routine_id = r.id WHERE tb.id = ? AND r.user_id = ?`.
+     - Change `SELECT name FROM habits WHERE id = ?` to `SELECT name FROM habits WHERE id = ? AND user_id = ?`.
+     - Parse `entity_id` and `user_id` into `uuid::Uuid` before binding so SQLx binds 16-byte `BLOB` UUIDs matching the SQLite schema.
+   - In `catch_up_missed_reminders` (`#L103-L133`):
+     - Change `tb.title` to `tb.name` (`SELECT tb.id, tb.routine_id, tb.name, tb.start_time, r.user_id FROM time_blocks tb JOIN routines r ON tb.routine_id = r.id WHERE r.is_active = 1`).
+     - Extract `id: Uuid` and `user_id: Uuid` instead of `String` so binary UUIDs do not panic or fail to decode.
+2. **Wire `ReminderScheduler` into Controllers:**
+   - When `state.redis` is `Some(redis_svc)`:
+     - In `routine_controller.rs` (`create_routine`): schedule reminders for the created routine's time blocks for today/upcoming occurrence using `ReminderScheduler`, and in `delete_routine` cancel scheduled reminders.
+3. **Exclude SSE Stream from 30-Second `TimeoutLayer` (`api/crates/server/src/server.rs#L67-L89`):**
+   - `TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30))` currently wraps the entire router, killing `/api/v1/notifications/stream` every 30 seconds.
+   - Apply `TimeoutLayer` only to standard REST routes and merge the `/api/v1/notifications/stream` route outside the `TimeoutLayer`.
+4. **Configure Nginx for SSE Streaming (`frontend/nginx.conf#L18-L27`):**
+   - Add `proxy_buffering off;`, `proxy_cache off;`, `proxy_read_timeout 86400s;`, and `chunked_transfer_encoding on;` for `/api/v1/notifications/stream` (or `/api/`).
+
+## 3. Implementation Steps
+1. Fix `hydrate_reminder` and `catch_up_missed_reminders` in `api/crates/server/src/workers/reminder_worker.rs` to query `tb.name`, bind `Uuid`, and filter by `user_id`.
+2. Wire `ReminderScheduler` into `routine_controller.rs` when creating/deleting routines.
+3. Refactor `build_router` in `api/crates/server/src/server.rs` so `/api/v1/notifications/stream` is not terminated by the 30s `TimeoutLayer`.
+4. Update `frontend/nginx.conf` with SSE proxy directives.
+5. Add unit/integration tests in `api/crates/server/tests/server_lifecycle.rs` verifying `hydrate_reminder` and `catch_up_missed_reminders` with real seeded `Routine`, `TimeBlock`, and `Habit` rows in the database.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `hydrate_reminder` returns the actual `TimeBlock.name` and `Habit.name` from the database for the owning `user_id`.
+- [ ] `catch_up_missed_reminders` executes without SQL errors and schedules upcoming blocks in Redis when available.
+- [ ] `/api/v1/notifications/stream` is not subject to the 30-second `TimeoutLayer`.
+- [ ] `frontend/nginx.conf` disables proxy buffering for SSE.
+- [ ] All backend tests (`cargo test --workspace`) and clippy checks pass.
+

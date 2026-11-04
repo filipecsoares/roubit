@@ -1,0 +1,35 @@
+# Activity 05.1: CLI `HttpClient` REST Routes & DTO Contract Alignment
+
+## 1. Objective & Context
+Fix all broken HTTP URLs, request payloads, and response DTO deserializations in `api/crates/cli/src/client/remote.rs` (`HttpClient`), which currently fail with `404 Not Found` or JSON deserialization errors when communicating with `roubit-server`.
+
+- **Priority:** P2 (CLI Hybrid Remote Mode Parity)
+- **Prerequisites:** Phase 04 (Activity 04.1 and Activity 04.2).
+- **Target Locations:**
+  - `api/crates/cli/src/client/remote.rs` (`#L1-L437`)
+  - `api/crates/server/src/controllers/*.rs`
+
+## 2. Technical Scope & Specifications
+1. **Fix Habit Endpoints & DTOs (`remote.rs#L134-L242`):**
+   - `list_habits` and `list_active_habits` (`#L134-L171`): `GET /api/v1/habits` on `roubit-server` returns `Vec<HabitSummaryDto>` (flat JSON object with `id`, `name`, `habit_type`, `target_value`, `unit`, `frequency_days`, `color`, `current_streak`, `longest_streak`, `is_active_today`), NOT `Vec<{ habit: Habit, streak: StreakMetrics }>`. Update `HttpClient` to deserialize the server's flat `HabitSummaryDto` and map it cleanly into `(Habit, StreakMetrics)`.
+   - `archive_habit` (`#L233-L242`): verify `POST /api/v1/habits/{habit_id}/archive` (exposed in Activity 04.2) returns `200 OK` / `204 No Content`.
+2. **Fix Routine Endpoints (`remote.rs#L250-L295`):**
+   - `get_active_routine` (`#L256`): change URL from `GET /api/v1/routines/active` to `GET /api/v1/routines` and parse `ActiveRoutineResponse` (`{ routine, blocks, progress }`).
+   - `list_routine_blocks` (`#L272`): extract `blocks` from `GET /api/v1/routines` (or expose `GET /api/v1/routines/{id}/blocks` on `routine_controller.rs`).
+   - `log_block_status` (`#L288`): change URL from `POST /api/v1/routines/blocks/{block_id}/log` to `POST /api/v1/routines/blocks/{block_id}/complete` with `{ "status": status }`.
+3. **Fix Journal Endpoints & Payloads (`remote.rs#L330-L390`):**
+   - `list_journal_metadata` (`#L337`): change URL from `GET /api/v1/journal?from={from}&to={to}` to `GET /api/v1/journal/metadata?start_date={from}&end_date={to}`.
+   - `save_journal` (`#L364`): change JSON field `"mood": mood` to `"mood_score": mood` to match `CreateJournalEntryRequest` in `journal_controller.rs#L41`.
+
+## 3. Implementation Steps
+1. Update `HabitSummaryDto` / response mapping in `api/crates/cli/src/client/remote.rs`.
+2. Update routine URLs (`/api/v1/routines`, `/api/v1/routines/blocks/{id}/complete`) and response parsing in `remote.rs`.
+3. Update journal URLs (`/api/v1/journal/metadata?start_date=...&end_date=...`) and `"mood_score"` field in `remote.rs`.
+4. Add unit/integration tests verifying `HttpClient` serialization and deserialization against `roubit-server` DTOs.
+5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] Every method in `HttpClient` (`remote.rs`) matches the exact URL path, HTTP method, request JSON schema, and response DTO of `roubit-server`.
+- [ ] `roubit --remote <URL> habit list`, `checkin`, `add`, and `archive` succeed against a live `roubit-server`.
+- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

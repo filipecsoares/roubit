@@ -1,0 +1,45 @@
+# Activity 06.1: RFC 7807 Error Toasts, Modal Form Preservation & Audio/Listener Leak Fixes
+
+## 1. Objective & Context
+Improve frontend UX, error reporting, and resource hygiene: surface localized RFC 7807 `detail` messages in error toasts instead of generic Axios `"Request failed with status code 400"`, prevent `HabitManageModal.vue` and `OkrManageModal.vue` from wiping user input before API success, fix native `AudioContext` and global event listener leaks in `focus.ts` and `FocusModeModal.vue`, fix `document.body.style.overflow` scroll lock collisions in `useModal.ts`, fix the broken notification icon path `/favicon.ico`, and make the desktop `"Online"` badge in `AppNavbar.vue` reactive.
+
+- **Priority:** P3 (UX Polish & Resource Leak Elimination)
+- **Target Locations:**
+  - `frontend/src/views/DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue`, `JournalView.vue`
+  - `frontend/src/components/habits/HabitManageModal.vue` (`#L58-L70`)
+  - `frontend/src/components/okrs/OkrManageModal.vue` (`#L109-L134`)
+  - `frontend/src/stores/focus.ts` (`#L52-L60`)
+  - `frontend/src/components/dashboard/FocusModeModal.vue` (`#L106-L114`)
+  - `frontend/src/composables/useModal.ts` (`#L20-L28`)
+  - `frontend/src/stores/notification.ts` (`#L62`)
+  - `frontend/src/components/common/AppNavbar.vue` (`#L296-L299`)
+
+## 2. Technical Scope & Specifications
+1. **RFC 7807 Error Details & Timer Cleanup in Toasts:**
+   - Extract a shared `useToast` composable (or helper) that clears any previous `setTimeout` before starting a new one and cleans up on unmount.
+   - In `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue`, and `JournalView.vue`, display `err.response?.data?.detail || store.error || err.message` so the user sees the descriptive RFC 7807 problem detail returned by `roubit-server`.
+   - Avoid flashing "Empty State" banners while initial `store.loading` is `true`.
+2. **Preserve Modal Form State Until Save Succeeds (`HabitManageModal.vue` & `OkrManageModal.vue`):**
+   - Only reset form fields when the modal transitions from open to closed (via `watch(() => props.isOpen)`) or after the parent confirms the API call succeeded, so a validation or network failure does not erase the user's typed input.
+3. **Fix Resource & Event Listener Leaks (`focus.ts`, `FocusModeModal.vue`, `useModal.ts`):**
+   - In `frontend/src/stores/focus.ts#L52-L60`, reuse a singleton `AudioContext` (or close it after the chord finishes) instead of creating a new unclosed `AudioContext` on every completed Pomodoro session.
+   - In `FocusModeModal.vue#L106-L114`, attach `resize` and `keydown` listeners only while `focusStore.isModalOpen` is `true` (and use `useModal` to lock body scroll when open).
+   - In `useModal.ts#L20-L28`, use a reference counter (`openModalCount`) so mounting closed modals with `{ immediate: true }` or closing a nested modal never unlocks `document.body.style.overflow` while another modal is open.
+4. **Fix Notification Icon & Reactive Online Badge (`notification.ts#L62` & `AppNavbar.vue#L296-L299`):**
+   - In `notification.ts#L62`, replace `icon: '/favicon.ico'` (which does not exist) with `icon: '/favicon.svg'`.
+   - In `AppNavbar.vue#L296-L299`, bind the status indicator to `isOnline` from `usePwa()` instead of static hardcoded `"Online"`.
+
+## 3. Implementation Steps
+1. Create `frontend/src/composables/useToast.ts` (with RFC 7807 error extraction and timeout cleanup) and adopt it across all 4 views.
+2. Fix form reset timing in `HabitManageModal.vue` and `OkrManageModal.vue`.
+3. Fix singleton `AudioContext` in `focus.ts`, conditional listeners in `FocusModeModal.vue`, and ref-counted body scroll lock in `useModal.ts`.
+4. Update `icon: '/favicon.svg'` in `notification.ts` and reactive online status in `AppNavbar.vue`.
+5. Run `npm run test` and `npm run build` in `frontend/`.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] Error toasts display the backend's RFC 7807 `detail` message.
+- [ ] `HabitManageModal.vue` and `OkrManageModal.vue` do not wipe user input if an API error occurs.
+- [ ] `focus.ts` does not leak `AudioContext` instances and `FocusModeModal.vue` only listens to `keydown`/`resize` while open.
+- [ ] All frontend tests (`npm run test`) and build (`npm run build`) pass.
+

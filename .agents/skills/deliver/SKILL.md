@@ -3,12 +3,12 @@ name: deliver
 description: >-
   Systematic workflow for delivering a project activity from a .prompt file.
   Use this skill whenever asked to execute, develop, implement, or deliver an activity
-  (e.g., 'deliver activity-01', 'execute .prompt', or 'DELIVER').
+  (e.g., 'deliver activity-01', 'deliver improvement 01.1', 'execute .prompt', or 'DELIVER').
 ---
 
 # DELIVER — Activity Execution & Delivery Runbook
 
-This skill establishes the standard operating procedure for implementing and validating engineering activities in the Roubit project from `.prompt` specification files.
+This skill establishes the standard operating procedure for implementing and validating engineering activities and improvements in the Roubit project from `.prompt` specification files.
 
 ---
 
@@ -31,7 +31,9 @@ flowchart TD
 ## Step 1: Read & Analyze Activity
 
 1. **Locate and Read the `.prompt` File:**
-   - Locate the target activity under `docs/features/<feature-name>/<activity-filename>.prompt`.
+   - Locate the target activity under either:
+     - `docs/improvements/<phase-name>/<activity-filename>.prompt` (for stabilization, bug fixes, dual-DB, security hardening, and improvements), OR
+     - `docs/features/<feature-name>/<activity-filename>.prompt` (for original feature specifications).
    - Read the complete file, paying close attention to:
      - **Objective & Context** and prerequisites.
      - **Technical Scope & Specifications** (target crates, packages, versions).
@@ -49,7 +51,8 @@ flowchart TD
 1. **Resolve Questions Autonomously:**
    - First, consult project specifications:
      - [Technical Specification](file:///home/filipe/Documents/projects/roubit/docs/00-especificacao-tecnica.md)
-     - [Development Plan](file:///home/filipe/Documents/projects/roubit/docs/01-plano-de-desenvolvimento.md)
+     - [Development Plan v1](file:///home/filipe/Documents/projects/roubit/docs/01-plano-de-desenvolvimento.md)
+     - [Improvements Plan v3](file:///home/filipe/Documents/projects/roubit/docs/04-plano-de-melhorias-e-correcoes.md)
    - Inspect existing architectural patterns and conventions in the workspace.
 2. **When to Ask the User:**
    - **Only** ask the user if there is a fundamental ambiguity, a conflicting business requirement, or a breaking architectural fork that cannot be deduced from documentation.
@@ -68,6 +71,7 @@ flowchart TD
      - Code lives inside `api/` workspace (`api/crates/core`, `api/crates/cli`, `api/crates/server`).
      - Strong typing, domain errors using `thiserror`, avoid unhandled `.unwrap()` in production paths.
      - Memory hygiene: Use `zeroize` where sensitive secrets/keys are touched.
+     - Database support: Local dev and local CLI use SQLite (`SqlitePool`); production and server test environments support PostgreSQL (`PgPool`).
    - **Frontend (Vue 3):**
      - Code lives inside `frontend/src/`.
      - Composition API with `<script setup lang="ts">`, Pinia stores, TailwindCSS utilities.
@@ -97,10 +101,10 @@ After completing code changes, perform a thorough review from two distinct persp
 
 1. **Review Technical Docs:**
    - Check if new configurations, environment variables, or database migrations need documentation in `docs/`.
-2. **Update Development Plan:**
-   - Check off completed tasks in [docs/01-plano-de-desenvolvimento.md](file:///home/filipe/Documents/projects/roubit/docs/01-plano-de-desenvolvimento.md).
-3. **Review `README.md`:**
-   - If the activity adds user-facing commands, routes, or setup prerequisites, update [README.md](file:///home/filipe/Documents/projects/roubit/README.md) accordingly.
+2. **Update Development & Status Plans:**
+   - Check off completed tasks in [docs/04-plano-de-melhorias-e-correcoes.md](file:///home/filipe/Documents/projects/roubit/docs/04-plano-de-melhorias-e-correcoes.md) (or [docs/01-plano-de-desenvolvimento.md](file:///home/filipe/Documents/projects/roubit/docs/01-plano-de-desenvolvimento.md)) and update status in [docs/02-status-atividades.md](file:///home/filipe/Documents/projects/roubit/docs/02-status-atividades.md) and inside the `.prompt` file's DoD checkboxes.
+3. **Always Update `README.md` When Startup/Config Changes:**
+   - If the activity adds or modifies user-facing commands, routes, environment variables, database setup (SQLite local dev vs PostgreSQL prod/test), Docker Compose settings, or build/run prerequisites, you **MUST** update [README.md](file:///home/filipe/Documents/projects/roubit/README.md) (and `.env.example` / `frontend/README.md` if applicable) so anyone cloning the repo knows the exact steps to run the project.
 
 ---
 
@@ -156,7 +160,7 @@ Once all tests pass and documentation is updated, create a clean Git commit usin
 - **Scopes:** `core`, `cli`, `server`, `crypto`, `routine`, `habit`, `okr`, `journal`, `ui`, `infra`.
 
 ### Commit Examples
-- `feat(routine): implement time block overlap validation engine`
-- `feat(crypto): implement argon2id key derivation with zeroize`
-- `test(habit): add streak calculation edge case tests`
-- `docs(plan): update progress checklist for feature 01`
+- `fix(habit): use RAII transaction and decay missed streaks`
+- `feat(infra): implement postgresql domain repositories and dynamic server wiring`
+- `fix(ui): derive journal key per salt for cross-session decryption`
+- `docs(readme): document local sqlite dev and postgresql docker startup`

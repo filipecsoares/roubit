@@ -1,0 +1,55 @@
+# Activity 02.3: Server Dynamic DB Wiring, Docker Compose Alignment & `README.md` Startup Guide
+
+## 1. Objective & Context
+Refactor `roubit-server` (`AppState`, `main.rs`, `server.rs`, controllers, `idempotency.rs`, and `reminder_worker.rs`) to dynamically run with **SQLite in local development** (`DATABASE_URL=sqlite://...`) and **PostgreSQL in production/test environments** (`DATABASE_URL=postgres://...`), fix environment variable mismatches in `docker-compose.yml`, and update `README.md` and `.env.example` with clear, step-by-step instructions on how to run the application in both modes.
+
+- **Priority:** P0/P1 (Critical — Enables Production Docker Compose & Dual-DB Architecture)
+- **Prerequisites:** Activity 02.1 and Activity 02.2.
+- **Target Locations:**
+  - `api/crates/server/src/state.rs`
+  - `api/crates/server/src/main.rs`
+  - `api/crates/server/src/server.rs`
+  - `api/crates/server/src/controllers/*.rs`
+  - `api/crates/server/src/auth/handlers.rs`
+  - `api/crates/server/src/middleware/idempotency.rs`
+  - `api/crates/server/src/workers/reminder_worker.rs`
+  - `docker-compose.yml`
+  - `.env.example` & `README.md`
+
+## 2. Technical Scope & Specifications
+1. **Dynamic Repository & Pool Wiring in `AppState` (`api/crates/server/src/state.rs`):**
+   - Replace hardcoded `pub pool: SqlitePool` in `AppState` with `pub db: DatabasePool` (from `roubit_core::db::DatabasePool`) and trait-object repositories:
+     - `pub user_repo: Arc<dyn UserRepository>`
+     - `pub routine_repo: Arc<dyn RoutineRepository>`
+     - `pub habit_repo: Arc<dyn HabitRepository>`
+     - `pub okr_repo: Arc<dyn OkrRepository>`
+     - `pub journal_repo: Arc<dyn JournalRepository>`
+   - Provide `AppState::from_pool(db: DatabasePool, config: AppConfig, redis: Option<RedisService>) -> Self` (and keep `AppState::new(pool: SqlitePool, config: AppConfig)` as a convenience constructor delegating to `DatabasePool::Sqlite(pool)` so existing tests compile seamlessly).
+2. **Controllers, Auth, Idempotency & Worker Adaptation:**
+   - Update `auth/handlers.rs`, `routine_controller.rs`, `habit_controller.rs`, `okr_controller.rs`, and `journal_controller.rs` to use `state.user_repo`, `state.routine_repo`, `state.habit_repo`, `state.okr_repo`, and `state.journal_repo` instead of constructing `Sqlite*Repository::new(state.pool.clone())` directly.
+   - Update `readiness_check` (`GET /ready` in `server.rs`), `idempotency.rs`, and `reminder_worker.rs` to support both `DatabasePool::Sqlite` and `DatabasePool::Postgres`.
+   - In `api/crates/server/src/main.rs`: use `DatabasePool::connect(&config.database_url).await?` and `db_pool.run_migrations().await?` so starting the server with `sqlite://...` uses SQLite and starting with `postgres://...` uses PostgreSQL automatically!
+3. **Fix `docker-compose.yml` & `.env.example`:**
+   - In `docker-compose.yml#L52`, rename `CORS_ALLOWED_ORIGINS` to `ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"` (matching `AppConfig.allowed_origins` and avoiding wildcard `*` panic with `allow_credentials(true)`).
+   - Update `.env.example` to document both `DATABASE_URL=sqlite://roubit.db?mode=rwc` (default for local dev) and `DATABASE_URL=postgres://roubit_user:roubit_secure_password@localhost:5432/roubit` (for prod/test), as well as `ALLOWED_ORIGINS` and `LOG_LEVEL`.
+4. **Update `README.md` Startup Guide:**
+   - Update `README.md` with clear, accurate instructions for anyone running the project:
+     - **Modo 1: Desenvolvimento Local (SQLite + Vite Dev Server)** — exact commands to run `roubit-server`, `roubit` CLI, and `frontend` locally with zero external containers.
+     - **Modo 2: Produção / Ambiente de Testes Integrado (Docker Compose com PostgreSQL 16 + Redis 7 + Nginx)** — exact commands (`docker compose up --build`), ports (`http://localhost:3000` web, `http://localhost:8080` API), and environment variables.
+     - **Migração de Dados (`SQLite -> PostgreSQL`)** — how to run `roubit admin migrate-to-postgres`.
+
+## 3. Implementation Steps
+1. Update `AppState` in `api/crates/server/src/state.rs` to hold `DatabasePool` and `Arc<dyn *Repository>` trait objects.
+2. Refactor controllers, auth handlers, `idempotency.rs`, `reminder_worker.rs`, `server.rs`, and `main.rs` to use `DatabasePool` and the trait objects on `AppState`.
+3. Fix `docker-compose.yml` (`ALLOWED_ORIGINS`) and `.env.example`.
+4. Update `README.md` with complete, step-by-step instructions for Local Dev (SQLite) and Prod/Test (PostgreSQL / Docker Compose).
+5. Run `cargo test --workspace` to verify all server and core tests pass.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `roubit-server` starts and runs migrations automatically with either `sqlite://...` or `postgres://...` in `DATABASE_URL`.
+- [ ] All controllers use the repository trait objects from `AppState`.
+- [ ] `docker-compose.yml` uses `ALLOWED_ORIGINS` with explicit origins (compatible with `allow_credentials(true)`).
+- [ ] `README.md` and `.env.example` clearly document how to start and configure the project in Local Dev (SQLite) and Prod/Test (PostgreSQL).
+- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

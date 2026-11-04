@@ -1,0 +1,44 @@
+# Activity 03.3: Rate Limiting Middleware, Secure Auth Cookies & Complete Session Logout
+
+## 1. Objective & Context
+Implement the Rate Limiting middleware specified in `docs/00-especificacao-tecnica.md`, add `POST /api/v1/auth/logout` and the `Secure` cookie attribute on `roubit_token`, restrict `?token=` query parameter authentication strictly to the SSE endpoint `/api/v1/notifications/stream`, and fix `authStore.logout()` in the frontend so logging out scrubs the cryptographic vault in RAM, clears the IndexedDB offline mutation queue, and resets all Pinia stores.
+
+- **Priority:** P1 (High — Session Hygiene, RNF03 Compliance & Multi-User Privacy on Shared Devices)
+- **Target Locations:**
+  - `api/crates/server/src/middleware/security.rs`
+  - `api/crates/server/src/auth/handlers.rs` (`#L68-L72`, `#L108-L112`)
+  - `api/crates/server/src/auth/extractor.rs` (`#L65-L76`)
+  - `api/crates/server/src/server.rs`
+  - `frontend/src/stores/auth.ts` (`#L59-L63`)
+  - `frontend/src/views/LoginView.vue` (`#L29-L30`)
+
+## 2. Technical Scope & Specifications
+1. **Rate Limiting Middleware (`api/crates/server/src/middleware/security.rs` & `server.rs`):**
+   - Implement an in-memory/Redis token-bucket or sliding-window rate limiter middleware (keyed by client IP / `AuthenticatedUser` ID) protecting `/api/v1/auth/*` (e.g. 20 req/min burst) and general API endpoints (e.g. 300 req/min), returning `429 Too Many Requests` (`ProblemDetails`) with `Retry-After` header when exceeded.
+2. **Cookie Hardening, Logout Endpoint & Scoped Query Token (`auth/handlers.rs` & `auth/extractor.rs`):**
+   - Add `POST /api/v1/auth/logout` returning `Set-Cookie: roubit_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`.
+   - Include `SameSite=Strict` and conditionally include `Secure` (enabled by default unless `COOKIE_SECURE=false` in local HTTP dev) when issuing `roubit_token`.
+   - In `auth/extractor.rs#L65-L76`, only accept the `?token=` query string parameter when `parts.uri.path().ends_with("/notifications/stream")` (since browser `EventSource` cannot send custom headers) and URL-decode the token properly.
+3. **Complete Frontend Logout & Open-Redirect Sanitization (`frontend/src/stores/auth.ts` & `LoginView.vue`):**
+   - In `authStore.logout()` (`frontend/src/stores/auth.ts#L59-L63`):
+     - Call `POST /api/v1/auth/logout` (ignoring network errors if offline).
+     - Lock the cryptographic vault (`useVaultStore().lock()`), wiping `masterKey` and derived keys from RAM!
+     - Clear the IndexedDB offline mutation queue (`await clearQueue()`) so a previous user's queued offline mutations are never replayed under a new user's account.
+     - Disconnect SSE (`useNotificationStore().disconnectSSE()`) and reset domain Pinia stores (`habitStore`, `routineStore`, `okrStore`, `journalStore`, `focusStore`).
+   - In `LoginView.vue#L29-L30`, sanitize `route.query.redirect` so it only accepts internal relative paths starting with a single `/` (`redirect.startsWith('/') && !redirect.startsWith('//')`).
+
+## 3. Implementation Steps
+1. Implement rate limiting middleware in `api/crates/server/src/middleware/security.rs` and attach it in `server.rs`.
+2. Add `POST /api/v1/auth/logout` and `Secure` / `SameSite=Strict` cookie formatting in `api/crates/server/src/auth/handlers.rs`.
+3. Restrict `?token=` extraction in `api/crates/server/src/auth/extractor.rs` to `/notifications/stream`.
+4. Update `authStore.logout()` in `frontend/src/stores/auth.ts` to lock `vaultStore`, clear `offlineQueue`, and reset all Pinia stores, and sanitize `redirect` in `LoginView.vue`.
+5. Add backend tests verifying rate limiting (`429`), logout cookie clearing, and rejection of `?token=` on non-SSE routes, plus frontend Vitest tests verifying vault lock and queue purge on logout.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] Rate limiting middleware returns `429 Too Many Requests` when auth burst limits are exceeded.
+- [ ] `POST /api/v1/auth/logout` clears the `roubit_token` cookie.
+- [ ] `?token=` query parameter authentication is rejected on standard REST routes and allowed only on `/api/v1/notifications/stream`.
+- [ ] `authStore.logout()` locks the vault in RAM, clears IndexedDB `offlineQueue`, and resets Pinia stores.
+- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+
