@@ -60,14 +60,13 @@ pub fn build_router(state: AppState) -> Router {
                 .latency_unit(tower_http::LatencyUnit::Millis),
         );
 
-    let middleware_stack = ServiceBuilder::new()
+    let observability_stack = ServiceBuilder::new()
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, MakeRequestUuid))
         .layer(trace_layer)
-        .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER))
-        .layer(TimeoutLayer::with_status_code(
-            StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(30),
-        ));
+        .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER));
+
+    let timeout_layer =
+        TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30));
 
     let allowed_origins = state.config.parsed_allowed_origins();
     let cors_layer = crate::middleware::build_cors_layer(&allowed_origins);
@@ -77,28 +76,30 @@ pub fn build_router(state: AppState) -> Router {
         .route("/login", post(crate::auth::login))
         .route("/me", get(crate::auth::me));
 
-    let api_v1 = Router::new()
+    let api_v1_rest = Router::new()
         .nest("/auth", auth_routes)
         .nest("/routines", crate::controllers::routine_routes())
         .nest("/habits", crate::controllers::habit_routes())
         .nest("/okrs", crate::controllers::okr_routes())
         .nest("/journal", crate::controllers::journal_routes())
-        .route(
-            "/notifications/stream",
-            get(crate::workers::notification_stream_handler),
-        )
         .layer(from_fn_with_state(
             state.clone(),
             crate::middleware::idempotency_middleware,
-        ));
+        ))
+        .layer(timeout_layer);
+
+    let api_v1 = api_v1_rest.route(
+        "/notifications/stream",
+        get(crate::workers::notification_stream_handler),
+    );
 
     Router::new()
-        .route("/health", get(health_check))
+        .route("/health", get(health_check).layer(timeout_layer))
         .nest("/api/v1", api_v1)
         .fallback(fallback_handler)
         .layer(from_fn(crate::middleware::security_headers_middleware))
         .layer(cors_layer)
-        .layer(middleware_stack)
+        .layer(observability_stack)
         .with_state(state)
 }
 

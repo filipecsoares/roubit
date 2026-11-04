@@ -572,6 +572,7 @@ async fn test_tcp_zero_knowledge_journal_endpoints() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_tcp_sse_notification_stream() {
     let pool = create_sqlite_pool("sqlite::memory:")
         .await
@@ -620,12 +621,81 @@ async fn test_tcp_sse_notification_stream() {
     assert_eq!(reg_res.status(), reqwest::StatusCode::CREATED);
     let auth: roubit_server::AuthResponse = reg_res.json().await.expect("Valid auth response");
 
-    // Test notification hydration
-    let hydrated =
-        roubit_server::hydrate_reminder(&pool, &auth.user.id.to_string(), "habit", "non_existent")
-            .await;
-    assert_eq!(hydrated.entity_type, "habit");
-    assert!(hydrated.title.contains("Hábito"));
+    // Create a real routine and habit to verify SQL hydration and catch-up
+    let routine_url = format!("http://{local_addr}/api/v1/routines");
+    let routine_res = client
+        .post(&routine_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Rotina SSE",
+            "is_active": true,
+            "blocks": [
+                {
+                    "name": "Bloco Foco Total",
+                    "start_time": "00:00",
+                    "end_time": "01:00",
+                    "category": "Focus"
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Create routine failed");
+    assert_eq!(routine_res.status(), reqwest::StatusCode::CREATED);
+
+    let get_routine_res = client
+        .get(&routine_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get routine failed");
+    let routine_with_blocks: roubit_server::controllers::RoutineWithProgressResponse =
+        get_routine_res.json().await.expect("Valid routine JSON");
+    let created_block_id = routine_with_blocks.blocks[0].id;
+
+    let habit_url = format!("http://{local_addr}/api/v1/habits");
+    let habit_res = client
+        .post(&habit_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Leitura Diária",
+            "habit_type": "binary",
+            "target_value": 1.0
+        }))
+        .send()
+        .await
+        .expect("Create habit failed");
+    assert_eq!(habit_res.status(), reqwest::StatusCode::CREATED);
+    let created_habit: roubit_core::Habit = habit_res.json().await.expect("Valid habit JSON");
+
+    // Verify notification hydration with real entities
+    let hydrated_block = roubit_server::hydrate_reminder(
+        &pool,
+        &auth.user.id.to_string(),
+        "time_block",
+        &created_block_id.to_string(),
+    )
+    .await;
+    assert_eq!(hydrated_block.entity_type, "time_block");
+    assert_eq!(hydrated_block.title, "Rotina: Bloco Foco Total");
+
+    let hydrated_habit = roubit_server::hydrate_reminder(
+        &pool,
+        &auth.user.id.to_string(),
+        "habit",
+        &created_habit.id.to_string(),
+    )
+    .await;
+    assert_eq!(hydrated_habit.entity_type, "habit");
+    assert_eq!(hydrated_habit.title, "Lembrete de Hábito: Leitura Diária");
+
+    // Verify catch_up_missed_reminders decodes binary UUIDs and tb.name
+    let (tx_catchup, mut rx_catchup) = tokio::sync::broadcast::channel(16);
+    roubit_server::catch_up_missed_reminders(&pool, &tx_catchup).await;
+    let catchup_notif = rx_catchup.try_recv().expect("Expected catch-up reminder");
+    assert_eq!(catchup_notif.entity_id, created_block_id.to_string());
+    assert_eq!(catchup_notif.user_id, auth.user.id.to_string());
+    assert_eq!(catchup_notif.title, "Rotina Ativa: Bloco Foco Total");
 
     // Connect to SSE stream via Authorization header
     let sse_url = format!("http://{local_addr}/api/v1/notifications/stream");

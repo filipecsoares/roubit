@@ -38,9 +38,9 @@ Fix the broken real-time notification pipeline from end to end: correct the non-
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `hydrate_reminder` returns the actual `TimeBlock.name` and `Habit.name` from the database for the owning `user_id`.
-- [ ] `catch_up_missed_reminders` executes without SQL errors and schedules upcoming blocks in Redis when available.
-- [ ] `/api/v1/notifications/stream` is not subject to the 30-second `TimeoutLayer`.
-- [ ] `frontend/nginx.conf` disables proxy buffering for SSE.
-- [ ] All backend tests (`cargo test --workspace`) and clippy checks pass.
+- [x] `hydrate_reminder` returns the actual `TimeBlock.name` and `Habit.name` from the database for the owning `user_id`.
+- [x] `catch_up_missed_reminders` executes without SQL errors and schedules upcoming blocks in Redis when available.
+- [x] `/api/v1/notifications/stream` is not subject to the 30-second `TimeoutLayer`.
+- [x] `frontend/nginx.conf` disables proxy buffering for SSE.
+- [x] All backend tests (`cargo test --workspace`) and clippy checks pass.
 

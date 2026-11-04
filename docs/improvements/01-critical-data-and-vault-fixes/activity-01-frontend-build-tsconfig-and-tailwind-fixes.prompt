@@ -37,9 +37,9 @@ Restore the broken TypeScript and production Vite/Docker build in `frontend/` ca
 6. Update `README.md`, `docs/02-status-atividades.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `frontend/tsconfig.app.json` exists and `npm run build` (`vue-tsc -b && vite build`) succeeds with 0 errors.
-- [ ] `font-outfit`, `font-mono`, `animate-fade-in`, and `animate-bounce-short` generate valid CSS rules in the production bundle.
-- [ ] `StreakBadge.vue` uses `py-0.5` instead of `py-0.2`.
-- [ ] All Vitest unit tests (`npm run test`) pass.
-- [ ] `README.md` build instructions are accurate and up to date.
+- [x] `frontend/tsconfig.app.json` exists and `npm run build` (`vue-tsc -b && vite build`) succeeds with 0 errors.
+- [x] `font-outfit`, `font-mono`, `animate-fade-in`, and `animate-bounce-short` generate valid CSS rules in the production bundle.
+- [x] `StreakBadge.vue` uses `py-0.5` instead of `py-0.2`.
+- [x] All Vitest unit tests (`npm run test`) pass.
+- [x] `README.md` build instructions are accurate and up to date.
 

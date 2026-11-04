@@ -328,6 +328,33 @@ async fn test_zero_knowledge_journal_contract_in_memory() {
 
     let res_get = app.clone().oneshot(req_get).await.expect("Execute request");
     assert_eq!(res_get.status(), StatusCode::OK);
+
+    // 4. Updating a non-existent explicit entry ID returns 404 Not Found (not 500)
+    let non_existent_payload = serde_json::json!({
+        "id": uuid::Uuid::new_v4(),
+        "entry_date": "2026-10-31",
+        "mood_score": 3,
+        "tags": ["missing"],
+        "salt_base64": fake_salt,
+        "nonce_base64": fake_nonce,
+        "ciphertext_base64": fake_ciphertext
+    });
+    let req_missing = Request::builder()
+        .uri("/api/v1/journal")
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&non_existent_payload).expect("Serialize"),
+        ))
+        .expect("Build missing ID request");
+
+    let res_missing = app
+        .clone()
+        .oneshot(req_missing)
+        .await
+        .expect("Execute missing ID request");
+    assert_eq!(res_missing.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

@@ -66,12 +66,12 @@ npm run preview
 frontend/src/
 ├── assets/          # Global styles, Tailwind base & glassmorphism utilities
 ├── components/      # UI components
-│   ├── common/      # Network status, modal dialogs, buttons, banners
+│   ├── common/      # Navbar, network status, NotificationToast & activity drawer
 │   ├── dashboard/   # Routine timeline, time blocks, and Focus Mode Pomodoro
 │   ├── habits/      # Habit cards, check-in dialogs, and 52-week heatmap
 │   ├── journal/     # Zero-knowledge vault unlock, editor & timeline
-│   ├── notifications/# Toast manager and activity feed
-│   └── okrs/        # Objectives list, Key Results & progress bars
+│   ├── okrs/        # Objectives list, Key Results & progress bars
+│   └── pwa/         # PWA install and service worker update prompts
 ├── composables/     # Vue composables (usePwa, useModal, useNotification)
 ├── services/        # WebCrypto (AES-256-GCM/Argon2id), Axios API, Offline Queue (IndexedDB)
 ├── stores/          # Pinia stores (auth, routine, habit, okr, journal, focus, notification)

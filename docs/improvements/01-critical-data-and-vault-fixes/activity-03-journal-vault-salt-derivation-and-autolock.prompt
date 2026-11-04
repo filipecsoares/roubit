@@ -35,9 +35,9 @@ Fix the critical Zero-Knowledge Journal bug where encrypted entries saved in pre
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] An encrypted journal entry saved in one session can be decrypted after locking the vault and unlocking again with the same passphrase.
-- [ ] Auto-lock timer resets on user activity and scrubs `plaintextReflection`, `moodScore`, and `tags` from `JournalView.vue` when triggered.
-- [ ] `journal_entries` enforces uniqueness on `(user_id, entry_date)`.
-- [ ] Updating a non-existent or another user's journal entry ID returns `404 Not Found` instead of `500 Internal Server Error`.
-- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+- [x] An encrypted journal entry saved in one session can be decrypted after locking the vault and unlocking again with the same passphrase.
+- [x] Auto-lock timer resets on user activity and scrubs `plaintextReflection`, `moodScore`, and `tags` from `JournalView.vue` when triggered.
+- [x] `journal_entries` enforces uniqueness on `(user_id, entry_date)`.
+- [x] Updating a non-existent or another user's journal entry ID returns `404 Not Found` instead of `500 Internal Server Error`.
+- [x] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
 
