@@ -98,6 +98,7 @@ pub fn build_router(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/register", post(crate::auth::register))
         .route("/login", post(crate::auth::login))
+        .route("/logout", post(crate::auth::logout))
         .route("/me", get(crate::auth::me));
 
     let api_v1_rest = Router::new()
@@ -122,6 +123,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(readiness_check).layer(timeout_layer))
         .nest("/api/v1", api_v1)
         .fallback(fallback_handler)
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit_middleware,
+        ))
         .layer(from_fn(crate::middleware::security_headers_middleware))
         .layer(cors_layer)
         .layer(observability_stack)

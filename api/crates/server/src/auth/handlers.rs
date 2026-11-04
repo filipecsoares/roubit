@@ -74,9 +74,22 @@ fn validate_registration(req: &RegisterRequest) -> Result<(String, &str), ApiErr
     Ok((email, &req.password))
 }
 
+fn is_cookie_secure() -> bool {
+    std::env::var("COOKIE_SECURE").map_or(true, |v| v != "false" && v != "0")
+}
+
 fn build_cookie_header(token: &str) -> Option<HeaderValue> {
+    let secure_flag = if is_cookie_secure() { "; Secure" } else { "" };
+    let cookie_val = format!(
+        "roubit_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600{secure_flag}"
+    );
+    HeaderValue::from_str(&cookie_val).ok()
+}
+
+fn build_logout_cookie_header() -> Option<HeaderValue> {
+    let secure_flag = if is_cookie_secure() { "; Secure" } else { "" };
     let cookie_val =
-        format!("roubit_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600");
+        format!("roubit_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0{secure_flag}");
     HeaderValue::from_str(&cookie_val).ok()
 }
 
@@ -197,4 +210,15 @@ pub async fn me(user: AuthenticatedUser) -> Json<UserDto> {
         id: user.id,
         email: user.email,
     })
+}
+
+/// Handler for `POST /api/v1/auth/logout`
+///
+/// Clears the `roubit_token` session cookie by setting `Max-Age=0`.
+pub async fn logout() -> Response {
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    if let Some(cookie) = build_logout_cookie_header() {
+        response.headers_mut().insert(header::SET_COOKIE, cookie);
+    }
+    response
 }

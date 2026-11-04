@@ -25,6 +25,15 @@ pub struct AppConfig {
 
     #[serde(default)]
     pub redis_url: Option<String>,
+
+    #[serde(default = "default_rate_limit_enabled")]
+    pub rate_limit_enabled: bool,
+
+    #[serde(default = "default_auth_rate_limit")]
+    pub auth_rate_limit: u32,
+
+    #[serde(default = "default_general_rate_limit")]
+    pub general_rate_limit: u32,
 }
 
 fn default_database_url() -> String {
@@ -51,6 +60,18 @@ fn default_allowed_origins() -> String {
     "http://localhost:5173,http://127.0.0.1:5173".to_string()
 }
 
+const fn default_rate_limit_enabled() -> bool {
+    true
+}
+
+const fn default_auth_rate_limit() -> u32 {
+    20
+}
+
+const fn default_general_rate_limit() -> u32 {
+    300
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -61,6 +82,9 @@ impl Default for AppConfig {
             jwt_secret: default_jwt_secret(),
             allowed_origins: default_allowed_origins(),
             redis_url: None,
+            rate_limit_enabled: default_rate_limit_enabled(),
+            auth_rate_limit: default_auth_rate_limit(),
+            general_rate_limit: default_general_rate_limit(),
         }
     }
 }

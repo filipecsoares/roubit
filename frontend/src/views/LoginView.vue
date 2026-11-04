@@ -26,7 +26,13 @@ async function handleSubmit() {
     } else {
       await authStore.login(email.value, password.value)
     }
-    const redirect = (route.query.redirect as string) || '/'
+    const redirectQuery = route.query.redirect
+    const redirect =
+      typeof redirectQuery === 'string' &&
+      redirectQuery.startsWith('/') &&
+      !redirectQuery.startsWith('//')
+        ? redirectQuery
+        : '/'
     router.push(redirect)
   } catch (_err: any) {
     errorMessage.value = authStore.error || 'Erro na autenticação'
