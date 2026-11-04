@@ -82,10 +82,10 @@ flowchart TD
   - [x] Substituir `to_bytes(body, usize::MAX)` por limite estrito de `2 MiB` em `idempotency.rs`.
   - [x] Validar `request_path` e método HTTP (`POST`, `PUT`, `PATCH`, `DELETE`) no cache hit (Redis e DB).
   - [x] Ignorar rotas `/api/v1/auth/*` no middleware de idempotência, liberar lock Redis em retornos de conflito, deletar registros pendentes em erros `5xx`, corrigir race condition TOCTOU em locks expirados e agendar task periódica para `purge_expired_keys`.
-- [ ] **03.2 Isolamento de Thread Argon2id, Defesa contra Timing Attack & Redação de Logs** ([activity-02-auth-argon2-blocking-and-timing-defense.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-02-auth-argon2-blocking-and-timing-defense.prompt))
-  - [ ] Executar `hash_password`, `verify_password` e `KdfService::derive_key` dentro de `tokio::task::spawn_blocking`.
-  - [ ] Impor tamanho máximo de senha (128 bytes) no registro/login e executar verificação dummy de Argon2 quando o e-mail não existir no login.
-  - [ ] Desativar `.include_headers(true)` no `TraceLayer` (evitando logar `Authorization` e `Cookie`) e exigir `JWT_SECRET` explícito fora de modo dev local (atualizando `README.md` e `.env.example`).
+- [x] **03.2 Isolamento de Thread Argon2id, Defesa contra Timing Attack & Redação de Logs** ([activity-02-auth-argon2-blocking-and-timing-defense.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-02-auth-argon2-blocking-and-timing-defense.prompt))
+  - [x] Executar `hash_password`, `verify_password` e `KdfService::derive_key` dentro de `tokio::task::spawn_blocking`.
+  - [x] Impor tamanho máximo de senha (128 bytes) no registro/login e executar verificação dummy de Argon2 quando o e-mail não existir no login.
+  - [x] Desativar `.include_headers(true)` no `TraceLayer` (evitando logar `Authorization` e `Cookie`) e exigir `JWT_SECRET` explícito fora de modo dev local (atualizando `README.md` e `.env.example`).
 - [ ] **03.3 Rate Limiting, Cookies Seguros & Logout Completo (Backend + Frontend)** ([activity-03-rate-limiting-secure-cookies-and-logout.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-03-rate-limiting-secure-cookies-and-logout.prompt))
   - [ ] Adicionar middleware de Rate Limiting para rotas de autenticação e mutações críticas.
   - [ ] Criar endpoint `POST /api/v1/auth/logout` limpando o cookie `roubit_token` e suportar flag `Secure` configurável.

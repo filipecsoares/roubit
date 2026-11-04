@@ -76,7 +76,7 @@ pub fn build_router(state: AppState) -> Router {
         .make_span_with(
             DefaultMakeSpan::new()
                 .level(Level::INFO)
-                .include_headers(true),
+                .include_headers(false),
         )
         .on_response(
             DefaultOnResponse::new()
@@ -455,8 +455,46 @@ mod tests {
             ))
             .expect("Failed to build request");
 
-        let res = app.oneshot(req_short_pw).await.expect("Failed to execute");
+        let res = app
+            .clone()
+            .oneshot(req_short_pw)
+            .await
+            .expect("Failed to execute");
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Long password (> 128 chars) on register
+        let long_password = "a".repeat(129);
+        let req_long_reg = Request::builder()
+            .uri("/api/v1/auth/register")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"email": "test@roubit.app", "password": "{long_password}"}}"#
+            )))
+            .expect("Failed to build request");
+
+        let res_reg = app
+            .clone()
+            .oneshot(req_long_reg)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res_reg.status(), StatusCode::BAD_REQUEST);
+
+        // Long password (> 128 chars) on login
+        let req_long_login = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"email": "test@roubit.app", "password": "{long_password}"}}"#
+            )))
+            .expect("Failed to build request");
+
+        let res_login = app
+            .oneshot(req_long_login)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(res_login.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -519,7 +557,23 @@ mod tests {
             .expect("Failed to execute");
         assert_eq!(dup_res.status(), StatusCode::CONFLICT);
 
-        // 3. Login with incorrect password -> 401 Unauthorized
+        // 3. Login with nonexistent user -> 401 Unauthorized (runs dummy Argon2id verification)
+        let unk_login_req = Request::builder()
+            .uri("/api/v1/auth/login")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email": "unknown_user@roubit.app", "password": "wrongpassword!"}"#,
+            ))
+            .expect("Failed to build request");
+
+        let unk_login_res = build_router(state.clone())
+            .oneshot(unk_login_req)
+            .await
+            .expect("Failed to execute");
+        assert_eq!(unk_login_res.status(), StatusCode::UNAUTHORIZED);
+
+        // 4. Login with incorrect password -> 401 Unauthorized
         let wrong_login_req = Request::builder()
             .uri("/api/v1/auth/login")
             .method("POST")

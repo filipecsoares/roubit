@@ -6,6 +6,7 @@ use roubit_server::run_server;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::from_env().unwrap_or_default();
+    config.validate()?;
     init_telemetry(&config.log_level);
     tracing::info!(
         host = %config.server_host,
