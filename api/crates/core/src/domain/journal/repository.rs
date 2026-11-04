@@ -1,11 +1,11 @@
-//! Asynchronous SQLite repository for Encrypted Journaling (RF04).
+//! Asynchronous SQLite and PostgreSQL repositories for Encrypted Journaling (RF04).
 
 use async_trait::async_trait;
-use chrono::NaiveDate;
-use sqlx::SqlitePool;
+use chrono::{DateTime, NaiveDate, Utc};
+use sqlx::{PgPool, Row, SqlitePool};
 use uuid::Uuid;
 
-use super::models::{EncryptedJournalEntry, JournalMetadata, JournalModelError};
+use super::models::{deserialize_tags, EncryptedJournalEntry, JournalMetadata, JournalModelError};
 
 /// Errors encountered during Journal repository operations.
 #[derive(Debug, thiserror::Error)]
@@ -205,6 +205,240 @@ impl JournalRepository for SqliteJournalRepository {
         let result = sqlx::query("DELETE FROM journal_entries WHERE id = ? AND user_id = ?")
             .bind(id)
             .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(JournalRepositoryError::NotFound(id));
+        }
+
+        Ok(())
+    }
+}
+
+/// PostgreSQL implementation of [`JournalRepository`].
+#[derive(Debug, Clone)]
+pub struct PgJournalRepository {
+    pool: PgPool,
+}
+
+impl PgJournalRepository {
+    /// Creates a new repository instance backed by the provided `PgPool`.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Returns a reference to the underlying `PgPool`.
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    fn map_metadata_row(row: &sqlx::postgres::PgRow) -> Result<JournalMetadata, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let user_id_str: Option<String> = row.try_get("user_id").ok().flatten();
+        let user_id = user_id_str.as_deref().and_then(|s| Uuid::parse_str(s).ok());
+        let entry_date: NaiveDate = row.try_get("entry_date")?;
+        let mood_score: Option<u8> = row
+            .try_get::<Option<i32>, _>("mood_score")?
+            .map(|m| u8::try_from(m).map_err(|e| sqlx::Error::Decode(Box::new(e))))
+            .transpose()?;
+
+        let tags_str: String = row.try_get("tags")?;
+        let tags = deserialize_tags(&tags_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+        #[allow(clippy::option_if_let_else)]
+        let ciphertext_bytes_len = if let Ok(len) = row.try_get::<i32, _>("ciphertext_bytes_len") {
+            usize::try_from(len).unwrap_or(0)
+        } else if let Ok(len64) = row.try_get::<i64, _>("ciphertext_bytes_len") {
+            usize::try_from(len64).unwrap_or(0)
+        } else if let Ok(payload) = row.try_get::<Vec<u8>, _>("encrypted_payload") {
+            payload.len()
+        } else {
+            0
+        };
+
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+
+        Ok(JournalMetadata {
+            id,
+            user_id,
+            entry_date,
+            mood_score,
+            tags,
+            ciphertext_bytes_len,
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn map_entry_row(row: &sqlx::postgres::PgRow) -> Result<EncryptedJournalEntry, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let user_id_str: Option<String> = row.try_get("user_id").ok().flatten();
+        let user_id = user_id_str.as_deref().and_then(|s| Uuid::parse_str(s).ok());
+        let entry_date: NaiveDate = row.try_get("entry_date")?;
+        let mood_score: Option<u8> = row
+            .try_get::<Option<i32>, _>("mood_score")?
+            .map(|m| u8::try_from(m).map_err(|e| sqlx::Error::Decode(Box::new(e))))
+            .transpose()?;
+
+        let tags_str: String = row.try_get("tags")?;
+        let tags = deserialize_tags(&tags_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+        let salt_raw: Vec<u8> = row.try_get("salt")?;
+        let nonce_raw: Vec<u8> = row.try_get("nonce")?;
+        let encrypted_payload: Vec<u8> = row.try_get("encrypted_payload")?;
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+
+        let salt: [u8; 16] = salt_raw.try_into().map_err(|vec: Vec<u8>| {
+            sqlx::Error::Decode(
+                format!("Invalid salt length: expected 16 bytes, got {}", vec.len()).into(),
+            )
+        })?;
+        let nonce: [u8; 12] = nonce_raw.try_into().map_err(|vec: Vec<u8>| {
+            sqlx::Error::Decode(
+                format!("Invalid nonce length: expected 12 bytes, got {}", vec.len()).into(),
+            )
+        })?;
+
+        let ciphertext_bytes_len = encrypted_payload.len();
+        let metadata = JournalMetadata {
+            id,
+            user_id,
+            entry_date,
+            mood_score,
+            tags,
+            ciphertext_bytes_len,
+            created_at,
+            updated_at,
+        };
+
+        Ok(EncryptedJournalEntry {
+            metadata,
+            salt,
+            nonce,
+            encrypted_payload,
+        })
+    }
+}
+
+#[async_trait]
+impl JournalRepository for PgJournalRepository {
+    async fn save_entry(
+        &self,
+        user_id: Uuid,
+        entry: &EncryptedJournalEntry,
+    ) -> Result<(), JournalRepositoryError> {
+        let tags_json = entry.metadata.tags_to_json()?;
+
+        let result = sqlx::query(
+            r"
+            INSERT INTO journal_entries (
+                id, user_id, entry_date, mood_score, tags, salt, nonce, encrypted_payload, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT(id) DO UPDATE SET
+                entry_date = EXCLUDED.entry_date,
+                mood_score = EXCLUDED.mood_score,
+                tags = EXCLUDED.tags,
+                salt = EXCLUDED.salt,
+                nonce = EXCLUDED.nonce,
+                encrypted_payload = EXCLUDED.encrypted_payload,
+                updated_at = EXCLUDED.updated_at
+            WHERE journal_entries.user_id = EXCLUDED.user_id
+            ",
+        )
+        .bind(entry.metadata.id.to_string())
+        .bind(user_id.to_string())
+        .bind(entry.metadata.entry_date)
+        .bind(entry.metadata.mood_score.map(i32::from))
+        .bind(&tags_json)
+        .bind(&entry.salt[..])
+        .bind(&entry.nonce[..])
+        .bind(&entry.encrypted_payload[..])
+        .bind(entry.metadata.created_at)
+        .bind(entry.metadata.updated_at)
+        .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(JournalRepositoryError::NotFound(entry.metadata.id));
+        }
+
+        Ok(())
+    }
+
+    async fn get_entry_by_id(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError> {
+        let row = sqlx::query("SELECT * FROM journal_entries WHERE id = $1 AND user_id = $2")
+            .bind(id.to_string())
+            .bind(user_id.to_string())
+            .fetch_optional(&self.pool)
+            .await?;
+
+        row.as_ref()
+            .map(Self::map_entry_row)
+            .transpose()
+            .map_err(JournalRepositoryError::Database)
+    }
+
+    async fn get_entry_by_date(
+        &self,
+        date: NaiveDate,
+        user_id: Uuid,
+    ) -> Result<Option<EncryptedJournalEntry>, JournalRepositoryError> {
+        let row = sqlx::query(
+            "SELECT * FROM journal_entries WHERE entry_date = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(date)
+        .bind(user_id.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.as_ref()
+            .map(Self::map_entry_row)
+            .transpose()
+            .map_err(JournalRepositoryError::Database)
+    }
+
+    async fn list_metadata_in_range(
+        &self,
+        user_id: Uuid,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<JournalMetadata>, JournalRepositoryError> {
+        let rows = sqlx::query(
+            r"
+            SELECT id, user_id, entry_date, mood_score, tags, OCTET_LENGTH(encrypted_payload) as ciphertext_bytes_len, created_at, updated_at
+            FROM journal_entries
+            WHERE user_id = $1 AND entry_date BETWEEN $2 AND $3
+            ORDER BY entry_date DESC, created_at DESC
+            ",
+        )
+        .bind(user_id.to_string())
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter()
+            .map(Self::map_metadata_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(JournalRepositoryError::Database)
+    }
+
+    async fn delete_entry(&self, id: Uuid, user_id: Uuid) -> Result<(), JournalRepositoryError> {
+        let result = sqlx::query("DELETE FROM journal_entries WHERE id = $1 AND user_id = $2")
+            .bind(id.to_string())
+            .bind(user_id.to_string())
             .execute(&self.pool)
             .await?;
 

@@ -9,5 +9,7 @@ pub mod streak;
 
 pub use analytics::{HabitAnalyticsService, HabitAnalyticsSummary, HeatmapCell};
 pub use models::{Habit, HabitLog, HabitType};
-pub use repository::{HabitRepository, HabitRepositoryError, SqliteHabitRepository};
+pub use repository::{
+    HabitRepository, HabitRepositoryError, PgHabitRepository, SqliteHabitRepository,
+};
 pub use streak::{StreakCalculator, StreakMetrics};

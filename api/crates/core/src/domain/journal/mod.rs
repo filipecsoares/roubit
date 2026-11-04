@@ -12,5 +12,7 @@ pub use models::{
     deserialize_tags, serialize_tags, DecryptedJournalEntry, EncryptedJournalEntry,
     JournalMetadata, JournalModelError,
 };
-pub use repository::{JournalRepository, JournalRepositoryError, SqliteJournalRepository};
+pub use repository::{
+    JournalRepository, JournalRepositoryError, PgJournalRepository, SqliteJournalRepository,
+};
 pub use service::{JournalService, JournalServiceError};
