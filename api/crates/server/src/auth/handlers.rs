@@ -9,7 +9,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use roubit_core::{SqliteUserRepository, User, UserRepository, UserRepositoryError};
+use roubit_core::{User, UserRepositoryError};
 
 use crate::{
     auth::{
@@ -82,8 +82,8 @@ pub async fn register(
 ) -> Result<Response, ApiError> {
     let (email, password) = validate_registration(&payload)?;
 
-    let user_repo = SqliteUserRepository::new(state.db.clone());
-    if user_repo
+    if state
+        .user_repo
         .find_by_email(&email)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
@@ -99,7 +99,8 @@ pub async fn register(
     let created_at = chrono::Utc::now().to_rfc3339();
     let new_user = User::new(user_id, email.clone(), password_hash, created_at);
 
-    user_repo
+    state
+        .user_repo
         .create_user(&new_user)
         .await
         .map_err(|e| match e {
@@ -135,8 +136,8 @@ pub async fn login(
 ) -> Result<Response, ApiError> {
     let email = payload.email.trim().to_lowercase();
 
-    let user_repo = SqliteUserRepository::new(state.db.clone());
-    let Some(user) = user_repo
+    let Some(user) = state
+        .user_repo
         .find_by_email(&email)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?

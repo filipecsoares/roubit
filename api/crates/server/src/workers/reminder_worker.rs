@@ -29,9 +29,9 @@ pub fn parse_reminder_key(key: &str) -> Option<(String, String, String)> {
     Some((user_id, entity_type, entity_id))
 }
 
-/// Hydrates a reminder notification with domain details from the database.
-pub async fn hydrate_reminder(
-    db: &SqlitePool,
+/// Hydrates a reminder notification with domain details from a [`roubit_core::DatabasePool`].
+pub async fn hydrate_reminder_from_pool(
+    db: &roubit_core::DatabasePool,
     user_id: &str,
     entity_type: &str,
     entity_id: &str,
@@ -42,28 +42,44 @@ pub async fn hydrate_reminder(
 
     match entity_type {
         "time_block" => {
-            let row = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
-                sqlx::query(
-                    r"
-                    SELECT tb.name
-                    FROM time_blocks tb
-                    JOIN routines r ON tb.routine_id = r.id
-                    WHERE tb.id = ? AND r.user_id = ?
-                    ",
-                )
-                .bind(e_id)
-                .bind(u_id)
-                .fetch_optional(db)
-                .await
-                .ok()
-                .flatten()
+            let title_opt = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
+                match db {
+                    roubit_core::DatabasePool::Sqlite(pool) => sqlx::query(
+                        r"
+                        SELECT tb.name
+                        FROM time_blocks tb
+                        JOIN routines r ON tb.routine_id = r.id
+                        WHERE tb.id = ? AND r.user_id = ?
+                        ",
+                    )
+                    .bind(e_id)
+                    .bind(u_id)
+                    .fetch_optional(pool)
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|r| r.try_get::<String, _>("name").ok()),
+                    roubit_core::DatabasePool::Postgres(pool) => sqlx::query(
+                        r"
+                        SELECT tb.name
+                        FROM time_blocks tb
+                        JOIN routines r ON tb.routine_id = r.id
+                        WHERE tb.id = $1 AND r.user_id = $2
+                        ",
+                    )
+                    .bind(e_id.to_string())
+                    .bind(u_id.to_string())
+                    .fetch_optional(pool)
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|r| r.try_get::<String, _>("name").ok()),
+                }
             } else {
                 None
             };
 
-            let title_str = row
-                .and_then(|r| r.try_get::<String, _>("name").ok())
-                .unwrap_or_else(|| "Bloco de Rotina".to_string());
+            let title_str = title_opt.unwrap_or_else(|| "Bloco de Rotina".to_string());
 
             ReminderNotification {
                 user_id: user_id.to_string(),
@@ -75,21 +91,34 @@ pub async fn hydrate_reminder(
             }
         }
         "habit" => {
-            let row = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
-                sqlx::query("SELECT name FROM habits WHERE id = ? AND user_id = ?")
-                    .bind(e_id)
-                    .bind(u_id)
-                    .fetch_optional(db)
-                    .await
-                    .ok()
-                    .flatten()
+            let name_opt = if let (Some(e_id), Some(u_id)) = (entity_uuid, user_uuid) {
+                match db {
+                    roubit_core::DatabasePool::Sqlite(pool) => {
+                        sqlx::query("SELECT name FROM habits WHERE id = ? AND user_id = ?")
+                            .bind(e_id)
+                            .bind(u_id)
+                            .fetch_optional(pool)
+                            .await
+                            .ok()
+                            .flatten()
+                            .and_then(|r| r.try_get::<String, _>("name").ok())
+                    }
+                    roubit_core::DatabasePool::Postgres(pool) => {
+                        sqlx::query("SELECT name FROM habits WHERE id = $1 AND user_id = $2")
+                            .bind(e_id.to_string())
+                            .bind(u_id.to_string())
+                            .fetch_optional(pool)
+                            .await
+                            .ok()
+                            .flatten()
+                            .and_then(|r| r.try_get::<String, _>("name").ok())
+                    }
+                }
             } else {
                 None
             };
 
-            let name_str = row
-                .and_then(|r| r.try_get::<String, _>("name").ok())
-                .unwrap_or_else(|| "Hábito".to_string());
+            let name_str = name_opt.unwrap_or_else(|| "Hábito".to_string());
 
             ReminderNotification {
                 user_id: user_id.to_string(),
@@ -111,64 +140,129 @@ pub async fn hydrate_reminder(
     }
 }
 
-/// Runs a fast catch-up check on startup for any routines whose start times passed during downtime.
-pub async fn catch_up_missed_reminders(
+/// Hydrates a reminder notification with domain details from the SQLite database.
+pub async fn hydrate_reminder(
     db: &SqlitePool,
+    user_id: &str,
+    entity_type: &str,
+    entity_id: &str,
+) -> ReminderNotification {
+    hydrate_reminder_from_pool(
+        &roubit_core::DatabasePool::Sqlite(db.clone()),
+        user_id,
+        entity_type,
+        entity_id,
+    )
+    .await
+}
+
+/// Runs a fast catch-up check on startup across SQLite or PostgreSQL for any routines whose start times passed during downtime.
+pub async fn catch_up_missed_reminders_from_pool(
+    db: &roubit_core::DatabasePool,
     tx_notification: &broadcast::Sender<ReminderNotification>,
 ) {
     let now = chrono::Utc::now();
     let current_time_str = now.format("%H:%M:%S").to_string();
 
-    let rows = sqlx::query(
-        r"
-        SELECT tb.id, tb.routine_id, tb.name, tb.start_time, r.user_id
-        FROM time_blocks tb
-        JOIN routines r ON r.id = tb.routine_id
-        WHERE r.is_active = 1 AND tb.start_time <= ?
-        ORDER BY tb.start_time DESC
-        LIMIT 10
-        ",
-    )
-    .bind(&current_time_str)
-    .fetch_all(db)
-    .await;
+    match db {
+        roubit_core::DatabasePool::Sqlite(pool) => {
+            let rows = sqlx::query(
+                r"
+                SELECT tb.id, tb.routine_id, tb.name, tb.start_time, r.user_id
+                FROM time_blocks tb
+                JOIN routines r ON r.id = tb.routine_id
+                WHERE r.is_active = 1 AND tb.start_time <= ?
+                ORDER BY tb.start_time DESC
+                LIMIT 10
+                ",
+            )
+            .bind(&current_time_str)
+            .fetch_all(pool)
+            .await;
 
-    if let Ok(records) = rows {
-        for record in records {
-            let entity_id = record
-                .try_get::<uuid::Uuid, _>("id")
-                .map(|u| u.to_string())
-                .or_else(|_| record.try_get::<String, _>("id"))
-                .unwrap_or_default();
-            let user_id = record
-                .try_get::<uuid::Uuid, _>("user_id")
-                .map(|u| u.to_string())
-                .or_else(|_| record.try_get::<String, _>("user_id"))
-                .unwrap_or_default();
-            let title: String = record.try_get("name").unwrap_or_default();
+            if let Ok(records) = rows {
+                for record in records {
+                    let entity_id = record
+                        .try_get::<uuid::Uuid, _>("id")
+                        .map(|u| u.to_string())
+                        .or_else(|_| record.try_get::<String, _>("id"))
+                        .unwrap_or_default();
+                    let user_id = record
+                        .try_get::<uuid::Uuid, _>("user_id")
+                        .map(|u| u.to_string())
+                        .or_else(|_| record.try_get::<String, _>("user_id"))
+                        .unwrap_or_default();
+                    let title: String = record.try_get("name").unwrap_or_default();
 
-            let notif = ReminderNotification {
-                user_id,
-                entity_type: "time_block".to_string(),
-                entity_id,
-                title: format!("Rotina Ativa: {title}"),
-                message: format!("Bloco '{title}' programado para hoje."),
-                scheduled_at: now,
-            };
-            let _ = tx_notification.send(notif);
+                    let notif = ReminderNotification {
+                        user_id,
+                        entity_type: "time_block".to_string(),
+                        entity_id,
+                        title: format!("Rotina Ativa: {title}"),
+                        message: format!("Bloco '{title}' programado para hoje."),
+                        scheduled_at: now,
+                    };
+                    let _ = tx_notification.send(notif);
+                }
+            }
+        }
+        roubit_core::DatabasePool::Postgres(pool) => {
+            let rows = sqlx::query(
+                r"
+                SELECT tb.id, tb.routine_id, tb.name, tb.start_time, r.user_id
+                FROM time_blocks tb
+                JOIN routines r ON r.id = tb.routine_id
+                WHERE r.is_active = TRUE AND tb.start_time <= $1
+                ORDER BY tb.start_time DESC
+                LIMIT 10
+                ",
+            )
+            .bind(&current_time_str)
+            .fetch_all(pool)
+            .await;
+
+            if let Ok(records) = rows {
+                for record in records {
+                    let entity_id: String = record.try_get("id").unwrap_or_default();
+                    let user_id: String = record.try_get("user_id").unwrap_or_default();
+                    let title: String = record.try_get("name").unwrap_or_default();
+
+                    let notif = ReminderNotification {
+                        user_id,
+                        entity_type: "time_block".to_string(),
+                        entity_id,
+                        title: format!("Rotina Ativa: {title}"),
+                        message: format!("Bloco '{title}' programado para hoje."),
+                        scheduled_at: now,
+                    };
+                    let _ = tx_notification.send(notif);
+                }
+            }
         }
     }
+}
+
+/// Runs a fast catch-up check on startup for any routines whose start times passed during downtime.
+pub async fn catch_up_missed_reminders(
+    db: &SqlitePool,
+    tx_notification: &broadcast::Sender<ReminderNotification>,
+) {
+    catch_up_missed_reminders_from_pool(
+        &roubit_core::DatabasePool::Sqlite(db.clone()),
+        tx_notification,
+    )
+    .await;
 }
 
 /// Starts the background Tokio worker listening to Redis Keyspace Notifications (`__keyevent@0__:expired`).
 pub fn start_reminder_worker(
     redis_url: Option<String>,
-    db: SqlitePool,
+    db: roubit_core::DatabasePool,
     tx_notification: broadcast::Sender<ReminderNotification>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Fast catch-up on startup
-        catch_up_missed_reminders(&db, &tx_notification).await;
+        catch_up_missed_reminders_from_pool(&db, &tx_notification).await;
 
         let Some(url) = redis_url else {
             tracing::info!("Redis not configured; reminder background keyspace listener idle");
@@ -217,7 +311,8 @@ pub fn start_reminder_worker(
                     if let Some((user_id, entity_type, entity_id)) = parse_reminder_key(&key) {
                         tracing::info!(user_id = %user_id, entity_type = %entity_type, entity_id = %entity_id, "Redis reminder expired event received");
                         let notification =
-                            hydrate_reminder(&db, &user_id, &entity_type, &entity_id).await;
+                            hydrate_reminder_from_pool(&db, &user_id, &entity_type, &entity_id)
+                                .await;
                         let _ = tx_notification.send(notification);
                     }
                 }

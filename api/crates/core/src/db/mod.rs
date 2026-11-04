@@ -94,6 +94,22 @@ impl DatabasePool {
         }
         Ok(())
     }
+
+    /// Executes a lightweight `SELECT 1` query against the active database pool to verify connectivity.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] if the database connection is unhealthy or unreachable.
+    pub async fn health_check(&self) -> Result<(), sqlx::Error> {
+        match self {
+            Self::Sqlite(pool) => {
+                sqlx::query("SELECT 1").execute(pool).await?;
+            }
+            Self::Postgres(pool) => {
+                sqlx::query("SELECT 1").execute(pool).await?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Statistics and count of migrated entities from SQLite to PostgreSQL.

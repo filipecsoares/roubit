@@ -12,8 +12,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    Habit, HabitLog, HabitRepository, HabitRepositoryError, HabitType, OkrSyncService,
-    SqliteHabitRepository, SqliteOkrRepository, StreakMetrics,
+    DatabasePool, Habit, HabitLog, HabitRepositoryError, HabitType, OkrSyncService,
+    PgHabitRepository, PgOkrRepository, SqliteHabitRepository, SqliteOkrRepository, StreakMetrics,
 };
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
@@ -155,9 +155,9 @@ pub async fn list_habits(
         return Ok(res);
     }
 
-    let repo = SqliteHabitRepository::new(state.db.clone());
     let today = Utc::now().date_naive();
-    let habits_with_streaks = repo
+    let habits_with_streaks = state
+        .habit_repo
         .list_active_habits_with_streaks(user.id, today)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -215,8 +215,9 @@ pub async fn create_habit(
         updated_at: Utc::now(),
     };
 
-    let repo = SqliteHabitRepository::new(state.db.clone());
-    repo.create_habit(user.id, &habit)
+    state
+        .habit_repo
+        .create_habit(user.id, &habit)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -249,8 +250,7 @@ pub async fn record_checkin(
         .validate()
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let repo = SqliteHabitRepository::new(state.db.clone());
-    let habit = match repo.get_habit_by_id(habit_id, user.id).await {
+    let habit = match state.habit_repo.get_habit_by_id(habit_id, user.id).await {
         Ok(Some(h)) => h,
         Ok(None) | Err(HabitRepositoryError::NotFound(_)) => {
             return Err(ApiError::NotFound(format!("Habit {habit_id} not found")));
@@ -259,7 +259,8 @@ pub async fn record_checkin(
     };
 
     let is_increment = payload.is_increment.unwrap_or(false);
-    let log = match repo
+    let log = match state
+        .habit_repo
         .record_check_in(habit_id, user.id, payload.date, payload.value, is_increment)
         .await
     {
@@ -270,10 +271,24 @@ pub async fn record_checkin(
         Err(e) => return Err(ApiError::Internal(e.into())),
     };
 
-    // Synchronize linked Key Results progress
-    let okr_repo = SqliteOkrRepository::new(state.db.clone());
-    let sync_svc = OkrSyncService::new(okr_repo, repo.clone());
-    if let Err(err) = sync_svc.sync_linked_krs_for_habit(user.id, habit_id).await {
+    // Synchronize linked Key Results progress across SQLite or PostgreSQL
+    let sync_res = match &state.db {
+        DatabasePool::Sqlite(pool) => {
+            let sync_svc = OkrSyncService::new(
+                SqliteOkrRepository::new(pool.clone()),
+                SqliteHabitRepository::new(pool.clone()),
+            );
+            sync_svc.sync_linked_krs_for_habit(user.id, habit_id).await
+        }
+        DatabasePool::Postgres(pool) => {
+            let sync_svc = OkrSyncService::new(
+                PgOkrRepository::new(pool.clone()),
+                PgHabitRepository::new(pool.clone()),
+            );
+            sync_svc.sync_linked_krs_for_habit(user.id, habit_id).await
+        }
+    };
+    if let Err(err) = sync_res {
         tracing::warn!(error = %err, %habit_id, "Failed to synchronize linked Key Results for habit check-in");
     }
 
@@ -281,7 +296,8 @@ pub async fn record_checkin(
     invalidate_habit_caches(&state, user.id).await;
 
     // Read updated habit streak atomically computed in O(1)
-    let updated_habit = repo
+    let updated_habit = state
+        .habit_repo
         .get_habit_by_id(habit_id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
@@ -291,7 +307,9 @@ pub async fn record_checkin(
     let is_active_today = if log.log_date == today {
         log.is_completed
     } else {
-        repo.is_habit_completed_on_date(habit_id, today)
+        state
+            .habit_repo
+            .is_habit_completed_on_date(habit_id, today)
             .await
             .unwrap_or(false)
     };
@@ -314,8 +332,7 @@ pub async fn delete_habit(
     user: AuthenticatedUser,
     Path(habit_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteHabitRepository::new(state.db.clone());
-    match repo.delete_habit(habit_id, user.id).await {
+    match state.habit_repo.delete_habit(habit_id, user.id).await {
         Ok(()) => {
             invalidate_habit_caches(&state, user.id).await;
             if let Some(ref redis_svc) = state.redis {

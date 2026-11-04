@@ -12,10 +12,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-use roubit_core::{
-    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError,
-    SqliteOkrRepository,
-};
+use roubit_core::{KeyResult, Objective, ObjectiveWithKeyResults, OkrRepositoryError};
 
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
@@ -59,13 +56,16 @@ pub async fn list_okrs(
     user: AuthenticatedUser,
     Query(query): Query<ListOkrsQuery>,
 ) -> Result<Json<Vec<ObjectiveWithKeyResults>>, ApiError> {
-    let repo = SqliteOkrRepository::new(state.db);
     let objectives = if let Some(quarter) = query.quarter {
-        repo.list_objectives_by_quarter(user.id, &quarter)
+        state
+            .okr_repo
+            .list_objectives_by_quarter(user.id, &quarter)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     } else {
-        repo.list_all_objectives(user.id)
+        state
+            .okr_repo
+            .list_all_objectives(user.id)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     };
@@ -86,7 +86,6 @@ pub async fn create_objective(
         .validate()
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let repo = SqliteOkrRepository::new(state.db);
     let today = Utc::now().date_naive();
     let quarter = payload.quarter.unwrap_or_else(|| "2026-Q4".to_string());
     let start_date = payload.start_date.unwrap_or(today);
@@ -112,7 +111,9 @@ pub async fn create_objective(
         }
     }
 
-    repo.create_objective(user.id, &objective)
+    state
+        .okr_repo
+        .create_objective(user.id, &objective)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -139,7 +140,7 @@ pub async fn create_objective(
                 )
             };
 
-            match repo.create_key_result(user.id, &kr).await {
+            match state.okr_repo.create_key_result(user.id, &kr).await {
                 Ok(()) => created_krs.push(kr),
                 Err(OkrRepositoryError::Habit(msg)) => return Err(ApiError::NotFound(msg)),
                 Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
@@ -196,8 +197,7 @@ pub async fn create_kr(
         )
     };
 
-    let repo = SqliteOkrRepository::new(state.db);
-    match repo.create_key_result(user.id, &kr).await {
+    match state.okr_repo.create_key_result(user.id, &kr).await {
         Ok(()) => Ok((StatusCode::CREATED, Json(kr))),
         Err(OkrRepositoryError::ObjectiveNotFound(_)) => Err(ApiError::NotFound(format!(
             "Objective {objective_id} not found"
@@ -216,8 +216,7 @@ pub async fn delete_objective(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteOkrRepository::new(state.db);
-    match repo.delete_objective(id, user.id).await {
+    match state.okr_repo.delete_objective(id, user.id).await {
         Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
         Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
             Err(ApiError::NotFound(format!("Objective {id} not found")))
