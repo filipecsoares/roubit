@@ -42,7 +42,7 @@ const numericIncrementStep = computed(() => {
 })
 
 function handleBinaryToggle() {
-  const nextValue = props.isCompletedToday ? 0 : 1
+  const nextValue = props.isCompletedToday ? 0 : props.habit.target_value
   emit('checkin', props.habit.id, nextValue, false)
 }
 

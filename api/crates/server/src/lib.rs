@@ -15,8 +15,9 @@ pub use auth::{
 pub use controllers::{
     habit_routes, journal_routes, okr_routes, routine_routes, CheckinResponse, CreateHabitRequest,
     CreateKeyResultRequest, CreateObjectiveRequest, CreateRoutineRequest, CreateTimeBlockRequest,
-    EncryptedJournalResponse, HabitCheckinRequest, JournalMetadataQuery, ListOkrsQuery,
-    LogBlockStatusRequest, RoutineWithProgressResponse, SaveEncryptedJournalRequest,
+    EncryptedJournalResponse, HabitAnalyticsResponse, HabitCheckinRequest, HabitSummaryAnalyticsDto,
+    HabitWithStreakResponse, JournalMetadataQuery, ListOkrsQuery, LogBlockStatusRequest,
+    RoutineWithProgressResponse, SaveEncryptedJournalRequest,
 };
 pub use errors::{ApiError, ProblemDetails};
 pub use middleware::{

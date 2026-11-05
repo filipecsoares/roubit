@@ -6,7 +6,8 @@ pub mod okr_controller;
 pub mod routine_controller;
 
 pub use habit_controller::{
-    habit_routes, CheckinResponse, CreateHabitRequest, HabitCheckinRequest,
+    habit_routes, CheckinResponse, CreateHabitRequest, HabitAnalyticsResponse, HabitCheckinRequest,
+    HabitSummaryAnalyticsDto, HabitWithStreakResponse,
 };
 pub use journal_controller::{
     journal_routes, EncryptedJournalResponse, JournalMetadataQuery, SaveEncryptedJournalRequest,

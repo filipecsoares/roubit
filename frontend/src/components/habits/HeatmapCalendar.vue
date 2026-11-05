@@ -35,6 +35,13 @@ const hoveredCell = ref<{
   y: number
 } | null>(null)
 
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
 // Generate weeks structure ending on the week of props.endDate
 const weeks = computed<HeatmapWeek[]>(() => {
   const result: HeatmapWeek[] = []
@@ -69,12 +76,7 @@ const weeks = computed<HeatmapWeek[]>(() => {
         else if (count >= 2) level = 2
         else if (count >= 1) level = 1
 
-        const formattedDate = cursor.toLocaleDateString('pt-BR', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        })
+        const formattedDate = dateFormatter.format(cursor)
 
         days.push({
           date: dateStr,

@@ -425,7 +425,7 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         Some("HIT")
     );
 
-    // List habits
+    // List habits & verify today_value hydration
     let list_habits_res = client
         .get(&habits_url)
         .bearer_auth(&auth.token)
@@ -433,6 +433,105 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("List habits failed");
     assert_eq!(list_habits_res.status(), reqwest::StatusCode::OK);
+    let habits_list: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        list_habits_res.json().await.expect("Parse habits list");
+    assert_eq!(habits_list.len(), 1);
+    assert_eq!(habits_list[0].habit.id, habit.id);
+
+    // Incremental check-in for today (1.0L)
+    let today_str = chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string();
+    let inc1_res = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "date": today_str,
+            "value": 1.0,
+            "is_increment": true
+        }))
+        .send()
+        .await
+        .expect("Increment 1 failed");
+    assert_eq!(inc1_res.status(), reqwest::StatusCode::OK);
+
+    // Second incremental check-in for today (1.5L -> total 2.5L, target reached)
+    let inc2_res = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "date": today_str,
+            "value": 1.5,
+            "is_increment": true
+        }))
+        .send()
+        .await
+        .expect("Increment 2 failed");
+    assert_eq!(inc2_res.status(), reqwest::StatusCode::OK);
+
+    // Fetch habits again and verify today_value reflects 2.5L and streak is active today
+    let list2_res = client
+        .get(&habits_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List habits 2 failed");
+    let habits_list2: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        list2_res.json().await.expect("Parse habits list 2");
+    assert!((habits_list2[0].today_value - 2.5).abs() < f64::EPSILON);
+    assert!(habits_list2[0].streak.is_active_today);
+
+    // Analytics endpoint (GET /api/v1/habits/analytics)
+    let analytics_url = format!("http://{local_addr}/api/v1/habits/analytics");
+    let analytics_res = client
+        .get(&analytics_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get habit analytics failed");
+    assert_eq!(analytics_res.status(), reqwest::StatusCode::OK);
+    let analytics_data: roubit_server::controllers::HabitAnalyticsResponse =
+        analytics_res.json().await.expect("Parse habit analytics");
+    assert!(!analytics_data.habits_summary.is_empty());
+    assert_eq!(analytics_data.habits_summary[0].habit_id, habit.id);
+    assert_eq!(
+        analytics_data.habits_summary[0].summary.heatmap_cells.len(),
+        365
+    );
+
+    // Archive habit endpoint (POST /api/v1/habits/:id/archive)
+    let create_temp_habit_res = client
+        .post(&habits_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Temporary Habit",
+            "habit_type": "binary",
+            "target_value": 1.0
+        }))
+        .send()
+        .await
+        .expect("Create temp habit failed");
+    assert_eq!(create_temp_habit_res.status(), reqwest::StatusCode::CREATED);
+    let temp_habit: roubit_core::Habit =
+        create_temp_habit_res.json().await.expect("Parse temp habit");
+
+    let archive_url = format!("http://{local_addr}/api/v1/habits/{}/archive", temp_habit.id);
+    let archive_res = client
+        .post(&archive_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Archive habit failed");
+    assert_eq!(archive_res.status(), reqwest::StatusCode::OK);
+
+    // Verify temp_habit is no longer in active list
+    let list_after_archive = client
+        .get(&habits_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List after archive failed");
+    let habits_after_archive: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        list_after_archive.json().await.expect("Parse list after archive");
+    assert!(!habits_after_archive.iter().any(|h| h.habit.id == temp_habit.id));
 
     // 4. OKRs CRUD
     let okrs_url = format!("http://{local_addr}/api/v1/okrs");

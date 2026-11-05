@@ -116,6 +116,7 @@ const filteredHabits = computed(() => {
         :key="item.habit.id"
         :habit="item.habit"
         :streak="item.streak"
+        :current-value="item.today_value"
         :is-completed-today="item.streak.is_active_today"
         :loading="loading"
         @checkin="(id, val, inc) => emit('checkin', id, val, inc)"

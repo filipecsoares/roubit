@@ -105,6 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const habitStore = useHabitStore()
       habitStore.habits = []
+      habitStore.analytics = null
     } catch {}
 
     try {

@@ -92,6 +92,33 @@ export interface StreakMetrics {
 export interface HabitWithStreakResponse {
   habit: Habit
   streak: StreakMetrics
+  today_value?: number
+}
+
+export interface HeatmapCell {
+  date: string
+  count: number
+  target: number
+  intensity: number
+}
+
+export interface HabitAnalyticsSummary {
+  total_logs_count: number
+  completion_rate_30d: number
+  completion_rate_90d: number
+  all_time_completion_rate: number
+  heatmap_cells: HeatmapCell[]
+}
+
+export interface HabitSummaryAnalytics {
+  habit_id: string
+  habit_name: string
+  summary: HabitAnalyticsSummary
+}
+
+export interface HabitAnalyticsResponse {
+  aggregated_activity_map: Record<string, number>
+  habits_summary: HabitSummaryAnalytics[]
 }
 
 export interface HabitLog {

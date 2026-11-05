@@ -128,9 +128,12 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
   // Save previous state for optimistic rollback
   const prevActive = habitItem.streak.is_active_today
   const prevStreak = habitItem.streak.current_streak
+  const prevValue = habitItem.today_value ?? 0
 
   // Optimistic update
-  const willBeActive = isIncrement ? true : value > 0
+  const nextValue = isIncrement ? prevValue + value : value
+  const willBeActive = nextValue >= habitItem.habit.target_value
+  habitItem.today_value = nextValue
   habitItem.streak.is_active_today = willBeActive
   if (willBeActive && !prevActive) {
     habitItem.streak.current_streak += 1
@@ -142,9 +145,16 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
 
   try {
     await habitStore.checkin(habitId, todayStr, value, isIncrement)
-    showToast(willBeActive ? 'Hábito concluído!' : 'Check-in desfeito')
+    if (willBeActive) {
+      showToast('Hábito concluído!')
+    } else if (isIncrement) {
+      showToast('Progresso registrado!')
+    } else {
+      showToast('Check-in desfeito')
+    }
   } catch (err: any) {
     // Rollback on failure
+    habitItem.today_value = prevValue
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
     showToast(err.message || 'Falha ao registrar check-in', 'error')

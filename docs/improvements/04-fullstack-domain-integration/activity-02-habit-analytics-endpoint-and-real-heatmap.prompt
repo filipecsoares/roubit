@@ -36,8 +36,8 @@ Expose the backend's `HabitAnalyticsService` (`30d`/`90d` adherence rates and `3
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `GET /api/v1/habits/analytics` and `POST /api/v1/habits/{id}/archive` are implemented and tested.
-- [ ] `HabitsView.vue` displays real 365-day check-in history from the backend.
-- [ ] Numeric and timer habits display current daily progress (`today_value / target_value`) and only mark as completed when `today_value >= target_value`.
-- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+- [x] `GET /api/v1/habits/analytics` and `POST /api/v1/habits/{id}/archive` are implemented and tested.
+- [x] `HabitsView.vue` displays real 365-day check-in history from the backend.
+- [x] Numeric and timer habits display current daily progress (`today_value / target_value`) and only mark as completed when `today_value >= target_value`.
+- [x] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
 
