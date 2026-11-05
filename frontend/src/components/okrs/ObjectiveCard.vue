@@ -17,6 +17,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'linkHabit', krId: string): void
+  (e: 'link-habit', krId: string): void
   (e: 'delete', objectiveId: string): void
 }>()
 

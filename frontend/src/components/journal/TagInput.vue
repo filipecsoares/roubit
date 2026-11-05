@@ -4,7 +4,7 @@ import { Tag, X } from 'lucide-vue-next'
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string[]
+    modelValue?: string[]
     disabled?: boolean
   }>(),
   {

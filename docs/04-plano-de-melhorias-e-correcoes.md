@@ -137,9 +137,9 @@ flowchart TD
 - [x] **06.2 Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado)** ([activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt))
   - [x] Adicionar `role="dialog"`, `aria-modal="true"`, `aria-labelledby` e *focus trap* nos 6 modais.
   - [x] Associar `<label for="...">` aos inputs, adicionar `aria-label` em controles de ícone e habilitar suporte a teclado (`tabindex="0"`, `role="button"`, `@keydown`) na pílula do Modo Foco, itens de notificação e células do Heatmap.
-- [ ] **06.3 Testes Vitest para as 5 Views Principais & ESLint no Pipeline CI** ([activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt))
-  - [ ] Criar suíte de testes de integração Vitest para `LoginView.vue`, `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue` e `JournalView.vue`.
-  - [ ] Configurar ESLint no frontend (`package.json`), adicioná-lo ao `.github/workflows/vue-ci.yml` e atualizar `scripts/pre-commit.sh`.
+- [x] **06.3 Testes Vitest para as 5 Views Principais & ESLint no Pipeline CI** ([activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt))
+  - [x] Criar suíte de testes de integração Vitest para `LoginView.vue`, `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue` e `JournalView.vue`.
+  - [x] Configurar ESLint no frontend (`package.json`), adicioná-lo ao `.github/workflows/vue-ci.yml` e atualizar `scripts/pre-commit.sh`.
 - [ ] **06.4 Correção de Benchmarks (k6 / P99), Limpeza do Repositório & Consolidação Documental** ([activity-04-benchmarks-cleanup-and-docs-consolidation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-04-benchmarks-cleanup-and-docs-consolidation.prompt))
   - [ ] Corrigir payload de check-in em `tests/load/k6_benchmark.js` (`date`, `value`, `is_increment`) e alinhar `load_p99_benchmark.rs` sem sujar a árvore Git durante `cargo test`.
   - [ ] Remover arquivos residuais (`roubit.db*`, `frontend/dev-dist/`, especificação duplicada em `docs/`, assets não utilizados), adicionar `LICENSE-MIT` e `LICENSE-APACHE`, e consolidar toda a documentação (`README.md`, `01`, `02`, `03`, `04`).

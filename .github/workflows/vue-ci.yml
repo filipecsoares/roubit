@@ -28,8 +28,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Vitest unit tests
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type check (vue-tsc)
+        run: npx vue-tsc -b
+
+      - name: Run Vitest unit and integration tests
         run: npm test
 
-      - name: Type check and production build
+      - name: Production build
         run: npm run build
