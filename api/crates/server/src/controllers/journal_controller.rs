@@ -7,7 +7,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -20,6 +20,7 @@ use validator::Validate;
 
 use roubit_core::{EncryptedJournalEntry, JournalMetadata, JournalRepositoryError};
 
+use super::extract_local_date;
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Query parameters for listing journal metadata across a date range
@@ -68,9 +69,11 @@ pub struct EncryptedJournalResponse {
 pub async fn list_metadata(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
     Query(query): Query<JournalMetadataQuery>,
 ) -> Result<Json<Vec<JournalMetadata>>, ApiError> {
-    let end_date = query.end_date.unwrap_or_else(|| Utc::now().date_naive());
+    let today = extract_local_date(&headers);
+    let end_date = query.end_date.unwrap_or(today);
     let start_date = query
         .start_date
         .unwrap_or_else(|| end_date - Duration::days(365));

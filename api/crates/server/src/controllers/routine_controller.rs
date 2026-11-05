@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -19,6 +19,7 @@ use roubit_core::{
     TimeBlock, TimeBlockValidator,
 };
 
+use super::{extract_local_date, extract_local_time};
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Request payload to create an individual time block within a routine
@@ -80,6 +81,7 @@ fn parse_time(time_str: &str) -> Result<NaiveTime, ApiError> {
 pub async fn get_routine(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
 ) -> Result<Json<RoutineWithProgressResponse>, ApiError> {
     let routine_opt = state
         .routine_repo
@@ -103,7 +105,7 @@ pub async fn get_routine(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let today = Utc::now().date_naive();
+    let today = extract_local_date(&headers);
     let daily_logs = state
         .routine_repo
         .list_daily_logs_for_routine(routine.id, user.id, today)
@@ -133,8 +135,9 @@ pub async fn get_routine(
         })
         .collect();
 
+    let now_time = extract_local_time(&headers);
     let progress =
-        RoutineProgressTracker::compute_progress(&blocks, &block_statuses, Utc::now().time());
+        RoutineProgressTracker::compute_progress(&blocks, &block_statuses, now_time);
 
     Ok(Json(RoutineWithProgressResponse {
         routine: Some(routine),
@@ -268,6 +271,7 @@ pub async fn complete_block(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(block_id): Path<Uuid>,
+    headers: HeaderMap,
     payload: Option<Json<LogBlockStatusRequest>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let req = payload.map(|Json(p)| p).unwrap_or(LogBlockStatusRequest {
@@ -276,7 +280,7 @@ pub async fn complete_block(
         notes: None,
     });
 
-    let target_date = req.date.unwrap_or_else(|| Utc::now().date_naive());
+    let target_date = req.date.unwrap_or_else(|| extract_local_date(&headers));
     let status = match req.status.as_deref().unwrap_or("completed") {
         "completed" => BlockStatus::Completed,
         "in_progress" => BlockStatus::InProgress,

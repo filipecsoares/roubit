@@ -31,7 +31,7 @@ Each activity can be executed independently in priority order using the `deliver
 
 ---
 
-### 🟡 [Phase 04: Full-Stack Domain Integration & Timezone Awareness (`P2`)](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration)
+### 🟢 [Phase 04: Full-Stack Domain Integration & Timezone Awareness (`P2`)](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration)
 1. [Activity 01: Daily Routine Progress Hydration, `Skipped` Status & Routine Modal Editor](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt)
 2. [Activity 02: Habit Analytics REST Endpoint, Real 365-Day Heatmap & Numeric/Timer Check-ins](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt)
 3. [Activity 03: Atomic OKR Creation & Key Result Habit-Link Persistence Endpoint](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt)

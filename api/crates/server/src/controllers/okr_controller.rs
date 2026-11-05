@@ -2,12 +2,12 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, patch},
     Json, Router,
 };
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
@@ -17,6 +17,7 @@ use roubit_core::{
     OkrSyncService, PgHabitRepository, PgOkrRepository, SqliteHabitRepository, SqliteOkrRepository,
 };
 
+use super::extract_local_date;
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Query parameters for listing objectives
@@ -90,13 +91,14 @@ pub async fn list_okrs(
 pub async fn create_objective(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
     Json(payload): Json<CreateObjectiveRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
         .validate()
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let today = Utc::now().date_naive();
+    let today = extract_local_date(&headers);
     let quarter = payload.quarter.unwrap_or_else(|| {
         let q = (today.month() - 1) / 3 + 1;
         format!("{}-Q{}", today.year(), q)

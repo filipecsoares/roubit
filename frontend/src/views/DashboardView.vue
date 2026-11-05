@@ -9,6 +9,7 @@ import HabitChecklist from '@/components/dashboard/HabitChecklist.vue'
 import DailyProgressGauge from '@/components/dashboard/DailyProgressGauge.vue'
 import RoutineManageModal from '@/components/dashboard/RoutineManageModal.vue'
 import type { BlockStatusType } from '@/types'
+import { formatLocalDate } from '@/utils/date'
 
 const routineStore = useRoutineStore()
 const habitStore = useHabitStore()
@@ -141,7 +142,7 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
     habitItem.streak.current_streak = Math.max(0, habitItem.streak.current_streak - 1)
   }
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = formatLocalDate()
 
   try {
     await habitStore.checkin(habitId, todayStr, value, isIncrement)

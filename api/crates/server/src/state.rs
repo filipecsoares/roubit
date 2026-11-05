@@ -30,8 +30,8 @@ pub struct AppState {
     pub redis: Option<roubit_core::redis::RedisService>,
     /// Broadcast channel for real-time reminder notifications
     pub tx_notification: tokio::sync::broadcast::Sender<roubit_core::ReminderNotification>,
-    /// Fast L1 in-memory habit dashboard summary cache: (`cached_at`, `serialized_json`)
-    pub summary_cache: Arc<RwLock<HashMap<uuid::Uuid, (Instant, String)>>>,
+    /// Fast L1 in-memory habit dashboard summary cache: (`(user_id, date)` -> (`cached_at`, `serialized_json`))
+    pub summary_cache: Arc<RwLock<HashMap<(uuid::Uuid, chrono::NaiveDate), (Instant, String)>>>,
     /// In-memory token-bucket rate limiter protecting auth and API endpoints
     pub rate_limiter: Arc<crate::middleware::RateLimiter>,
 }

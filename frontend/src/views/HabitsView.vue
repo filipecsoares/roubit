@@ -6,6 +6,7 @@ import StreakBadge from '@/components/habits/StreakBadge.vue'
 import HeatmapCalendar from '@/components/habits/HeatmapCalendar.vue'
 import HabitManageModal from '@/components/habits/HabitManageModal.vue'
 import type { HabitKind } from '@/types'
+import { formatLocalDate, addDaysLocal } from '@/utils/date'
 
 const habitStore = useHabitStore()
 
@@ -39,15 +40,13 @@ const aggregatedActivityMap = computed<Record<string, number>>(() => {
     return habitStore.analytics.aggregated_activity_map
   }
   const map: Record<string, number> = {}
-  const today = new Date()
+  const todayStr = formatLocalDate()
 
   // Fallback: Generate heatmap marks from active streaks if analytics not yet loaded
   habitStore.habits.forEach((h) => {
     const streak = h.streak.current_streak
     for (let i = 0; i < streak; i++) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      const dStr = d.toISOString().split('T')[0]
+      const dStr = addDaysLocal(todayStr, -i)
       map[dStr] = (map[dStr] || 0) + 1
     }
   })
@@ -88,7 +87,7 @@ async function handleCheckin(habitId: string, isCompletedCurrently: boolean) {
   habitItem.streak.is_active_today = willBeActive
   habitItem.streak.current_streak = willBeActive ? prevStreak + 1 : Math.max(0, prevStreak - 1)
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = formatLocalDate()
   try {
     await habitStore.checkin(habitId, todayStr, nextValue, false)
     await habitStore.fetchAnalytics().catch(() => {})

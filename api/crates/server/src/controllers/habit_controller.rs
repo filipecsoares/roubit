@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -16,6 +16,7 @@ use roubit_core::{
     PgHabitRepository, PgOkrRepository, SqliteHabitRepository, SqliteOkrRepository, StreakMetrics,
 };
 
+use super::extract_local_date;
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Request payload to create a new habit definition
@@ -83,11 +84,14 @@ fn parse_habit_type(s: &str) -> Result<HabitType, ApiError> {
     }
 }
 
+const MAX_L1_CACHE_ENTRIES: usize = 1000;
+const L1_CACHE_TTL_SECS: u64 = 300;
+
 /// Invalidates both L1 in-memory summary cache and L2 Redis cache for `user_id`.
 async fn invalidate_habit_caches(state: &AppState, user_id: Uuid) {
     {
         let mut cache = state.summary_cache.write().await;
-        cache.remove(&user_id);
+        cache.retain(|(u, _), _| *u != user_id);
     }
     if let Some(redis) = &state.redis {
         if let Err(err) = redis
@@ -99,13 +103,29 @@ async fn invalidate_habit_caches(state: &AppState, user_id: Uuid) {
     }
 }
 
-/// Retrieves cached habit summary from L1 or L2 cache if available.
-async fn get_cached_habit_summary(state: &AppState, user_id: Uuid) -> Option<String> {
+async fn set_l1_cache(state: &AppState, user_id: Uuid, today: NaiveDate, json_str: String) {
+    let mut cache = state.summary_cache.write().await;
+    if cache.len() >= MAX_L1_CACHE_ENTRIES {
+        let now = std::time::Instant::now();
+        let ttl = std::time::Duration::from_secs(L1_CACHE_TTL_SECS);
+        cache.retain(|_, (cached_at, _)| now.duration_since(*cached_at) < ttl);
+
+        if cache.len() >= MAX_L1_CACHE_ENTRIES {
+            if let Some((&oldest_key, _)) = cache.iter().min_by_key(|(_, (ts, _))| *ts) {
+                cache.remove(&oldest_key);
+            }
+        }
+    }
+    cache.insert((user_id, today), (std::time::Instant::now(), json_str));
+}
+
+/// Retrieves cached habit summary from L1 or L2 cache if available for a given date.
+async fn get_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveDate) -> Option<String> {
     // 1. Check L1 in-memory summary cache first
     {
         let cache_read = state.summary_cache.read().await;
-        if let Some((cached_at, ref cached_json)) = cache_read.get(&user_id) {
-            if cached_at.elapsed() < std::time::Duration::from_secs(300) {
+        if let Some((cached_at, ref cached_json)) = cache_read.get(&(user_id, today)) {
+            if cached_at.elapsed() < std::time::Duration::from_secs(L1_CACHE_TTL_SECS) {
                 return Some(cached_json.clone());
             }
         }
@@ -113,14 +133,10 @@ async fn get_cached_habit_summary(state: &AppState, user_id: Uuid) -> Option<Str
 
     // 2. Check L2 Redis cache if available
     if let Some(redis) = &state.redis {
-        match redis.get_cached_habit_summary(&user_id.to_string()).await {
+        match redis.get_cached_habit_summary(&user_id.to_string(), today).await {
             Ok(Some(cached_json)) => {
                 // Populate L1 cache from Redis hit
-                state
-                    .summary_cache
-                    .write()
-                    .await
-                    .insert(user_id, (std::time::Instant::now(), cached_json.clone()));
+                set_l1_cache(state, user_id, today, cached_json.clone()).await;
                 return Some(cached_json);
             }
             Ok(None) => {}
@@ -134,16 +150,12 @@ async fn get_cached_habit_summary(state: &AppState, user_id: Uuid) -> Option<Str
 }
 
 /// Populates L1 and L2 caches with newly queried habit summary JSON.
-async fn set_cached_habit_summary(state: &AppState, user_id: Uuid, json_str: &str) {
-    state
-        .summary_cache
-        .write()
-        .await
-        .insert(user_id, (std::time::Instant::now(), json_str.to_string()));
+async fn set_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveDate, json_str: &str) {
+    set_l1_cache(state, user_id, today, json_str.to_string()).await;
 
     if let Some(redis) = &state.redis {
         if let Err(err) = redis
-            .set_cached_habit_summary(&user_id.to_string(), json_str, 300)
+            .set_cached_habit_summary(&user_id.to_string(), today, json_str, 300)
             .await
         {
             tracing::warn!(error = %err, %user_id, "Failed to cache habit summary in Redis");
@@ -161,8 +173,11 @@ async fn set_cached_habit_summary(state: &AppState, user_id: Uuid, json_str: &st
 pub async fn list_habits(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    if let Some(cached_json) = get_cached_habit_summary(&state, user.id).await {
+    let today = extract_local_date(&headers);
+
+    if let Some(cached_json) = get_cached_habit_summary(&state, user.id, today).await {
         let res = Response::builder()
             .status(StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -171,8 +186,6 @@ pub async fn list_habits(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
         return Ok(res);
     }
-
-    let today = Utc::now().date_naive();
     let habits_with_streaks = state
         .habit_repo
         .list_active_habits_with_streaks(user.id, today)
@@ -198,7 +211,7 @@ pub async fn list_habits(
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("Serialization error: {e}")))?;
 
     if let Ok(json_str) = std::str::from_utf8(&payload_bytes) {
-        set_cached_habit_summary(&state, user.id, json_str).await;
+        set_cached_habit_summary(&state, user.id, today, json_str).await;
     }
 
     let res = Response::builder()
@@ -271,6 +284,7 @@ pub async fn record_checkin(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(habit_id): Path<Uuid>,
+    headers: HeaderMap,
     Json(payload): Json<HabitCheckinRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
@@ -322,7 +336,7 @@ pub async fn record_checkin(
         .map_err(|e| ApiError::Internal(e.into()))?
         .ok_or_else(|| ApiError::NotFound(format!("Habit {habit_id} not found")))?;
 
-    let today = Utc::now().date_naive();
+    let today = extract_local_date(&headers);
     let is_active_today = if log.log_date == today {
         log.is_completed
     } else {
@@ -351,8 +365,9 @@ pub async fn record_checkin(
 pub async fn get_habit_analytics(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
 ) -> Result<Json<HabitAnalyticsResponse>, ApiError> {
-    let today = Utc::now().date_naive();
+    let today = extract_local_date(&headers);
     let start_365d = today - chrono::Duration::days(364);
 
     let habits = state

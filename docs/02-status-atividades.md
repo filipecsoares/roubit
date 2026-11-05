@@ -248,7 +248,7 @@
 | **IMP-04.1** | Hidratação do Progresso Diário de Rotinas, Status `Skipped` & Editor | [activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-04.2** | Endpoint de Analytics de Hábitos, Heatmap Real de 365d & Numéricos | [activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
-| **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 
 ---
 
