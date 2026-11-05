@@ -114,16 +114,16 @@ flowchart TD
 
 ---
 
-### 🟡 Fase 05: Conclusão do Modo Híbrido Remoto da CLI (`P2 — Paridade CLI`)
+### 🟢 Fase 05: Conclusão do Modo Híbrido Remoto da CLI (`P2 — Paridade CLI`)
 *Objetivo: Tornar todos os comandos da CLI (`habit`, `routine`, `okr`, `journal`, `config`) 100% funcionais em modo remoto (`--remote` / `ROUBIT_API_URL`).*
 
 - [x] **05.1 Alinhamento de Contratos REST e DTOs no `HttpClient` da CLI** ([activity-01-cli-remote-dto-and-endpoint-alignment.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-01-cli-remote-dto-and-endpoint-alignment.prompt))
   - [x] Alinhar DTOs e URLs em `api/crates/cli/src/client/remote.rs` com `roubit-server` (`HabitSummaryDto`, `/api/v1/habits/{id}/archive`, `/api/v1/routines`, `/api/v1/routines/blocks/{id}/complete`, `/api/v1/journal/metadata` e `mood_score`).
 - [x] **05.2 Habilitação Remota de `routine`, `okr`, `journal` & Persistência de `config set`** ([activity-02-cli-remote-routine-okr-journal-commands.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-02-cli-remote-routine-okr-journal-commands.prompt))
-  - [ ] Adaptar `Commands::Routine`, `Commands::Okr` e `Commands::Journal` em `api/crates/cli/` para operarem via trait `RoubitClient`.
-  - [ ] Persistir configurações em `~/.roubit/config.json` no comando `roubit config set`, padronizar `ROUBIT_API_URL` e atualizar a documentação da CLI no `README.md`.
-- [ ] **05.3 Suíte Completa de Testes E2E da CLI Remota** ([activity-03-cli-remote-full-e2e-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-03-cli-remote-full-e2e-test-suite.prompt))
-  - [ ] Expandir `api/crates/server/tests/cli_remote_e2e.rs` testando `habit`, `routine`, `okr`, `journal` e `config` em modo remoto contra o servidor Axum.
+  - [x] Adaptar `Commands::Routine`, `Commands::Okr` e `Commands::Journal` em `api/crates/cli/` para operarem via trait `RoubitClient`.
+  - [x] Persistir configurações em `~/.roubit/config.json` no comando `roubit config set`, padronizar `ROUBIT_API_URL` e atualizar a documentação da CLI no `README.md`.
+- [x] **05.3 Suíte Completa de Testes E2E da CLI Remota** ([activity-03-cli-remote-full-e2e-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-03-cli-remote-full-e2e-test-suite.prompt))
+  - [x] Expandir `api/crates/server/tests/cli_remote_e2e.rs` testando `habit`, `routine`, `okr`, `journal` e `config` em modo remoto contra o servidor Axum com diretório HOME isolado e verificação de integridade Zero-Knowledge no SQLite.
 
 ---
 

@@ -73,10 +73,12 @@ async fn main() -> anyhow::Result<()> {
         .or(persisted_cfg.database_url.as_deref())
         .unwrap_or(config.database_url.as_str());
 
-    let db_flag = args.db.as_deref().or(if persisted_cfg.api_url.is_none() {
-        Some(db_url)
-    } else {
-        None
+    let db_flag = args.db.as_deref().or_else(|| {
+        if persisted_cfg.api_url.is_none() {
+            Some(db_url)
+        } else {
+            None
+        }
     });
 
     let client = client::ClientFactory::create_client(args.remote.as_deref(), db_flag, None)
