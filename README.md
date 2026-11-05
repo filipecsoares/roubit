@@ -91,7 +91,7 @@ Most productivity setups are fragmented: a to-do list in one app, habit tracking
 
 ### 🖥️ 7. Dual Interface: Web SPA & Hybrid Terminal CLI (RF05 & Feature 15)
 - **Modern Web App:** Responsive Vue 3 Single Page Application with clean aesthetics, glassmorphism design, and dark mode.
-- **Fast Terminal CLI (`roubit`):** Full-featured command-line tool with interactive prompts, tables, and Ratatui widgets.
+- **Fast Terminal CLI (`roubit`):** Full-featured command-line tool with interactive prompts, Unicode tables (`comfy-table`), and progress bars (`indicatif`).
 - **Hybrid Transport:** Seamlessly switch between local offline SQLite mode and remote authenticated HTTP API access with secure token storage in `~/.roubit/credentials.json`.
 
 ### 🛡️ 8. Enterprise Multi-Tenancy & Data Isolation (Feature 12)
@@ -106,7 +106,7 @@ Most productivity setups are fragmented: a to-do list in one app, habit tracking
 flowchart TD
     subgraph Clients["Clients (End-to-End Encryption & PWA)"]
         Web["Vue 3 SPA & PWA<br/>(Service Worker / IndexedDB / Web Crypto / Pinia)"]
-        CLI["Terminal CLI<br/>(Local SQLite WAL / Remote JWT Transport / Ratatui)"]
+        CLI["Terminal CLI<br/>(Local SQLite WAL / Remote JWT Transport / comfy-table)"]
     end
 
     subgraph Server["Backend Engine (Rust / Axum 0.8)"]
@@ -212,44 +212,67 @@ cargo build --release --bin roubit --manifest-path api/Cargo.toml
 sudo cp target/release/roubit /usr/local/bin/
 ```
 
-#### Daily CLI Commands:
+#### Daily CLI Commands (Local & Remote Modes):
+
+All domain commands (`routine`, `habit`, `okr`, `journal`) seamlessly support both embedded local SQLite execution and remote authenticated HTTP REST API access via the `--remote <URL>` global flag, `ROUBIT_API_URL` / `ROUBIT_REMOTE_URL` environment variables, or persisted configuration in `~/.roubit/config.json`.
+
 ```bash
-# 📅 Routines: Create, activate, list, and transition blocks
+# 📅 Routines: Create, activate, list, and transition blocks (local or --remote)
 roubit routine create --name "Workday" --blocks "08:00-12:00:Deep Work,12:00-13:00:Lunch,13:00-17:00:Projects" --active
 roubit routine list
 roubit routine start <BLOCK_ID>
 roubit routine complete <BLOCK_ID>
+roubit routine skip <BLOCK_ID>
+roubit routine activate <ROUTINE_ID>
+roubit routine delete <ROUTINE_ID>
 
-# ⚡ Habits: Create, check in, view streaks, archive, or delete
+# ⚡ Habits: Create, check in, view streaks, archive, or delete (local or --remote)
 roubit habit create --name "Meditate" --kind timer --target 20 --unit min
 roubit habit create --name "Hydration" --kind numeric --target 2500 --unit ml
 roubit habit checkin <HABIT_ID> --value 1.0
 roubit habit streaks
 roubit habit archive <HABIT_ID>
+roubit habit delete <HABIT_ID>
 
-# 🎯 OKRs: Create objectives, add Key Results, inspect progress
+# 🎯 OKRs: Create objectives, add Key Results, inspect progress (local or --remote)
 roubit okr create --title "Improve Physical Health" --quarter "2026-Q4"
 roubit okr add-kr --objective-id <OBJ_ID> --title "Run 100km" --target 100 --unit km
 roubit okr list
 roubit okr summary
+roubit okr delete <OBJ_ID>
 
-# 🔒 Journal: Write encrypted reflections, read, or delete
-roubit journal write --mood 5 --tags "focus,shipping"
-roubit journal read
-roubit journal delete --date 2026-10-30
+# 🔒 Journal: Client-side Zero-Knowledge encryption (Argon2id + AES-256-GCM)
+roubit journal write --mood 5 --tags "focus,shipping" --content "Personal reflection content"
+roubit journal read --date 2026-11-05
+roubit journal list --from 2026-11-01 --to 2026-11-30
+roubit journal delete --date 2026-11-05
 
 # 🌐 Remote Mode & Authentication (Features 14 & 15)
 roubit auth login --url http://127.0.0.1:8080 --email user@example.com
 roubit auth status
 roubit habit list --remote http://127.0.0.1:8080
-roubit habit checkin <HABIT_ID> --value 1.0 --remote http://127.0.0.1:8080
+roubit routine list --remote http://127.0.0.1:8080
+roubit okr list --remote http://127.0.0.1:8080
+roubit journal read --remote http://127.0.0.1:8080
 roubit auth logout
 
-# ⚙️ Migrate SQLite data to PostgreSQL
+# ⚙️ Persistent Configuration (~/.roubit/config.json with 0600 permissions)
+roubit config set --db ~/.roubit/roubit.db --api-url http://127.0.0.1:8080 --output-format json
+roubit config show
+roubit config show --json
+
+# ⚙️ Administrative: Migrate SQLite data to PostgreSQL
 roubit admin migrate-to-postgres \
   --from sqlite://roubit.db \
   --to postgres://user:password@localhost:5432/roubit
 ```
+
+#### Environment Variables:
+- `ROUBIT_REMOTE_URL` or `ROUBIT_API_URL`: Target remote REST API base URL (activates remote mode automatically).
+- `ROUBIT_AUTH_TOKEN`: Override active Bearer JWT session token.
+- `ROUBIT_PASSPHRASE`: Master passphrase for non-interactive Zero-Knowledge journal encryption/decryption.
+- `ROUBIT_CREDENTIALS_PATH`: Custom path for saved session credentials (defaults to `~/.roubit/credentials.json`).
+- `ROUBIT_CONFIG_PATH`: Custom path for persistent CLI configuration (defaults to `~/.roubit/config.json`).
 
 ---
 
@@ -324,7 +347,7 @@ npm run build --prefix frontend
 roubit/
 ├── api/                     # Rust Multi-Crate Workspace
 │   ├── crates/core/         # Domain engines, SQLite/PostgreSQL repositories, Users, Habits, Crypto
-│   ├── crates/cli/          # Terminal interface (Clap, Ratatui UI, Prompts, Remote Client)
+│   ├── crates/cli/          # Terminal interface (Clap, comfy-table, Prompts, Remote Client)
 │   └── crates/server/       # REST API (Axum 0.8), JWT auth, Idempotency, SSE workers & Controllers
 ├── frontend/                # Vue 3 PWA (Composition API, Pinia, TailwindCSS, Web Crypto, Workbox)
 ├── docs/                    # Technical specifications, development plans & benchmarks

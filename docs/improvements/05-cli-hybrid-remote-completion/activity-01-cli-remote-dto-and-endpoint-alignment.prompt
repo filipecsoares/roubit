@@ -29,7 +29,7 @@ Fix all broken HTTP URLs, request payloads, and response DTO deserializations in
 5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] Every method in `HttpClient` (`remote.rs`) matches the exact URL path, HTTP method, request JSON schema, and response DTO of `roubit-server`.
-- [ ] `roubit --remote <URL> habit list`, `checkin`, `add`, and `archive` succeed against a live `roubit-server`.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+- [x] Every method in `HttpClient` (`remote.rs`) matches the exact URL path, HTTP method, request JSON schema, and response DTO of `roubit-server`.
+- [x] `roubit --remote <URL> habit list`, `checkin`, `add`, and `archive` succeed against a live `roubit-server`.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
 

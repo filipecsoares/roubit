@@ -1,25 +1,27 @@
 //! Journal command handler.
 
 use anyhow::{Context, Result};
+use base64::prelude::*;
 use chrono::{Local, NaiveDate};
 use roubit_core::{
-    crypto::{kdf::KdfService, memory::SecretString},
-    domain::{JournalRepository, JournalService, SqliteJournalRepository},
+    crypto::{
+        cipher::{AesGcmCipher, EncryptedEnvelope},
+        kdf::KdfService,
+        memory::SecretString,
+    },
+    LOCAL_USER_ID,
 };
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::args::{JournalArgs, JournalSubcommands};
+use crate::client::RoubitClient;
 
 /// Executes encrypted journal commands.
 ///
 /// # Errors
-/// Returns an error if database access, cryptographic operations, or parsing fails.
+/// Returns an error if client access, cryptographic operations, or parsing fails.
 #[allow(clippy::too_many_lines, clippy::option_if_let_else)]
-pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<()> {
-    let repo = SqliteJournalRepository::new(pool.clone());
-    let service = JournalService::new(repo.clone(), KdfService::default_recommended());
-
+pub async fn handle(args: JournalArgs, json: bool, client: &dyn RoubitClient) -> Result<()> {
     match args.action {
         JournalSubcommands::Write {
             date,
@@ -40,24 +42,35 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 SecretString::new("Daily personal reflection recorded via Roubit CLI.".to_string())
             };
 
-            let meta = service
-                .create_or_update_entry(
-                    roubit_core::LOCAL_USER_ID,
+            let (ciphertext_b64, salt_b64, nonce_b64) =
+                encrypt_reflection(target_date, &reflection_secret, &pass)?;
+
+            client
+                .save_journal(
                     target_date,
-                    mood,
-                    tags,
-                    reflection_secret,
-                    &pass,
+                    &ciphertext_b64,
+                    &salt_b64,
+                    &nonce_b64,
+                    mood.map(i32::from),
+                    &tags,
                 )
                 .await
-                .context("failed to encrypt and persist journal entry")?;
+                .context("failed to persist encrypted journal entry")?;
 
             if json {
-                println!("{}", serde_json::to_string_pretty(&meta)?);
+                let res = serde_json::json!({
+                    "entry_date": target_date.to_string(),
+                    "mood_score": mood,
+                    "tags": tags,
+                    "ciphertext_bytes_len": ciphertext_b64.len()
+                });
+                println!("{res}");
             } else {
                 crate::ui::TerminalUi::print_success(&format!(
-                    "Encrypted journal entry saved for date {} (ID: {}, Mood: {:?}, Payload: {} bytes)",
-                    meta.entry_date, meta.id, meta.mood_score, meta.ciphertext_bytes_len
+                    "Encrypted journal entry saved for date {} (Mood: {:?}, Tags: {})",
+                    target_date,
+                    mood,
+                    tags.join(", ")
                 ));
             }
         }
@@ -65,44 +78,56 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
         JournalSubcommands::Read { date, id } => {
             let pass = resolve_passphrase()?;
 
-            let decrypted = if let Some(id_str) = id {
+            let entry_opt = if let Some(id_str) = id {
                 let uuid = Uuid::parse_str(&id_str)
                     .with_context(|| format!("Invalid UUID for journal entry id: '{id_str}'"))?;
-                service
-                    .read_and_decrypt_entry(uuid, roubit_core::LOCAL_USER_ID, &pass)
+                client
+                    .get_journal_entry(uuid)
                     .await
-                    .context("failed to decrypt journal entry with provided passphrase")?
+                    .context("failed to fetch journal entry by id")?
             } else {
                 let target_date = parse_date_or_today(date.as_deref())?;
-                service
-                    .read_and_decrypt_entry_by_date(target_date, roubit_core::LOCAL_USER_ID, &pass)
+                client
+                    .get_journal_entry_by_date(target_date)
                     .await
-                    .context("failed to decrypt journal entry with provided passphrase")?
-                    .context("No journal entry found for target date")?
+                    .context("failed to fetch journal entry by date")?
             };
+
+            let Some(entry) = entry_opt else {
+                anyhow::bail!("No journal entry found for the specified target.");
+            };
+
+            let plaintext = decrypt_reflection(
+                entry.metadata.entry_date,
+                entry.metadata.user_id,
+                &entry.salt,
+                &entry.nonce,
+                &entry.encrypted_payload,
+                &pass,
+            )?;
 
             if json {
                 let json_repr = serde_json::json!({
-                    "id": decrypted.metadata.id,
-                    "date": decrypted.metadata.entry_date.to_string(),
-                    "mood": decrypted.metadata.mood_score,
-                    "tags": decrypted.metadata.tags,
-                    "content": decrypted.plaintext_content
+                    "id": entry.metadata.id,
+                    "date": entry.metadata.entry_date.to_string(),
+                    "mood": entry.metadata.mood_score,
+                    "tags": entry.metadata.tags,
+                    "content": plaintext
                 });
                 println!("{json_repr}");
             } else {
                 crate::ui::TerminalUi::print_success(&format!(
                     "Decrypted journal entry for {}:",
-                    decrypted.metadata.entry_date
+                    entry.metadata.entry_date
                 ));
                 println!(
                     "--- Journal Entry: {} (Mood: {:?}) ---",
-                    decrypted.metadata.entry_date, decrypted.metadata.mood_score
+                    entry.metadata.entry_date, entry.metadata.mood_score
                 );
-                if !decrypted.metadata.tags.is_empty() {
-                    println!("Tags: {}", decrypted.metadata.tags.join(", "));
+                if !entry.metadata.tags.is_empty() {
+                    println!("Tags: {}", entry.metadata.tags.join(", "));
                 }
-                println!("\n{}", decrypted.plaintext_content);
+                println!("\n{plaintext}");
                 println!("---------------------------------------");
             }
         }
@@ -123,8 +148,8 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
                 today
             };
 
-            let metadata_list = repo
-                .list_metadata_in_range(roubit_core::LOCAL_USER_ID, start, end)
+            let metadata_list = client
+                .list_journal_metadata(start, end)
                 .await
                 .context("failed to list journal metadata")?;
 
@@ -154,19 +179,14 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
             let target_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
                 .with_context(|| format!("Invalid date format '{date}'. Expected YYYY-MM-DD"))?;
 
-            if let Some(entry) = repo
-                .get_entry_by_date(target_date, roubit_core::LOCAL_USER_ID)
+            let deleted = client
+                .delete_journal_entry_by_date(target_date)
                 .await
-                .context("failed to check journal entry")?
-            {
-                repo.delete_entry(entry.metadata.id, roubit_core::LOCAL_USER_ID)
-                    .await
-                    .context("failed to delete journal entry")?;
+                .context("failed to delete journal entry")?;
+
+            if deleted {
                 if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({ "deleted": true, "date": date, "id": entry.metadata.id })
-                    );
+                    println!("{}", serde_json::json!({ "deleted": true, "date": date }));
                 } else {
                     crate::ui::TerminalUi::print_success(&format!(
                         "Journal entry for {date} deleted."
@@ -184,6 +204,63 @@ pub async fn handle(args: JournalArgs, json: bool, pool: &SqlitePool) -> Result<
     }
 
     Ok(())
+}
+
+fn encrypt_reflection(
+    date: NaiveDate,
+    plaintext: &SecretString,
+    passphrase: &SecretString,
+) -> Result<(String, String, String)> {
+    let kdf = KdfService::default_recommended();
+    let salt = KdfService::generate_salt();
+    let derived_key = kdf
+        .derive_key(passphrase.as_bytes(), &salt)
+        .context("Argon2id key derivation failed")?;
+
+    let aad = format!("{LOCAL_USER_ID}:{date}");
+    let envelope = AesGcmCipher::encrypt(
+        derived_key.as_bytes(),
+        plaintext.as_bytes(),
+        Some(aad.as_bytes()),
+    )
+    .context("AES-256-GCM authenticated encryption failed")?;
+
+    Ok((
+        BASE64_STANDARD.encode(envelope.ciphertext),
+        BASE64_STANDARD.encode(salt),
+        BASE64_STANDARD.encode(envelope.nonce),
+    ))
+}
+
+fn decrypt_reflection(
+    date: NaiveDate,
+    user_id: Option<Uuid>,
+    salt: &[u8; 16],
+    nonce: &[u8; 12],
+    ciphertext: &[u8],
+    passphrase: &SecretString,
+) -> Result<String> {
+    let kdf = KdfService::default_recommended();
+    let derived_key = kdf
+        .derive_key(passphrase.as_bytes(), salt)
+        .context("Argon2id key derivation failed")?;
+
+    let envelope = EncryptedEnvelope {
+        nonce: *nonce,
+        ciphertext: ciphertext.to_vec(),
+    };
+
+    let target_uid = user_id.unwrap_or(LOCAL_USER_ID);
+    let aad = format!("{target_uid}:{date}");
+
+    // Attempt decryption with AAD first (Rust service convention),
+    // then fallback without AAD (compatible with web frontend).
+    let decrypted_bytes =
+        AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, Some(aad.as_bytes()))
+            .or_else(|_| AesGcmCipher::decrypt(derived_key.as_bytes(), &envelope, None))
+            .context("Decryption failed: wrong passphrase or corrupted payload")?;
+
+    String::from_utf8(decrypted_bytes).context("Decrypted journal content is not valid UTF-8")
 }
 
 fn resolve_passphrase() -> Result<SecretString> {
