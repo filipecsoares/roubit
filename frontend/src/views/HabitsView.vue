@@ -1,25 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Flame, Plus, Sparkles, Trophy, Check, AlertCircle, Trash2 } from 'lucide-vue-next'
+import { Flame, Plus, Sparkles, Trophy, Check, AlertCircle, Trash2, Archive } from 'lucide-vue-next'
 import { useHabitStore } from '@/stores/habit'
 import StreakBadge from '@/components/habits/StreakBadge.vue'
 import HeatmapCalendar from '@/components/habits/HeatmapCalendar.vue'
 import HabitManageModal from '@/components/habits/HabitManageModal.vue'
 import type { HabitKind } from '@/types'
+import { formatLocalDate, addDaysLocal } from '@/utils/date'
+import { useToast } from '@/composables/useToast'
 
 const habitStore = useHabitStore()
+const { toastMessage, showToast } = useToast()
 
 const isModalOpen = ref(false)
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
-
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
 
 // Stats metrics
 const totalActiveHabits = computed(() => habitStore.habits.length)
@@ -33,18 +26,19 @@ const completedTodayCount = computed(() => {
   return habitStore.habits.filter((h) => h.streak.is_active_today).length
 })
 
-// Build sample heatmap activity map from habits' streak data
+// Real 365-day heatmap activity map from backend analytics (with fallback to active streaks)
 const aggregatedActivityMap = computed<Record<string, number>>(() => {
+  if (habitStore.analytics?.aggregated_activity_map) {
+    return habitStore.analytics.aggregated_activity_map
+  }
   const map: Record<string, number> = {}
-  const today = new Date()
+  const todayStr = formatLocalDate()
 
-  // Generate heatmap marks for active streaks
+  // Fallback: Generate heatmap marks from active streaks if analytics not yet loaded
   habitStore.habits.forEach((h) => {
     const streak = h.streak.current_streak
     for (let i = 0; i < streak; i++) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      const dStr = d.toISOString().split('T')[0]
+      const dStr = addDaysLocal(todayStr, -i)
       map[dStr] = (map[dStr] || 0) + 1
     }
   })
@@ -64,9 +58,10 @@ async function handleCreateHabit(payload: {
   try {
     await habitStore.createHabit(payload)
     isModalOpen.value = false
+    await habitStore.fetchAnalytics().catch(() => {})
     showToast('Hábito criado com sucesso!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criar hábito', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -76,19 +71,35 @@ async function handleCheckin(habitId: string, isCompletedCurrently: boolean) {
 
   const prevActive = habitItem.streak.is_active_today
   const prevStreak = habitItem.streak.current_streak
+  const prevValue = habitItem.today_value ?? 0
 
   const willBeActive = !isCompletedCurrently
+  const nextValue = willBeActive ? habitItem.habit.target_value : 0
+  habitItem.today_value = nextValue
   habitItem.streak.is_active_today = willBeActive
   habitItem.streak.current_streak = willBeActive ? prevStreak + 1 : Math.max(0, prevStreak - 1)
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = formatLocalDate()
   try {
-    await habitStore.checkin(habitId, todayStr, willBeActive ? habitItem.habit.target_value : 0, false)
+    await habitStore.checkin(habitId, todayStr, nextValue, false)
+    await habitStore.fetchAnalytics().catch(() => {})
     showToast(willBeActive ? 'Check-in concluído!' : 'Check-in desfeito')
   } catch (err: any) {
+    habitItem.today_value = prevValue
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
-    showToast(err.message || 'Erro ao registrar check-in', 'error')
+    showToast(err, 'error')
+  }
+}
+
+async function handleArchiveHabit(habitId: string, habitName: string) {
+  if (!confirm(`Deseja arquivar o hábito "${habitName}"?`)) return
+  try {
+    await habitStore.archiveHabit(habitId)
+    await habitStore.fetchAnalytics().catch(() => {})
+    showToast(`Hábito "${habitName}" arquivado com sucesso.`)
+  } catch (err: any) {
+    showToast(err, 'error')
   }
 }
 
@@ -96,14 +107,16 @@ async function handleDeleteHabit(habitId: string, habitName: string) {
   if (!confirm(`Tem certeza que deseja excluir o hábito "${habitName}"?`)) return
   try {
     await habitStore.deleteHabit(habitId)
+    await habitStore.fetchAnalytics().catch(() => {})
     showToast(`Hábito "${habitName}" excluído com sucesso.`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao excluir hábito', 'error')
+    showToast(err, 'error')
   }
 }
 
 onMounted(() => {
   habitStore.fetchHabits().catch(() => {})
+  habitStore.fetchAnalytics().catch(() => {})
 })
 </script>
 
@@ -112,6 +125,8 @@ onMounted(() => {
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
+      role="status"
+      aria-live="polite"
       class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'
@@ -190,8 +205,17 @@ onMounted(() => {
         <span class="text-xs text-slate-400 font-mono">{{ habitStore.habits.length }} cadastrados</span>
       </div>
 
+      <!-- Loading state -->
       <div
-        v-if="habitStore.habits.length === 0"
+        v-if="habitStore.loading && habitStore.habits.length === 0"
+        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border/40 animate-pulse space-y-2"
+      >
+        <Sparkles class="w-8 h-8 text-slate-500 mx-auto mb-2 animate-spin" />
+        <h3 class="text-sm font-semibold text-slate-300">Carregando hábitos...</h3>
+      </div>
+
+      <div
+        v-else-if="habitStore.habits.length === 0"
         class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border"
       >
         <Sparkles class="w-8 h-8 text-slate-500 mx-auto mb-2" />
@@ -237,6 +261,15 @@ onMounted(() => {
             </span>
 
             <div class="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                @click.stop="handleArchiveHabit(item.habit.id, item.habit.name)"
+                title="Arquivar hábito"
+                class="p-2 rounded-xl text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 transition-all touch-target sm:min-h-0 sm:min-w-0"
+              >
+                <Archive class="w-4 h-4" />
+              </button>
+
               <button
                 type="button"
                 @click.stop="handleDeleteHabit(item.habit.id, item.habit.name)"

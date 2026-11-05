@@ -274,7 +274,7 @@ pub enum OkrSubcommands {
         objective_id: String,
 
         /// Key Result title.
-        #[arg(short, long, help = "Key Result title")]
+        #[arg(short = 'k', long, help = "Key Result title")]
         title: String,
 
         /// Target metric value.
@@ -396,6 +396,10 @@ pub enum ConfigSubcommands {
         /// Set remote API base URL.
         #[arg(long, help = "Remote API base URL")]
         api_url: Option<String>,
+
+        /// Set default output format (text, json).
+        #[arg(long, help = "Default output format (text, json)")]
+        output_format: Option<String>,
     },
 }
 

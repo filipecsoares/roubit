@@ -7,7 +7,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -18,11 +18,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-use roubit_core::{
-    EncryptedJournalEntry, JournalMetadata, JournalRepository, JournalRepositoryError,
-    SqliteJournalRepository,
-};
+use roubit_core::{EncryptedJournalEntry, JournalMetadata, JournalRepositoryError};
 
+use super::extract_local_date;
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Query parameters for listing journal metadata across a date range
@@ -71,15 +69,17 @@ pub struct EncryptedJournalResponse {
 pub async fn list_metadata(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
     Query(query): Query<JournalMetadataQuery>,
 ) -> Result<Json<Vec<JournalMetadata>>, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
-    let end_date = query.end_date.unwrap_or_else(|| Utc::now().date_naive());
+    let today = extract_local_date(&headers);
+    let end_date = query.end_date.unwrap_or(today);
     let start_date = query
         .start_date
         .unwrap_or_else(|| end_date - Duration::days(365));
 
-    let metadata_list = repo
+    let metadata_list = state
+        .journal_repo
         .list_metadata_in_range(user.id, start_date, end_date)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -98,8 +98,8 @@ pub async fn get_entry(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<EncryptedJournalResponse>, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
-    let entry_opt = repo
+    let entry_opt = state
+        .journal_repo
         .get_entry_by_id(id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -176,12 +176,24 @@ pub async fn save_entry(
     let mut nonce_arr = [0u8; 12];
     nonce_arr.copy_from_slice(&nonce);
 
-    let repo = SqliteJournalRepository::new(state.db);
-
     // Reuse existing entry ID if saving for the same date without specifying ID
     let entry_id = if let Some(explicit_id) = payload.id {
+        let existing_by_id = state
+            .journal_repo
+            .get_entry_by_id(explicit_id, user.id)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        if existing_by_id.is_none() {
+            return Err(ApiError::NotFound(format!(
+                "Journal entry {explicit_id} not found"
+            )));
+        }
         explicit_id
-    } else if let Ok(Some(existing)) = repo.get_entry_by_date(payload.entry_date, user.id).await {
+    } else if let Ok(Some(existing)) = state
+        .journal_repo
+        .get_entry_by_date(payload.entry_date, user.id)
+        .await
+    {
         existing.metadata.id
     } else {
         Uuid::new_v4()
@@ -203,9 +215,16 @@ pub async fn save_entry(
     let entry = EncryptedJournalEntry::new(metadata, salt_arr, nonce_arr, ciphertext)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    repo.save_entry(user.id, &entry)
+    state
+        .journal_repo
+        .save_entry(user.id, &entry)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        .map_err(|e| match e {
+            JournalRepositoryError::NotFound(id) => {
+                ApiError::NotFound(format!("Journal entry {id} not found"))
+            }
+            other => ApiError::Internal(other.into()),
+        })?;
 
     Ok((
         StatusCode::CREATED,
@@ -230,8 +249,7 @@ pub async fn delete_entry(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteJournalRepository::new(state.db);
-    match repo.delete_entry(id, user.id).await {
+    match state.journal_repo.delete_entry(id, user.id).await {
         Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
         Err(JournalRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Journal entry {id} not found")))
@@ -240,10 +258,85 @@ pub async fn delete_entry(
     }
 }
 
+/// Handler for `GET /api/v1/journal/by-date/:date`
+///
+/// Fetches the complete encrypted envelope for client-side decryption by calendar date.
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if entry does not exist, or [`ApiError::Internal`] on db error.
+pub async fn get_entry_by_date(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(date): Path<NaiveDate>,
+) -> Result<Json<EncryptedJournalResponse>, ApiError> {
+    let entry_opt = state
+        .journal_repo
+        .get_entry_by_date(date, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let Some(entry) = entry_opt else {
+        return Err(ApiError::NotFound(format!(
+            "Journal entry for date {date} not found"
+        )));
+    };
+
+    Ok(Json(EncryptedJournalResponse {
+        id: entry.metadata.id,
+        entry_date: entry.metadata.entry_date,
+        mood_score: entry.metadata.mood_score,
+        tags: entry.metadata.tags,
+        salt_base64: BASE64_STANDARD.encode(entry.salt),
+        nonce_base64: BASE64_STANDARD.encode(entry.nonce),
+        ciphertext_base64: BASE64_STANDARD.encode(entry.encrypted_payload),
+    }))
+}
+
+/// Handler for `DELETE /api/v1/journal/by-date/:date`
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if entry does not exist, or [`ApiError::Internal`] on db error.
+pub async fn delete_entry_by_date(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(date): Path<NaiveDate>,
+) -> Result<impl IntoResponse, ApiError> {
+    let entry_opt = state
+        .journal_repo
+        .get_entry_by_date(date, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let Some(entry) = entry_opt else {
+        return Err(ApiError::NotFound(format!(
+            "Journal entry for date {date} not found"
+        )));
+    };
+
+    match state
+        .journal_repo
+        .delete_entry(entry.metadata.id, user.id)
+        .await
+    {
+        Ok(()) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({ "deleted": true, "id": entry.metadata.id, "date": date })),
+        )),
+        Err(JournalRepositoryError::NotFound(_)) => Err(ApiError::NotFound(format!(
+            "Journal entry {date} not found"
+        ))),
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
+}
+
 /// Constructs router for journal endpoints
 pub fn journal_routes() -> Router<AppState> {
     Router::new()
         .route("/metadata", get(list_metadata))
+        .route(
+            "/by-date/{date}",
+            get(get_entry_by_date).delete(delete_entry_by_date),
+        )
         .route("/", post(save_entry))
         .route("/{id}", get(get_entry).delete(delete_entry))
 }

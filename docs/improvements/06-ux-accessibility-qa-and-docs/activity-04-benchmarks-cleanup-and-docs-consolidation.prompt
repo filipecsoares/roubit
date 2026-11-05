@@ -1,0 +1,39 @@
+# Activity 06.4: Load Benchmarks Fix (`k6` / `P99`), Workspace Cleanup & Documentation Consolidation
+
+## 1. Objective & Context
+Fix the broken `tests/load/k6_benchmark.js` payload and the misleading report generator in `api/crates/server/tests/load_p99_benchmark.rs`, clean up untracked/residual database and template files in the repository, add the missing `LICENSE-MIT` and `LICENSE-APACHE` files referenced by `README.md` and `Cargo.toml`, and synchronize all project documentation (`README.md`, `frontend/README.md`, `01-plano-de-desenvolvimento.md`, `02-status-atividades.md`, `03-plano-de-desenvolvimento-v2.md`, `04-plano-de-melhorias-e-correcoes.md`).
+
+- **Priority:** P3 (Benchmarks, Repository Hygiene & Final Documentation Alignment)
+- **Target Locations:**
+  - `tests/load/k6_benchmark.js` (`#L74-L87`)
+  - `api/crates/server/tests/load_p99_benchmark.rs` (`#L264-L518`)
+  - `docs/benchmarks/02-streak-performance-p99-benchmark.md`
+  - `LICENSE-MIT` & `LICENSE-APACHE`
+  - `README.md`, `frontend/README.md`, `docs/*.md`
+
+## 2. Technical Scope & Specifications
+1. **Fix `tests/load/k6_benchmark.js` (`#L74-L87`):**
+   - Replace invalid JSON keys `{ log_date: '2026-10-30', actual_value: 1.0, is_completed: true }` with the server's `HabitCheckinRequest` schema `{ date: '2026-10-30', value: 1.0, is_increment: false }` so check-in requests return `200 OK` instead of `422 Unprocessable Entity`.
+2. **Fix `api/crates/server/tests/load_p99_benchmark.rs` (`#L264-L518`):**
+   - Report the actual concurrency variables (`checkin_concurrency`, `list_concurrency`) dynamically in the markdown output instead of hardcoding `25 workers` and `50 workers`, and compute status badges dynamically against the actual SLA thresholds.
+   - Only write to `docs/benchmarks/02-streak-performance-p99-benchmark.md` when an explicit env var `WRITE_BENCHMARK_REPORT=1` is set so normal `cargo test` runs do not dirty the git working tree.
+3. **Workspace Hygiene & Missing Licenses:**
+   - Remove lingering local SQLite files (`/roubit.db*`, `/api/roubit.db*`), `frontend/dev-dist/`, duplicate spec file `docs/Roubit - Especificação Técnica, Arquitetura e Roteiro de Engenharia.md`, and unused Vite scaffolding assets (`frontend/src/assets/hero.png`, `vite.svg`, `vue.svg`, `frontend/public/icons.svg`).
+   - Add `LICENSE-MIT` and `LICENSE-APACHE` in the repository root matching `README.md` and `api/Cargo.toml`.
+   - Update `api/.cargo/audit.toml` comment to reflect dual SQLite/PostgreSQL support.
+4. **Full Documentation & Startup Guide Verification:**
+   - Verify that `README.md` and `frontend/README.md` accurately reflect the directory tree, technology stack, environment variables, and complete instructions for starting the project in Local Dev (SQLite) and Production/Test (PostgreSQL + Redis / Docker Compose).
+   - Sync checkboxes across `docs/01-plano-de-desenvolvimento.md`, `docs/02-status-atividades.md`, `docs/03-plano-de-desenvolvimento-v2.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 3. Implementation Steps
+1. Fix `tests/load/k6_benchmark.js` and `api/crates/server/tests/load_p99_benchmark.rs`.
+2. Remove redundant/lingering artifacts (`roubit.db*`, duplicate spec file, unused template assets) and add `LICENSE-MIT` and `LICENSE-APACHE`.
+3. Audit and synchronize `README.md`, `frontend/README.md`, and all `docs/*.md` files.
+4. Run full verification (`./scripts/pre-commit.sh`).
+
+## 4. Definition of Done (DoD)
+- [ ] `tests/load/k6_benchmark.js` sends valid `{ date, value, is_increment }` payloads.
+- [ ] Running `cargo test --workspace` does not leave modified files in `git status`.
+- [ ] `LICENSE-MIT` and `LICENSE-APACHE` exist at the repository root and no duplicate spec or lingering `.db` files remain.
+- [ ] `README.md` provides complete, verified instructions to run and test the entire project.
+

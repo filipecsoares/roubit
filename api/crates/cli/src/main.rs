@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
 
     // If config command, we don't necessarily require database initialization
     if let Commands::Config(config_args) = command {
-        commands::config_cmd::handle(config_args, args.json, &config);
+        commands::config_cmd::handle(config_args, args.json, &config)?;
         return Ok(());
     }
 
@@ -64,37 +64,39 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Determine database URL override or default
-    let db_url = args.db.as_deref().unwrap_or(config.database_url.as_str());
+    // Determine database URL override or default from args, persistent config, or env
+    let persisted_cfg = client::CliConfigManager::load_config().unwrap_or_default();
+    let is_json = args.json || persisted_cfg.output_format.as_deref() == Some("json");
+    let db_url = args
+        .db
+        .as_deref()
+        .or(persisted_cfg.database_url.as_deref())
+        .unwrap_or(config.database_url.as_str());
 
-    let client = client::ClientFactory::create_client(args.remote.as_deref(), Some(db_url), None)
+    let db_flag = args.db.as_deref().or_else(|| {
+        if persisted_cfg.api_url.is_none() {
+            Some(db_url)
+        } else {
+            None
+        }
+    });
+
+    let client = client::ClientFactory::create_client(args.remote.as_deref(), db_flag, None)
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match command {
         Commands::Routine(routine_args) => {
-            if let Some(pool) = client.local_pool() {
-                commands::routine_cmd::handle(routine_args, args.json, pool).await?;
-            } else {
-                anyhow::bail!("Routine command is currently supported in local mode only.");
-            }
+            commands::routine_cmd::handle(routine_args, is_json, client.as_ref()).await?;
         }
         Commands::Habit(habit_args) => {
-            commands::habit_cmd::handle(habit_args, args.json, client.as_ref()).await?;
+            commands::habit_cmd::handle(habit_args, is_json, client.as_ref()).await?;
         }
         Commands::Okr(okr_args) => {
-            if let Some(pool) = client.local_pool() {
-                commands::okr_cmd::handle(okr_args, args.json, pool).await?;
-            } else {
-                anyhow::bail!("OKR command is currently supported in local mode only.");
-            }
+            commands::okr_cmd::handle(okr_args, is_json, client.as_ref()).await?;
         }
         Commands::Journal(journal_args) => {
-            if let Some(pool) = client.local_pool() {
-                commands::journal_cmd::handle(journal_args, args.json, pool).await?;
-            } else {
-                anyhow::bail!("Journal command is currently supported in local mode only.");
-            }
+            commands::journal_cmd::handle(journal_args, is_json, client.as_ref()).await?;
         }
         Commands::Config(_) | Commands::Admin(_) | Commands::Auth(_) => unreachable!(),
     }

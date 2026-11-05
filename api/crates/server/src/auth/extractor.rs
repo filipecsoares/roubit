@@ -61,19 +61,25 @@ where
             None
         };
 
-        // 3. Fallback to URL query parameter (?token=... or ?access_token=...) for SSE EventSource
-        let query_token_opt = parts.uri.query().and_then(|query| {
-            query.split('&').find_map(|pair| {
-                let mut p = pair.splitn(2, '=');
-                let key = p.next()?.trim();
-                let val = p.next()?.trim();
-                if key == "token" || key == "access_token" {
-                    Some(val.to_string())
-                } else {
-                    None
-                }
+        // 3. Fallback to URL query parameter (?token=... or ?access_token=...) strictly for SSE EventSource
+        // Browser EventSource API does not support custom Authorization headers.
+        // For standard REST endpoints, query tokens are rejected to prevent leakage in URL logs/referrers.
+        let query_token_opt = if parts.uri.path().ends_with("/notifications/stream") {
+            parts.uri.query().and_then(|query| {
+                query.split('&').find_map(|pair| {
+                    let mut p = pair.splitn(2, '=');
+                    let key = p.next()?.trim();
+                    let val = p.next()?.trim();
+                    if key == "token" || key == "access_token" {
+                        Some(percent_decode(val))
+                    } else {
+                        None
+                    }
+                })
             })
-        });
+        } else {
+            None
+        };
 
         let token = token_opt
             .or(cookie_token_opt)
@@ -86,4 +92,28 @@ where
             email: claims.email,
         })
     }
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(hex_val) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..=i + 2]).unwrap_or(""), 16)
+            {
+                decoded.push(hex_val);
+                i += 3;
+                continue;
+            }
+        } else if bytes[i] == b'+' {
+            decoded.push(b' ');
+            i += 1;
+            continue;
+        }
+        decoded.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(decoded).unwrap_or_else(|_| s.to_string())
 }

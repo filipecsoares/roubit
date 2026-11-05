@@ -23,6 +23,15 @@ pub struct Claims {
     pub iat: usize,
 }
 
+use std::sync::LazyLock;
+
+/// Precomputed dummy Argon2id hash used during login when the email does not exist,
+/// ensuring constant-time response and preventing user enumeration timing attacks.
+pub static DUMMY_ARGON2_HASH: LazyLock<String> = LazyLock::new(|| {
+    hash_password("dummy_constant_time_timing_attack_defense_password")
+        .unwrap_or_else(|_| "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$P5x9g2uV2".to_string())
+});
+
 /// Hashes a plaintext password using Argon2id with cryptographically secure random salt
 ///
 /// # Errors
@@ -36,6 +45,16 @@ pub fn hash_password(password: &str) -> Result<String, ApiError> {
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("Password hashing failed: {e}")))
 }
 
+/// Hashes a password asynchronously by offloading Argon2id to Tokio blocking thread pool
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if hashing fails or worker thread panics.
+pub async fn hash_password_async(password: String) -> Result<String, ApiError> {
+    tokio::task::spawn_blocking(move || hash_password(&password))
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Argon2 worker thread panicked: {e}")))?
+}
+
 /// Verifies a password against an Argon2id hash using constant-time comparison
 ///
 /// # Errors
@@ -47,6 +66,19 @@ pub fn verify_password(password: &str, password_hash: &str) -> Result<bool, ApiE
     Ok(argon2
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok())
+}
+
+/// Verifies a password against an Argon2id hash asynchronously by offloading to Tokio blocking thread pool
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if hash is malformed or worker thread panics.
+pub async fn verify_password_async(
+    password: String,
+    password_hash: String,
+) -> Result<bool, ApiError> {
+    tokio::task::spawn_blocking(move || verify_password(&password, &password_hash))
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("Argon2 worker thread panicked: {e}")))?
 }
 
 /// Encodes a signed JWT with HMAC-SHA256 (HS256)

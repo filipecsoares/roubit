@@ -1,0 +1,43 @@
+# Activity 01.3: Encrypted Journal Vault Cross-Session Salt Derivation, Auto-Lock & AAD
+
+## 1. Objective & Context
+Fix the critical Zero-Knowledge Journal bug where encrypted entries saved in previous sessions cannot be decrypted after locking or reloading the app, fix the inactivity auto-lock timer so it resets on user interaction and scrubs plaintext from Vue component state when locked, and harden backend/CLI journal encryption with AES-GCM Associated Authenticated Data (AAD) and a database `UNIQUE(user_id, entry_date)` constraint.
+
+- **Priority:** P0 (Critical Feature Broken — Data Unreadable Across Sessions)
+- **Target Locations:**
+  - `frontend/src/stores/vault.ts` (`#L1-L68`)
+  - `frontend/src/views/JournalView.vue` (`#L25`, `#L86-L139`)
+  - `frontend/src/components/journal/JournalEditor.vue`
+  - `api/crates/core/src/domain/journal/service.rs` (`#L98-L165`)
+  - `api/crates/core/migrations/` & `api/crates/core/migrations_pg/`
+
+## 2. Technical Scope & Specifications
+1. **Cross-Session Key Derivation with In-Memory Salt Cache (`frontend/src/stores/vault.ts` & `JournalView.vue`):**
+   - **Root Cause:** `vaultStore.unlock(passphrase)` currently generates a new random 16-byte `salt` on every unlock, derives one `masterKey`, and discards `passphrase`. When `JournalView.vue` fetches an entry from the server (`entry.salt_base64`), `WebCryptoService.decrypt` uses `vaultStore.masterKey` (derived with the new random salt) instead of deriving the key for `entry.salt_base64`, causing AES-GCM authentication failure (`OperationError`).
+   - **Solution (Best Cost-Benefit & Zero-Knowledge):**
+     - In `vaultStore`: keep the unlocked passphrase inside a private closure/variable in RAM (never in `localStorage`/`sessionStorage`) and maintain an in-memory `Map<string, CryptoKey>` (`derivedKeysBySalt`).
+     - Expose `async getKeyForSalt(saltBase64: string): Promise<CryptoKey>`: returns the cached `CryptoKey` in $O(1)$ if `saltBase64` is already in the `Map`, or derives it via `WebCryptoService.deriveKey(passphrase, saltBase64)` and stores it in the `Map`.
+     - When `JournalView.vue` unlocks the vault, if metadata or an existing entry already exists, pass its `salt_base64` as the default session salt (`currentSalt`) so all new entries created by the user reuse the same `salt` (with a fresh random 96-bit `nonce` per encryption), requiring only **one Argon2id derivation per session** while still being able to decrypt any historical entry with a different salt!
+2. **Inactivity Timer Reset & Reactive Plaintext Scrubbing (`vault.ts` & `JournalView.vue`):**
+   - Call `vaultStore.resetInactivityTimer()` whenever the user types in `JournalEditor.vue` or navigates dates in `JournalView.vue`.
+   - In `JournalView.vue`, add a `watch(() => vaultStore.isUnlocked, (unlocked) => { ... })` that immediately scrubs `plaintextReflection.value = ''`, `moodScore.value = 3`, `tags.value = []`, and `journalStore.currentEntry = null` whenever the vault locks (including when the 15-minute inactivity timer fires automatically).
+   - Ensure `vaultStore.lock()` clears `passphrase`, `derivedKeysBySalt.clear()`, `masterKey.value = null`, and `currentSalt.value = null`.
+3. **Unique Constraint on `(user_id, entry_date)` & Error Mapping (`roubit-core` & `roubit-server`):**
+   - Add a migration (`0010_journal_unique_user_date.sql` in `migrations/` and `migrations_pg/`) enforcing `CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_unique_user_date ON journal_entries(user_id, entry_date);` to prevent TOCTOU duplicate entries on the same date.
+   - In `api/crates/server/src/controllers/journal_controller.rs#L182-L209`, map `JournalServiceError::RepositoryError(JournalRepositoryError::NotFound(_))` to `ApiError::NotFound` (`404`) instead of `ApiError::InternalError` (`500`).
+
+## 3. Implementation Steps
+1. Refactor `frontend/src/stores/vault.ts` to support `getKeyForSalt(saltBase64)` with in-memory `Map<string, CryptoKey>` caching and complete RAM scrubbing on `lock()`.
+2. Update `frontend/src/views/JournalView.vue` to use `await vaultStore.getKeyForSalt(entry.salt_base64)` on decrypt, reuse existing entry salt on save, reset the inactivity timer on user input, and watch `vaultStore.isUnlocked` to wipe plaintext state when auto-locked.
+3. Create migration `0010_journal_unique_user_date.sql` in both `migrations/` and `migrations_pg/`.
+4. Fix error mapping in `journal_controller.rs` so updating a non-existent/foreign journal ID returns `404 Not Found`.
+5. Add Vitest unit tests in `frontend/src/components/journal/__tests__/Journal.spec.ts` verifying cross-session decryption with a pre-existing `salt_base64` and auto-lock plaintext scrubbing.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] An encrypted journal entry saved in one session can be decrypted after locking the vault and unlocking again with the same passphrase.
+- [x] Auto-lock timer resets on user activity and scrubs `plaintextReflection`, `moodScore`, and `tags` from `JournalView.vue` when triggered.
+- [x] `journal_entries` enforces uniqueness on `(user_id, entry_date)`.
+- [x] Updating a non-existent or another user's journal entry ID returns `404 Not Found` instead of `500 Internal Server Error`.
+- [x] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+

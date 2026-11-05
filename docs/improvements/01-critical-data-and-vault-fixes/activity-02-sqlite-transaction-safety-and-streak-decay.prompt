@@ -1,0 +1,43 @@
+# Activity 01.2: SQLite Transaction Safety (`RAII`) & Habit Streak Decay Engine
+
+## 1. Objective & Context
+Eliminate a critical SQLite database lock leak (`SQLITE_BUSY`) in `SqliteHabitRepository::record_check_in` and fix three domain bugs in the habit streak and adherence analytics engines where denormalized streaks never decay when days are missed, never recalculate when completed check-ins are overwritten or backdated, and under-report adherence for recently created habits.
+
+- **Priority:** P0 (Critical Data Integrity & Concurrency Bug)
+- **Target Locations:**
+  - `api/crates/core/src/domain/habit/repository.rs` (`#L215-L350`, `#L465-L515`)
+  - `api/crates/core/src/domain/habit/streak.rs` (`#L53-L97`, `#L183-L234`)
+  - `api/crates/core/src/domain/habit/analytics.rs` (`#L52-L81`)
+  - `api/crates/core/migrations/0008_habit_streak_denormalization.sql`
+
+## 2. Technical Scope & Specifications
+1. **Replace Raw `BEGIN IMMEDIATE` on Pooled Connection with RAII Transaction (`habit/repository.rs#L215-L350`):**
+   - Currently, `record_check_in` calls `let mut conn = self.pool.acquire().await?; sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;`. If the async future is cancelled/dropped at any `.await` point (e.g., HTTP timeout or client disconnect), `conn` returns to `SqlitePool` with an open write transaction, permanently locking SQLite (`SQLITE_BUSY`).
+   - Replace with `let mut tx = self.pool.begin().await?;` (which uses SQLx's automatic `Drop` rollback guard) and `tx.commit().await?;`.
+2. **Decay `current_streak` When Scheduled Days Are Missed (`habit/repository.rs#L465-L515`):**
+   - `list_active_habits_with_streaks` currently reads `habit.current_streak` directly from the `habits` table without checking when the habit was last completed. If a user stops checking in for weeks, `current_streak` stays frozen at its old value forever.
+   - Fetch the latest completed `log_date` (`MAX(log_date) WHERE habit_id = ? AND is_completed = 1 AND log_date <= ?`) or evaluate whether any scheduled day between `last_completed_date` and `reference_date` (excluding `reference_date` itself if not yet completed today) was missed according to `habit.frequency_days`. If a scheduled day was missed, effective `current_streak` must be `0` (and persisted or returned as `0`).
+3. **Recalculate Streaks on Incomplete Overwrite or Backdated Check-In (`habit/repository.rs#L296-L335`):**
+   - When an already-completed log (`was_already_completed == true`) is updated with a value below `target_value` (`!log.is_completed`), or when a check-in is recorded for a date earlier than the latest existing completed log (`date < max_completed_date`), compute accurate `(current_streak, longest_streak)` using `StreakCalculator::calculate_streaks` over the habit's logs inside the transaction instead of skipping update or corrupting incremental counters.
+4. **Fix Habit Analytics Scheduled Days Denominator (`habit/analytics.rs#L52-L81`):**
+   - In `HabitAnalyticsService::generate_summary`, `scheduled_days_in_range` iterates from `start_date` even if `habit.created_at.date_naive() > start_date`. Clamp the effective start date for scheduled days to `std::cmp::max(start_date, habit.created_at.date_naive())` (while still returning the full 365-day heatmap grid).
+
+## 3. Implementation Steps
+1. Refactor `SqliteHabitRepository::record_check_in` to use `self.pool.begin().await?` and `tx.commit().await?`.
+2. Handle streak recalculation when `was_already_completed && !log.is_completed` or when `date` is backdated.
+3. Update `list_active_habits_with_streaks` so `current_streak` accurately decays to `0` if scheduled days were missed prior to `reference_date`.
+4. Clamp `effective_start` in `HabitAnalyticsService::generate_summary`.
+5. Add unit and integration tests in `roubit-core` covering:
+   - Streak decay after missing scheduled days.
+   - Streak decrement when overwriting a completed check-in with `0`.
+   - Out-of-order / backdated check-in streak accuracy.
+   - Analytics completion rate for newly created habits.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] `record_check_in` uses `sqlx::Transaction` (`pool.begin()`) with automatic rollback on drop.
+- [x] `list_active_habits_with_streaks` returns `current_streak = 0` when a user misses scheduled days.
+- [x] Overwriting a completed check-in with an incomplete value or logging a backdated check-in produces accurate `current_streak` and `longest_streak`.
+- [x] `HabitAnalyticsService::generate_summary` does not penalize habits for days before `habit.created_at`.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

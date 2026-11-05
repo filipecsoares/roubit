@@ -9,5 +9,6 @@ pub mod repository;
 pub use models::{KeyResult, Objective};
 pub use progress::{OkrProgressEngine, OkrSyncService};
 pub use repository::{
-    ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError, SqliteOkrRepository,
+    ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError, PgOkrRepository,
+    SqliteOkrRepository,
 };

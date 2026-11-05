@@ -17,6 +17,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'linkHabit', krId: string): void
+  (e: 'link-habit', krId: string): void
   (e: 'delete', objectiveId: string): void
 }>()
 
@@ -86,6 +87,7 @@ const badgeStatusClasses = computed(() => {
           type="button"
           @click.stop="emit('delete', objective.id)"
           title="Excluir objetivo"
+          aria-label="Excluir objetivo"
           class="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all touch-target sm:min-h-0 sm:min-w-0"
         >
           <Trash2 class="w-4 h-4" />
@@ -93,6 +95,8 @@ const badgeStatusClasses = computed(() => {
 
         <button
           type="button"
+          :aria-expanded="isExpanded"
+          :aria-label="isExpanded ? 'Recolher detalhes do objetivo' : 'Expandir detalhes do objetivo'"
           class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
         >
           <ChevronUp v-if="isExpanded" class="w-5 h-5" />

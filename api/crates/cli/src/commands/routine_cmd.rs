@@ -2,31 +2,27 @@
 
 use anyhow::{Context, Result};
 use chrono::{Local, NaiveDate};
-use roubit_core::domain::{
-    BlockStatus, RoutineProgressTracker, RoutineRepository, SqliteRoutineRepository,
-};
-use sqlx::SqlitePool;
+use roubit_core::domain::BlockStatus;
 use uuid::Uuid;
 
 use crate::args::{RoutineArgs, RoutineSubcommands};
+use crate::client::RoubitClient;
 
 /// Executes routine commands.
 ///
 /// # Errors
-/// Returns an error if database access or JSON serialization fails.
+/// Returns an error if client operations or JSON serialization fails.
 #[allow(clippy::too_many_lines, clippy::option_if_let_else)]
-pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<()> {
-    let repo = SqliteRoutineRepository::new(pool.clone());
-
+pub async fn handle(args: RoutineArgs, json: bool, client: &dyn RoubitClient) -> Result<()> {
     match args.action {
         RoutineSubcommands::List { date } => {
             let target_date = parse_date_or_today(date.as_deref())?;
-            let routine_opt = repo
-                .get_active_routine(roubit_core::LOCAL_USER_ID)
+            let progress_opt = client
+                .get_active_routine_progress(target_date)
                 .await
-                .context("failed to fetch active routine")?;
+                .context("failed to fetch active routine progress")?;
 
-            let Some(routine) = routine_opt else {
+            let Some((routine, block_statuses, progress)) = progress_opt else {
                 if json {
                     println!(r#"{{"routine":null,"blocks":[],"adherence_percentage":0.0}}"#);
                 } else {
@@ -34,25 +30,6 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                 }
                 return Ok(());
             };
-
-            let blocks = repo
-                .list_blocks_for_routine(routine.id, roubit_core::LOCAL_USER_ID)
-                .await
-                .context("failed to list blocks for routine")?;
-
-            let mut block_statuses = Vec::new();
-            for block in &blocks {
-                let log_opt = repo
-                    .get_daily_log(block.id, roubit_core::LOCAL_USER_ID, target_date)
-                    .await
-                    .context("failed to fetch block log")?;
-                let status = log_opt.map_or(BlockStatus::Pending, |l| l.status);
-                block_statuses.push((block.clone(), status));
-            }
-
-            let now_time = Local::now().time();
-            let progress =
-                RoutineProgressTracker::compute_progress(&blocks, &block_statuses, now_time);
 
             if json {
                 let serialized = serde_json::to_string_pretty(&progress)?;
@@ -68,7 +45,7 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
 
         RoutineSubcommands::Start { block_id, date } => {
             update_block_status(
-                &repo,
+                client,
                 &block_id,
                 date.as_deref(),
                 BlockStatus::InProgress,
@@ -79,10 +56,21 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
 
         RoutineSubcommands::Complete { block_id, date } => {
             update_block_status(
-                &repo,
+                client,
                 &block_id,
                 date.as_deref(),
                 BlockStatus::Completed,
+                json,
+            )
+            .await?;
+        }
+
+        RoutineSubcommands::Skip { block_id, date } => {
+            update_block_status(
+                client,
+                &block_id,
+                date.as_deref(),
+                BlockStatus::Skipped,
                 json,
             )
             .await?;
@@ -98,28 +86,18 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
 
             if let Some(blocks_str) = blocks {
                 for (idx, part) in blocks_str.split(',').enumerate() {
-                    let segments: Vec<&str> = part.split(':').collect();
-                    if segments.len() >= 2 {
-                        let times: Vec<&str> = segments[0].split('-').collect();
-                        if times.len() == 2 {
-                            let start = chrono::NaiveTime::parse_from_str(times[0].trim(), "%H:%M")
-                                .with_context(|| format!("invalid start time {}", times[0]))?;
-                            let end = chrono::NaiveTime::parse_from_str(times[1].trim(), "%H:%M")
-                                .with_context(|| format!("invalid end time {}", times[1]))?;
-                            let block_name = segments[1..].join(":").trim().to_string();
-
-                            domain_blocks.push(roubit_core::TimeBlock {
-                                id: Uuid::new_v4(),
-                                routine_id,
-                                name: block_name,
-                                start_time: start,
-                                end_time: end,
-                                category: "General".to_string(),
-                                color_hex: "#6366F1".to_string(),
-                                order_index: i32::try_from(idx).unwrap_or(0),
-                                created_at: chrono::Utc::now(),
-                            });
-                        }
+                    if let Some((start, end, block_name)) = parse_block_segment(part) {
+                        domain_blocks.push(roubit_core::TimeBlock {
+                            id: Uuid::new_v4(),
+                            routine_id,
+                            name: block_name,
+                            start_time: start,
+                            end_time: end,
+                            category: "General".to_string(),
+                            color_hex: "#6366F1".to_string(),
+                            order_index: i32::try_from(idx).unwrap_or(0),
+                            created_at: chrono::Utc::now(),
+                        });
                     }
                 }
             }
@@ -129,25 +107,10 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                     .context("invalid time blocks schedule")?;
             }
 
-            let routine = roubit_core::Routine {
-                id: routine_id,
-                user_id: Some(roubit_core::LOCAL_USER_ID),
-                name,
-                description: None,
-                is_active: active,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            };
-
-            repo.create_routine_with_blocks(roubit_core::LOCAL_USER_ID, &routine, &domain_blocks)
+            let routine = client
+                .create_routine(&name, &domain_blocks, active)
                 .await
                 .context("failed to create routine")?;
-
-            if active {
-                repo.set_active_routine(routine_id, roubit_core::LOCAL_USER_ID)
-                    .await
-                    .context("failed to set routine as active")?;
-            }
 
             if json {
                 println!(
@@ -170,7 +133,8 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
         RoutineSubcommands::Activate { routine_id } => {
             let id = Uuid::parse_str(&routine_id)
                 .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
-            repo.set_active_routine(id, roubit_core::LOCAL_USER_ID)
+            client
+                .activate_routine(id)
                 .await
                 .context("failed to activate routine")?;
             if json {
@@ -188,7 +152,8 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
         RoutineSubcommands::Delete { routine_id } => {
             let id = Uuid::parse_str(&routine_id)
                 .with_context(|| format!("Invalid UUID: '{routine_id}'"))?;
-            repo.delete_routine(id, roubit_core::LOCAL_USER_ID)
+            client
+                .delete_routine(id)
                 .await
                 .context("failed to delete routine")?;
             if json {
@@ -202,24 +167,13 @@ pub async fn handle(args: RoutineArgs, json: bool, pool: &SqlitePool) -> Result<
                 ));
             }
         }
-
-        RoutineSubcommands::Skip { block_id, date } => {
-            update_block_status(
-                &repo,
-                &block_id,
-                date.as_deref(),
-                BlockStatus::Skipped,
-                json,
-            )
-            .await?;
-        }
     }
 
     Ok(())
 }
 
 async fn update_block_status(
-    repo: &SqliteRoutineRepository,
+    client: &dyn RoubitClient,
     block_id_str: &str,
     date_str: Option<&str>,
     status: BlockStatus,
@@ -229,15 +183,10 @@ async fn update_block_status(
         .with_context(|| format!("Invalid UUID for block_id: '{block_id_str}'"))?;
     let target_date = parse_date_or_today(date_str)?;
 
-    repo.log_block_status(
-        block_uuid,
-        roubit_core::LOCAL_USER_ID,
-        target_date,
-        status,
-        None,
-    )
-    .await
-    .context("failed to update time block status")?;
+    client
+        .log_block_status(block_uuid, target_date, status)
+        .await
+        .context("failed to update time block status")?;
 
     if json {
         let response = serde_json::json!({
@@ -267,4 +216,43 @@ fn parse_date_or_today(date_str: Option<&str>) -> Result<NaiveDate> {
                 .with_context(|| format!("Invalid date format: '{s}'. Expected YYYY-MM-DD"))
         },
     )
+}
+
+fn parse_block_segment(part: &str) -> Option<(chrono::NaiveTime, chrono::NaiveTime, String)> {
+    let trimmed = part.trim();
+    let (start_str, rest) = trimmed.split_once('-')?;
+    let colon_positions: Vec<usize> = rest.match_indices(':').map(|(i, _)| i).collect();
+    for &pos in &colon_positions {
+        let candidate_end = &rest[..pos];
+        if let Ok(end) = chrono::NaiveTime::parse_from_str(candidate_end.trim(), "%H:%M")
+            .or_else(|_| chrono::NaiveTime::parse_from_str(candidate_end.trim(), "%H:%M:%S"))
+        {
+            if let Ok(start) = chrono::NaiveTime::parse_from_str(start_str.trim(), "%H:%M")
+                .or_else(|_| chrono::NaiveTime::parse_from_str(start_str.trim(), "%H:%M:%S"))
+            {
+                let name = rest[pos + 1..].trim().to_string();
+                return Some((start, end, name));
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_block_segment() {
+        let res = parse_block_segment("08:00-10:00:Deep Focus").unwrap();
+        assert_eq!(res.0, chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap());
+        assert_eq!(res.1, chrono::NaiveTime::from_hms_opt(10, 0, 0).unwrap());
+        assert_eq!(res.2, "Deep Focus");
+
+        let res2 = parse_block_segment("10:00-10:30:Rest: Break").unwrap();
+        assert_eq!(res2.0, chrono::NaiveTime::from_hms_opt(10, 0, 0).unwrap());
+        assert_eq!(res2.1, chrono::NaiveTime::from_hms_opt(10, 30, 0).unwrap());
+        assert_eq!(res2.2, "Rest: Break");
+    }
 }

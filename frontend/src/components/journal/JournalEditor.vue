@@ -22,7 +22,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:plaintextReflection', value: string): void
+  (e: 'update:plaintext-reflection', value: string): void
   (e: 'update:moodScore', value: number): void
+  (e: 'update:mood-score', value: number): void
   (e: 'update:tags', value: string[]): void
   (e: 'save'): void
 }>()

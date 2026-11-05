@@ -1,10 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { apiClient } from '@/services/api'
-import type { HabitWithStreakResponse, Habit, CheckinResponse, HabitKind } from '@/types'
+import type {
+  HabitWithStreakResponse,
+  Habit,
+  CheckinResponse,
+  HabitKind,
+  HabitAnalyticsResponse,
+} from '@/types'
 
 export const useHabitStore = defineStore('habit', () => {
   const habits = ref<HabitWithStreakResponse[]>([])
+  const analytics = ref<HabitAnalyticsResponse | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -28,6 +35,21 @@ export const useHabitStore = defineStore('habit', () => {
       updateBadge()
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao listar hábitos'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchAnalytics(): Promise<HabitAnalyticsResponse> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await apiClient.get<HabitAnalyticsResponse>('/habits/analytics')
+      analytics.value = data
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Erro ao carregar métricas de hábitos'
       throw err
     } finally {
       loading.value = false
@@ -75,15 +97,35 @@ export const useHabitStore = defineStore('habit', () => {
         value,
         is_increment: isIncrement,
       })
-      // Update local habit streak in-place
+      // Update local habit streak and today_value in-place
       const idx = habits.value.findIndex((h) => h.habit.id === habitId)
-      if (idx !== -1 && data?.streak) {
-        habits.value[idx].streak = data.streak
+      if (idx !== -1 && data) {
+        if (data.streak) {
+          habits.value[idx].streak = data.streak
+        }
+        if (data.log) {
+          habits.value[idx].today_value = data.log.actual_value
+        }
         updateBadge()
       }
       return data
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao registrar check-in'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function archiveHabit(habitId: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      await apiClient.post(`/habits/${habitId}/archive`)
+      habits.value = habits.value.filter((h) => h.habit.id !== habitId)
+      updateBadge()
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Erro ao arquivar hábito'
       throw err
     } finally {
       loading.value = false
@@ -107,11 +149,14 @@ export const useHabitStore = defineStore('habit', () => {
 
   return {
     habits,
+    analytics,
     loading,
     error,
     fetchHabits,
+    fetchAnalytics,
     createHabit,
     checkin,
+    archiveHabit,
     deleteHabit,
   }
 })

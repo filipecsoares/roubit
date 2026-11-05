@@ -1,0 +1,42 @@
+# Activity 04.1: Daily Routine Progress Hydration, `Skipped` Status & Routine Modal Editor
+
+## 1. Objective & Context
+Fix the routine management and daily tracking integration between `roubit-server` and the Vue 3 frontend: ensure only one active routine is active per user when creating/updating routines, allow marking time blocks as `Skipped` via the REST API, return today's `completed_block_ids` and `skipped_block_ids` so `DashboardView.vue` does not reset routine progress to 0% on page reload, wire `<FocusModeModal />`'s `@complete-block` event in `App.vue`, and populate `RoutineManageModal.vue` with the user's current routine instead of hardcoded dummy blocks.
+
+- **Priority:** P2 (Full-Stack Domain Integration)
+- **Target Locations:**
+  - `api/crates/server/src/controllers/routine_controller.rs` (`#L18-L266`)
+  - `frontend/src/types/index.ts`
+  - `frontend/src/stores/routine.ts`
+  - `frontend/src/views/DashboardView.vue` (`#L20-L21`, `#L58-L63`, `#L90-L111`)
+  - `frontend/src/App.vue` (`#L72`)
+  - `frontend/src/components/dashboard/RoutineManageModal.vue` (`#L35-L72`)
+
+## 2. Technical Scope & Specifications
+1. **Single Active Routine & Daily Block Logs in `routine_controller.rs`:**
+   - In `create_routine` (`#L173-L194`): if `is_active` is `true`, call `repo.set_active_routine(routine.id, user.id).await` so previously active routines are deactivated, or replace the existing active routine cleanly.
+   - In `ActiveRoutineResponse` (`#L18-L24`), include `completed_block_ids: Vec<Uuid>` and `skipped_block_ids: Vec<Uuid>` extracted from today's `daily_logs` (`repo.get_daily_logs_for_date(routine.id, today, user.id)`).
+   - In `complete_time_block` (`POST /api/v1/routines/blocks/{id}/complete`, `#L202-L266`): accept an optional JSON body `{ "status": "completed" | "skipped" }` (defaulting to `"completed"` if omitted) and record `BlockStatus::Completed` or `BlockStatus::Skipped`.
+2. **Hydrate `DashboardView.vue` & Wire `FocusModeModal.vue`:**
+   - Store `completedBlockIds` and `skippedBlockIds` in `useRoutineStore` (`frontend/src/stores/routine.ts`), hydrated directly from `GET /api/v1/routines` and updated by `completeBlock(blockId, status)`.
+   - Use `routineStore.progress?.adherence_percentage` (or the store's reactive `completedBlockIds`) in `DashboardView.vue` so refreshing the browser or switching routes preserves 100% of completed/skipped blocks.
+   - In `frontend/src/App.vue#L72`, listen to `@complete-block="(id) => routineStore.completeBlock(id)"` on `<FocusModeModal />`.
+3. **Populate `RoutineManageModal.vue` with Existing Routine & Validate Overlaps:**
+   - When opening `RoutineManageModal.vue`, if `routineStore.routine` exists, pre-fill the routine name, description, and current `routineStore.blocks` instead of the 3 hardcoded sample blocks (use sample blocks only when creating the very first routine).
+   - Validate non-overlapping time blocks client-side before submitting.
+
+## 3. Implementation Steps
+1. Update `ActiveRoutineResponse` and `complete_time_block` in `api/crates/server/src/controllers/routine_controller.rs` and ensure single active routine enforcement in `create_routine`.
+2. Update `frontend/src/types/index.ts`, `frontend/src/stores/routine.ts`, `frontend/src/views/DashboardView.vue`, and `frontend/src/App.vue` to persist and hydrate `completedBlockIds` and `skippedBlockIds`.
+3. Update `frontend/src/components/dashboard/RoutineManageModal.vue` to load existing routine blocks when open and check for time overlaps.
+4. Add backend and frontend tests verifying routine progress persistence across reloads and `Skipped` block recording.
+5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [ ] `GET /api/v1/routines` returns `completed_block_ids` and `skipped_block_ids` for today.
+- [ ] `POST /api/v1/routines/blocks/{id}/complete` supports both `completed` and `skipped` statuses.
+- [ ] Reloading `DashboardView.vue` preserves all completed and skipped blocks and the adherence percentage.
+- [ ] Completing a block inside `FocusModeModal.vue` updates `routineStore` state.
+- [ ] `RoutineManageModal.vue` loads the user's current routine blocks when editing.
+- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+

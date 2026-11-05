@@ -2,21 +2,22 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::get,
+    routing::{get, patch},
     Json, Router,
 };
-use chrono::{NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    KeyResult, Objective, ObjectiveWithKeyResults, OkrRepository, OkrRepositoryError,
-    SqliteOkrRepository,
+    DatabasePool, KeyResult, Objective, ObjectiveWithKeyResults, OkrRepositoryError,
+    OkrSyncService, PgHabitRepository, PgOkrRepository, SqliteHabitRepository, SqliteOkrRepository,
 };
 
+use super::extract_local_date;
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Query parameters for listing objectives
@@ -36,6 +37,13 @@ pub struct CreateKeyResultRequest {
     pub unit: Option<String>,
     pub weight: Option<f32>,
     pub linked_habit_id: Option<Uuid>,
+}
+
+/// Request payload to update an existing Key Result's habit link or achieved value
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct UpdateKeyResultRequest {
+    pub linked_habit_id: Option<Uuid>,
+    pub current_value: Option<f64>,
 }
 
 /// Request payload to create an Objective with optional nested Key Results
@@ -59,13 +67,16 @@ pub async fn list_okrs(
     user: AuthenticatedUser,
     Query(query): Query<ListOkrsQuery>,
 ) -> Result<Json<Vec<ObjectiveWithKeyResults>>, ApiError> {
-    let repo = SqliteOkrRepository::new(state.db);
     let objectives = if let Some(quarter) = query.quarter {
-        repo.list_objectives_by_quarter(user.id, &quarter)
+        state
+            .okr_repo
+            .list_objectives_by_quarter(user.id, &quarter)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     } else {
-        repo.list_all_objectives(user.id)
+        state
+            .okr_repo
+            .list_all_objectives(user.id)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
     };
@@ -77,22 +88,32 @@ pub async fn list_okrs(
 ///
 /// # Errors
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
+#[allow(clippy::too_many_lines)]
 pub async fn create_objective(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
     Json(payload): Json<CreateObjectiveRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     payload
         .validate()
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let repo = SqliteOkrRepository::new(state.db);
-    let today = Utc::now().date_naive();
-    let quarter = payload.quarter.unwrap_or_else(|| "2026-Q4".to_string());
+    let today = extract_local_date(&headers);
+    let quarter = payload.quarter.unwrap_or_else(|| {
+        let q = (today.month() - 1) / 3 + 1;
+        format!("{}-Q{}", today.year(), q)
+    });
     let start_date = payload.start_date.unwrap_or(today);
     let end_date = payload
         .end_date
         .unwrap_or(today + chrono::Duration::days(90));
+
+    if start_date > end_date {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid date range: start_date ({start_date}) cannot be after end_date ({end_date})"
+        )));
+    }
 
     let objective = Objective::new(
         payload.title,
@@ -112,7 +133,9 @@ pub async fn create_objective(
         }
     }
 
-    repo.create_objective(user.id, &objective)
+    state
+        .okr_repo
+        .create_objective(user.id, &objective)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -139,27 +162,59 @@ pub async fn create_objective(
                 )
             };
 
-            match repo.create_key_result(user.id, &kr).await {
-                Ok(()) => created_krs.push(kr),
-                Err(OkrRepositoryError::Habit(msg)) => return Err(ApiError::NotFound(msg)),
-                Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
-                    return Err(ApiError::NotFound(format!(
+            if let Err(err) = state.okr_repo.create_key_result(user.id, &kr).await {
+                let _ = state.okr_repo.delete_objective(objective.id, user.id).await;
+                return match err {
+                    OkrRepositoryError::Habit(msg) => Err(ApiError::NotFound(msg)),
+                    OkrRepositoryError::ObjectiveNotFound(_) => Err(ApiError::NotFound(format!(
                         "Objective {} not found",
                         objective.id
-                    )));
-                }
-                Err(e) => return Err(ApiError::Internal(e.into())),
+                    ))),
+                    e => Err(ApiError::Internal(e.into())),
+                };
             }
+
+            if let Some(linked_habit_id) = kr.linked_habit_id {
+                let sync_res = match &state.db {
+                    DatabasePool::Sqlite(pool) => {
+                        let sync_svc = OkrSyncService::new(
+                            SqliteOkrRepository::new(pool.clone()),
+                            SqliteHabitRepository::new(pool.clone()),
+                        );
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
+                    }
+                    DatabasePool::Postgres(pool) => {
+                        let sync_svc = OkrSyncService::new(
+                            PgOkrRepository::new(pool.clone()),
+                            PgHabitRepository::new(pool.clone()),
+                        );
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
+                    }
+                };
+                if let Err(e) = sync_res {
+                    tracing::warn!(error = %e, %linked_habit_id, "Sync linked habit progress failed");
+                }
+            }
+
+            created_krs.push(kr);
         }
     }
 
-    Ok((
-        StatusCode::CREATED,
-        Json(ObjectiveWithKeyResults {
+    let final_obj = state
+        .okr_repo
+        .get_objective_with_krs(objective.id, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .unwrap_or(ObjectiveWithKeyResults {
             objective,
             key_results: created_krs,
-        }),
-    ))
+        });
+
+    Ok((StatusCode::CREATED, Json(final_obj)))
 }
 
 /// Handler for `POST /api/v1/okrs/:id/key-results`
@@ -196,15 +251,124 @@ pub async fn create_kr(
         )
     };
 
-    let repo = SqliteOkrRepository::new(state.db);
-    match repo.create_key_result(user.id, &kr).await {
-        Ok(()) => Ok((StatusCode::CREATED, Json(kr))),
+    match state.okr_repo.create_key_result(user.id, &kr).await {
+        Ok(()) => {
+            if let Some(linked_habit_id) = kr.linked_habit_id {
+                let sync_res = match &state.db {
+                    DatabasePool::Sqlite(pool) => {
+                        let sync_svc = OkrSyncService::new(
+                            SqliteOkrRepository::new(pool.clone()),
+                            SqliteHabitRepository::new(pool.clone()),
+                        );
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
+                    }
+                    DatabasePool::Postgres(pool) => {
+                        let sync_svc = OkrSyncService::new(
+                            PgOkrRepository::new(pool.clone()),
+                            PgHabitRepository::new(pool.clone()),
+                        );
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
+                    }
+                };
+                if let Err(e) = sync_res {
+                    tracing::warn!(error = %e, %linked_habit_id, "Sync linked habit progress failed");
+                }
+            }
+            Ok((StatusCode::CREATED, Json(kr)))
+        }
         Err(OkrRepositoryError::ObjectiveNotFound(_)) => Err(ApiError::NotFound(format!(
             "Objective {objective_id} not found"
         ))),
         Err(OkrRepositoryError::Habit(msg)) => Err(ApiError::NotFound(msg)),
         Err(e) => Err(ApiError::Internal(e.into())),
     }
+}
+
+/// Handler for `PATCH /api/v1/okrs/:id/key-results/:kr_id`
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if objective, key result or linked habit not found,
+/// [`ApiError::BadRequest`] on validation errors, or [`ApiError::Internal`] on db error.
+pub async fn update_key_result(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path((objective_id, kr_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<UpdateKeyResultRequest>,
+) -> Result<Json<ObjectiveWithKeyResults>, ApiError> {
+    payload
+        .validate()
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    // If linking to a habit, verify the habit exists and belongs to user
+    if let Some(habit_id) = payload.linked_habit_id {
+        let habit_opt = state
+            .habit_repo
+            .get_habit_by_id(habit_id, user.id)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        if habit_opt.is_none() {
+            return Err(ApiError::NotFound(format!("Habit {habit_id} not found")));
+        }
+    }
+
+    let _updated_kr = state
+        .okr_repo
+        .update_key_result_link_or_value(
+            user.id,
+            kr_id,
+            payload.linked_habit_id.map(Some),
+            payload.current_value,
+        )
+        .await
+        .map_err(|e| match e {
+            OkrRepositoryError::KeyResultNotFound(id) => {
+                ApiError::NotFound(format!("Key Result {id} not found"))
+            }
+            OkrRepositoryError::ObjectiveNotFound(id) => {
+                ApiError::NotFound(format!("Objective {id} not found"))
+            }
+            other => ApiError::Internal(other.into()),
+        })?;
+
+    // If habit link was specified in the request, sync progress immediately
+    if let Some(linked_habit_id) = payload.linked_habit_id {
+        let sync_res = match &state.db {
+            DatabasePool::Sqlite(pool) => {
+                let sync_svc = OkrSyncService::new(
+                    SqliteOkrRepository::new(pool.clone()),
+                    SqliteHabitRepository::new(pool.clone()),
+                );
+                sync_svc
+                    .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                    .await
+            }
+            DatabasePool::Postgres(pool) => {
+                let sync_svc = OkrSyncService::new(
+                    PgOkrRepository::new(pool.clone()),
+                    PgHabitRepository::new(pool.clone()),
+                );
+                sync_svc
+                    .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                    .await
+            }
+        };
+        if let Err(e) = sync_res {
+            tracing::warn!(error = %e, %linked_habit_id, "Sync linked habit progress failed");
+        }
+    }
+
+    let final_obj = state
+        .okr_repo
+        .get_objective_with_krs(objective_id, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Objective {objective_id} not found")))?;
+
+    Ok(Json(final_obj))
 }
 
 /// Handler for `DELETE /api/v1/okrs/:id`
@@ -216,8 +380,7 @@ pub async fn delete_objective(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteOkrRepository::new(state.db);
-    match repo.delete_objective(id, user.id).await {
+    match state.okr_repo.delete_objective(id, user.id).await {
         Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
         Err(OkrRepositoryError::ObjectiveNotFound(_)) => {
             Err(ApiError::NotFound(format!("Objective {id} not found")))
@@ -232,4 +395,5 @@ pub fn okr_routes() -> Router<AppState> {
         .route("/", get(list_okrs).post(create_objective))
         .route("/{id}", axum::routing::delete(delete_objective))
         .route("/{id}/key-results", axum::routing::post(create_kr))
+        .route("/{id}/key-results/{kr_id}", patch(update_key_result))
 }

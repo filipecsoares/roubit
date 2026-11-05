@@ -3,9 +3,15 @@ import { ref } from 'vue'
 import { apiClient } from '@/services/api'
 import type { ObjectiveWithKeyResults } from '@/types'
 
+function getCurrentQuarter(): string {
+  const now = new Date()
+  const q = Math.floor(now.getMonth() / 3) + 1
+  return `${now.getFullYear()}-Q${q}`
+}
+
 export const useOkrStore = defineStore('okr', () => {
   const objectives = ref<ObjectiveWithKeyResults[]>([])
-  const quarter = ref<string>('Q4-2026')
+  const quarter = ref<string>(getCurrentQuarter())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -62,6 +68,31 @@ export const useOkrStore = defineStore('okr', () => {
     }
   }
 
+  async function linkHabitToKeyResult(
+    objectiveId: string,
+    krId: string,
+    habitId: string | null,
+  ): Promise<ObjectiveWithKeyResults> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await apiClient.patch<ObjectiveWithKeyResults>(
+        `/okrs/${objectiveId}/key-results/${krId}`,
+        { linked_habit_id: habitId },
+      )
+      const idx = objectives.value.findIndex((o) => o.objective.id === objectiveId)
+      if (idx !== -1) {
+        objectives.value[idx] = data
+      }
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Erro ao vincular hábito ao Key Result'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function deleteObjective(objectiveId: string): Promise<void> {
     loading.value = true
     error.value = null
@@ -83,6 +114,7 @@ export const useOkrStore = defineStore('okr', () => {
     error,
     fetchOkrs,
     createObjective,
+    linkHabitToKeyResult,
     deleteObjective,
   }
 })

@@ -1,27 +1,27 @@
 //! OKR command handler.
 
 use anyhow::{Context, Result};
-use roubit_core::domain::{OkrRepository, SqliteOkrRepository};
-use sqlx::SqlitePool;
+use uuid::Uuid;
 
 use crate::args::{OkrArgs, OkrSubcommands};
+use crate::client::RoubitClient;
 
 /// Executes OKR commands.
 ///
 /// # Errors
-/// Returns an error if database access or JSON serialization fails.
+/// Returns an error if client operations or JSON serialization fails.
 #[allow(clippy::too_many_lines)]
-pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> {
-    let repo = SqliteOkrRepository::new(pool.clone());
-
+pub async fn handle(args: OkrArgs, json: bool, client: &dyn RoubitClient) -> Result<()> {
     match args.action {
         OkrSubcommands::List { quarter } => {
             let objectives = if let Some(q) = quarter {
-                repo.list_objectives_by_quarter(roubit_core::LOCAL_USER_ID, &q)
+                client
+                    .list_objectives_by_quarter(&q)
                     .await
                     .with_context(|| format!("failed to list objectives for quarter '{q}'"))?
             } else {
-                repo.list_all_objectives(roubit_core::LOCAL_USER_ID)
+                client
+                    .list_all_objectives()
                     .await
                     .context("failed to list all objectives")?
             };
@@ -65,13 +65,8 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
             quarter,
             description,
         } => {
-            let today = chrono::Local::now().date_naive();
-            let quarter_end = today + chrono::Duration::days(90);
-            let objective =
-                roubit_core::Objective::new(title, description, quarter, today, quarter_end)
-                    .with_user_id(roubit_core::LOCAL_USER_ID);
-
-            repo.create_objective(roubit_core::LOCAL_USER_ID, &objective)
+            let objective = client
+                .create_objective(&title, &quarter, description.as_deref())
                 .await
                 .context("failed to create objective")?;
 
@@ -92,32 +87,13 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
             unit,
             habit_id,
         } => {
-            let obj_uuid = uuid::Uuid::parse_str(&objective_id)
+            let obj_uuid = Uuid::parse_str(&objective_id)
                 .with_context(|| format!("Invalid UUID: '{objective_id}'"))?;
 
-            let linked_uuid = habit_id.and_then(|h| uuid::Uuid::parse_str(&h).ok());
+            let linked_uuid = habit_id.and_then(|h| Uuid::parse_str(&h).ok());
 
-            let kr = if let Some(h_id) = linked_uuid {
-                roubit_core::KeyResult::new_habit_linked(
-                    obj_uuid,
-                    h_id,
-                    title,
-                    target,
-                    unit.unwrap_or_else(|| "%".to_string()),
-                    1.0,
-                )
-            } else {
-                roubit_core::KeyResult::new_numeric(
-                    obj_uuid,
-                    title,
-                    0.0,
-                    target,
-                    unit.unwrap_or_else(|| "%".to_string()),
-                    1.0,
-                )
-            };
-
-            repo.create_key_result(roubit_core::LOCAL_USER_ID, &kr)
+            let kr = client
+                .create_key_result(obj_uuid, &title, target, unit.as_deref(), linked_uuid)
                 .await
                 .context("failed to create key result")?;
 
@@ -132,9 +108,10 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
         }
 
         OkrSubcommands::Delete { objective_id } => {
-            let id = uuid::Uuid::parse_str(&objective_id)
+            let id = Uuid::parse_str(&objective_id)
                 .with_context(|| format!("Invalid UUID: '{objective_id}'"))?;
-            repo.delete_objective(id, roubit_core::LOCAL_USER_ID)
+            client
+                .delete_objective(id)
                 .await
                 .context("failed to delete objective")?;
             if json {
@@ -148,8 +125,8 @@ pub async fn handle(args: OkrArgs, json: bool, pool: &SqlitePool) -> Result<()> 
         }
 
         OkrSubcommands::Summary => {
-            let objectives = repo
-                .list_all_objectives(roubit_core::LOCAL_USER_ID)
+            let objectives = client
+                .list_all_objectives()
                 .await
                 .context("failed to list objectives for summary")?;
 

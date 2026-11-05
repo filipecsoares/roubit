@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiClient } from '@/services/api'
+import { clearQueue } from '@/services/offlineQueue'
+import { useVaultStore } from '@/stores/vault'
+import { useNotificationStore } from '@/stores/notification'
+import { useHabitStore } from '@/stores/habit'
+import { useRoutineStore } from '@/stores/routine'
+import { useOkrStore } from '@/stores/okr'
+import { useJournalStore } from '@/stores/journal'
+import { useFocusStore } from '@/stores/focus'
 import type { User, AuthResponse } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -50,16 +58,82 @@ export const useAuthStore = defineStore('auth', () => {
       const { data } = await apiClient.get<User>('/auth/me')
       user.value = data
     } catch (err) {
-      logout()
+      await logout()
     } finally {
       loading.value = false
     }
   }
 
-  function logout(): void {
+  async function logout(): Promise<void> {
     token.value = null
     user.value = null
-    localStorage.removeItem('roubit_token')
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('roubit_token')
+    }
+
+    try {
+      await apiClient.post('/auth/logout', {}, { skipOfflineQueue: true } as any)
+    } catch {
+      // Ignore network errors when logging out while offline
+    }
+
+    // 1. Wipe masterKey and derived keys from RAM (Zero-Knowledge Memory Safety)
+    try {
+      const vaultStore = useVaultStore()
+      vaultStore.lock()
+    } catch {
+      // Ignore if vault store was not instantiated
+    }
+
+    // 2. Clear IndexedDB offline mutation queue to prevent cross-account replay attacks
+    try {
+      await clearQueue()
+    } catch {
+      // Ignore queue clearance error
+    }
+
+    // 3. Disconnect SSE stream and clear recent notifications
+    try {
+      const notificationStore = useNotificationStore()
+      notificationStore.disconnectSSE()
+      notificationStore.clearAll()
+    } catch {
+      // Ignore notification store errors
+    }
+
+    // 4. Scrub in-memory domain stores to avoid leaking data across user sessions
+    try {
+      const habitStore = useHabitStore()
+      habitStore.habits = []
+      habitStore.analytics = null
+    } catch {}
+
+    try {
+      const routineStore = useRoutineStore()
+      routineStore.routine = null
+      routineStore.blocks = []
+      routineStore.progress = null
+      routineStore.completedBlockIds = []
+      routineStore.skippedBlockIds = []
+    } catch {}
+
+    try {
+      const okrStore = useOkrStore()
+      okrStore.objectives = []
+    } catch {}
+
+    try {
+      const journalStore = useJournalStore()
+      journalStore.metadataList = []
+      journalStore.currentEntry = null
+      journalStore.isUnlocked = false
+    } catch {}
+
+    try {
+      const focusStore = useFocusStore()
+      focusStore.resetTimer()
+      focusStore.closeFocusModal()
+    } catch {}
   }
 
   return {

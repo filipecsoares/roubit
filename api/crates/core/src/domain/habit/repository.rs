@@ -7,11 +7,11 @@ use std::collections::HashSet;
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
-use sqlx::SqlitePool;
+use sqlx::{PgPool, Row, SqlitePool};
 use uuid::Uuid;
 
 use super::{
-    models::{Habit, HabitLog},
+    models::{Habit, HabitLog, HabitType},
     streak::{StreakCalculator, StreakMetrics},
 };
 
@@ -212,89 +212,125 @@ impl HabitRepository for SqliteHabitRepository {
         value: f64,
         is_increment: bool,
     ) -> Result<HabitLog, HabitRepositoryError> {
-        let mut conn = self.pool.acquire().await?;
-        sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
 
-        let res: Result<HabitLog, HabitRepositoryError> = async {
-            let habit = sqlx::query_as::<_, Habit>(
+        let habit = sqlx::query_as::<_, Habit>(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE id = ? AND user_id = ?
+            ",
+        )
+        .bind(habit_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
+        // Check if there was an existing completed log for this date to avoid double-incrementing streak
+        let existing_log: Option<HabitLog> = sqlx::query_as(
+            r"
+            SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+            FROM habit_logs
+            WHERE habit_id = ? AND log_date = ?
+            ",
+        )
+        .bind(habit_id)
+        .bind(date)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
+
+        let log_id = Uuid::new_v4();
+        let now: DateTime<Utc> = Utc::now();
+        let target_value = habit.target_value;
+        let initial_completed = value >= target_value;
+
+        let log: HabitLog = if is_increment {
+            sqlx::query_as::<_, HabitLog>(
                 r"
-                SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
-                FROM habits
-                WHERE id = ? AND user_id = ?
+                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                VALUES (?, ?, ?, ?, ?, NULL, ?)
+                ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                    actual_value = habit_logs.actual_value + excluded.actual_value,
+                    is_completed = (habit_logs.actual_value + excluded.actual_value >= ?),
+                    logged_at = excluded.logged_at
+                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
                 ",
             )
+            .bind(log_id)
             .bind(habit_id)
-            .bind(user_id)
-            .fetch_optional(&mut *conn)
+            .bind(date)
+            .bind(value)
+            .bind(initial_completed)
+            .bind(now)
+            .bind(target_value)
+            .fetch_one(&mut *tx)
             .await?
-            .ok_or(HabitRepositoryError::NotFound(habit_id))?;
-
-            // Check if there was an existing completed log for this date to avoid double-incrementing streak
-            let existing_log: Option<HabitLog> = sqlx::query_as(
+        } else {
+            sqlx::query_as::<_, HabitLog>(
                 r"
-                SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                VALUES (?, ?, ?, ?, ?, NULL, ?)
+                ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                    actual_value = excluded.actual_value,
+                    is_completed = (excluded.actual_value >= ?),
+                    logged_at = excluded.logged_at
+                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                ",
+            )
+            .bind(log_id)
+            .bind(habit_id)
+            .bind(date)
+            .bind(value)
+            .bind(initial_completed)
+            .bind(now)
+            .bind(target_value)
+            .fetch_one(&mut *tx)
+            .await?
+        };
+
+        // Atomically update habit's denormalized streak when completion state transitions
+        if log.is_completed && !was_already_completed {
+            let has_newer_completed: bool = sqlx::query_scalar::<_, i64>(
+                r"
+                SELECT COUNT(1)
                 FROM habit_logs
-                WHERE habit_id = ? AND log_date = ?
+                WHERE habit_id = ? AND log_date > ? AND is_completed = 1
                 ",
             )
             .bind(habit_id)
             .bind(date)
-            .fetch_optional(&mut *conn)
-            .await?;
+            .fetch_one(&mut *tx)
+            .await?
+                > 0;
 
-            let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
-
-            let log_id = Uuid::new_v4();
-            let now: DateTime<Utc> = Utc::now();
-            let target_value = habit.target_value;
-            let initial_completed = value >= target_value;
-
-            let log: HabitLog = if is_increment {
-                sqlx::query_as::<_, HabitLog>(
+            let (new_current_streak, new_longest_streak) = if has_newer_completed {
+                // Backdated completion: recalculate exact streaks across all completed dates
+                let completed_dates: Vec<NaiveDate> = sqlx::query_scalar(
                     r"
-                    INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
-                    VALUES (?, ?, ?, ?, ?, NULL, ?)
-                    ON CONFLICT(habit_id, log_date) DO UPDATE SET
-                        actual_value = habit_logs.actual_value + excluded.actual_value,
-                        is_completed = (habit_logs.actual_value + excluded.actual_value >= ?),
-                        logged_at = excluded.logged_at
-                    RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                    SELECT log_date
+                    FROM habit_logs
+                    WHERE habit_id = ? AND is_completed = 1
+                    ORDER BY log_date ASC
                     ",
                 )
-                .bind(log_id)
                 .bind(habit_id)
-                .bind(date)
-                .bind(value)
-                .bind(initial_completed)
-                .bind(now)
-                .bind(target_value)
-                .fetch_one(&mut *conn)
-                .await?
+                .fetch_all(&mut *tx)
+                .await?;
+
+                let ref_date = completed_dates.last().copied().unwrap_or(date);
+                let metrics =
+                    StreakCalculator::calculate(&completed_dates, habit.frequency_days, ref_date);
+                (
+                    i32::try_from(metrics.current_streak).unwrap_or(0),
+                    habit
+                        .longest_streak
+                        .max(i32::try_from(metrics.longest_streak).unwrap_or(0)),
+                )
             } else {
-                sqlx::query_as::<_, HabitLog>(
-                    r"
-                    INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
-                    VALUES (?, ?, ?, ?, ?, NULL, ?)
-                    ON CONFLICT(habit_id, log_date) DO UPDATE SET
-                        actual_value = excluded.actual_value,
-                        is_completed = (excluded.actual_value >= ?),
-                        logged_at = excluded.logged_at
-                    RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
-                    ",
-                )
-                .bind(log_id)
-                .bind(habit_id)
-                .bind(date)
-                .bind(value)
-                .bind(initial_completed)
-                .bind(now)
-                .bind(target_value)
-                .fetch_one(&mut *conn)
-                .await?
-            };
-
-            // Atomically update habit's denormalized streak when habit reaches completed state
-            if log.is_completed && !was_already_completed {
+                // Fast O(1) incremental path for latest chronological completion
                 let last_completed_date: Option<NaiveDate> = sqlx::query_scalar(
                     r"
                     SELECT log_date
@@ -306,48 +342,68 @@ impl HabitRepository for SqliteHabitRepository {
                 )
                 .bind(habit_id)
                 .bind(date)
-                .fetch_optional(&mut *conn)
+                .fetch_optional(&mut *tx)
                 .await?;
 
-                let (new_current_streak, new_longest_streak) =
-                    StreakCalculator::update_streak_incremental(
-                        habit.current_streak,
-                        habit.longest_streak,
-                        last_completed_date,
-                        date,
-                        habit.frequency_days,
-                    );
-
-                sqlx::query(
-                    r"
-                    UPDATE habits
-                    SET current_streak = ?, longest_streak = ?, updated_at = ?
-                    WHERE id = ? AND user_id = ?
-                    ",
+                StreakCalculator::update_streak_incremental(
+                    habit.current_streak,
+                    habit.longest_streak,
+                    last_completed_date,
+                    date,
+                    habit.frequency_days,
                 )
-                .bind(new_current_streak)
-                .bind(new_longest_streak)
-                .bind(now)
-                .bind(habit_id)
-                .bind(user_id)
-                .execute(&mut *conn)
-                .await?;
-            }
+            };
 
-            Ok(log)
-        }
-        .await;
+            sqlx::query(
+                r"
+                UPDATE habits
+                SET current_streak = ?, longest_streak = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                ",
+            )
+            .bind(new_current_streak)
+            .bind(new_longest_streak)
+            .bind(now)
+            .bind(habit_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        } else if !log.is_completed && was_already_completed {
+            // Reverted completion: recalculate current and longest streak from remaining completed logs
+            let completed_dates: Vec<NaiveDate> = sqlx::query_scalar(
+                r"
+                SELECT log_date
+                FROM habit_logs
+                WHERE habit_id = ? AND is_completed = 1
+                ORDER BY log_date ASC
+                ",
+            )
+            .bind(habit_id)
+            .fetch_all(&mut *tx)
+            .await?;
 
-        match res {
-            Ok(log) => {
-                sqlx::query("COMMIT").execute(&mut *conn).await?;
-                Ok(log)
-            }
-            Err(e) => {
-                let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
-                Err(e)
-            }
+            let ref_date = completed_dates.last().copied().unwrap_or(date).max(date);
+            let metrics =
+                StreakCalculator::calculate(&completed_dates, habit.frequency_days, ref_date);
+
+            sqlx::query(
+                r"
+                UPDATE habits
+                SET current_streak = ?, longest_streak = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                ",
+            )
+            .bind(i32::try_from(metrics.current_streak).unwrap_or(0))
+            .bind(i32::try_from(metrics.longest_streak).unwrap_or(0))
+            .bind(now)
+            .bind(habit_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
         }
+
+        tx.commit().await?;
+        Ok(log)
     }
 
     async fn get_logs_for_habit(
@@ -468,16 +524,593 @@ impl HabitRepository for SqliteHabitRepository {
         reference_date: NaiveDate,
     ) -> Result<Vec<(Habit, StreakMetrics)>, HabitRepositoryError> {
         let habits = self.list_active_habits(user_id).await?;
-        let completed_ids = self
-            .get_completed_habit_ids_for_date(user_id, reference_date)
-            .await?;
+        let last_completed_rows: Vec<(Uuid, NaiveDate)> = sqlx::query_as(
+            r"
+            SELECT hl.habit_id, MAX(hl.log_date) as last_completed_date
+            FROM habit_logs hl
+            JOIN habits h ON hl.habit_id = h.id
+            WHERE h.user_id = ? AND h.is_archived = 0 AND hl.is_completed = 1 AND hl.log_date <= ?
+            GROUP BY hl.habit_id
+            ",
+        )
+        .bind(user_id)
+        .bind(reference_date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let last_completed_map: std::collections::HashMap<Uuid, NaiveDate> =
+            last_completed_rows.into_iter().collect();
 
         let mut result = Vec::with_capacity(habits.len());
-        for habit in habits {
-            let is_active_today = completed_ids.contains(&habit.id);
+        for mut habit in habits {
+            let last_completed_date = last_completed_map.get(&habit.id).copied();
+            let is_active_today = last_completed_date == Some(reference_date);
+            let current_streak = StreakCalculator::effective_current_streak(
+                habit.current_streak,
+                last_completed_date,
+                reference_date,
+                habit.frequency_days,
+            );
+            let longest_streak = u32::try_from(habit.longest_streak.max(0))
+                .unwrap_or(0)
+                .max(current_streak);
+            habit.current_streak = i32::try_from(current_streak).unwrap_or(0);
+
             let streak = StreakMetrics {
-                current_streak: u32::try_from(habit.current_streak.max(0)).unwrap_or(0),
-                longest_streak: u32::try_from(habit.longest_streak.max(0)).unwrap_or(0),
+                current_streak,
+                longest_streak,
+                is_active_today,
+            };
+            result.push((habit, streak));
+        }
+
+        Ok(result)
+    }
+}
+
+/// PostgreSQL-backed implementation of [`HabitRepository`].
+#[derive(Debug, Clone)]
+pub struct PgHabitRepository {
+    pool: PgPool,
+}
+
+impl PgHabitRepository {
+    /// Creates a new `PgHabitRepository` wrapping an active PostgreSQL connection pool.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Accesses the underlying `SQLx` PostgreSQL connection pool.
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    fn map_habit_row(row: &sqlx::postgres::PgRow) -> Result<Habit, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let user_id_str: Option<String> = row.try_get("user_id").ok().flatten();
+        let user_id = user_id_str.as_deref().and_then(|s| Uuid::parse_str(s).ok());
+        let name: String = row.try_get("name")?;
+        let description: Option<String> = row.try_get("description")?;
+        let habit_type_str: String = row.try_get("habit_type")?;
+        let habit_type = match habit_type_str.as_str() {
+            "numeric" => HabitType::Numeric,
+            "timer" => HabitType::Timer,
+            _ => HabitType::Binary,
+        };
+        let target_value: f64 = row.try_get("target_value")?;
+        let unit: Option<String> = row.try_get("unit")?;
+        let freq_i32: i32 = row.try_get("frequency_days")?;
+        let frequency_days = u8::try_from(freq_i32).unwrap_or(Habit::FREQUENCY_DAILY);
+        let color_hex: String = row.try_get("color_hex")?;
+        let is_archived: bool = row.try_get("is_archived")?;
+        let current_streak: i32 = row.try_get("current_streak")?;
+        let longest_streak: i32 = row.try_get("longest_streak")?;
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+
+        Ok(Habit {
+            id,
+            user_id,
+            name,
+            description,
+            habit_type,
+            target_value,
+            unit,
+            frequency_days,
+            color_hex,
+            is_archived,
+            current_streak,
+            longest_streak,
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn map_log_row(row: &sqlx::postgres::PgRow) -> Result<HabitLog, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let habit_id_str: String = row.try_get("habit_id")?;
+        let habit_id =
+            Uuid::parse_str(&habit_id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let log_date: NaiveDate = row.try_get("log_date")?;
+        let actual_value: f64 = row.try_get("actual_value")?;
+        let is_completed: bool = row.try_get("is_completed")?;
+        let notes: Option<String> = row.try_get("notes")?;
+        let logged_at: DateTime<Utc> = row.try_get("logged_at")?;
+
+        Ok(HabitLog {
+            id,
+            habit_id,
+            log_date,
+            actual_value,
+            is_completed,
+            notes,
+            logged_at,
+        })
+    }
+}
+
+#[async_trait]
+#[allow(clippy::too_many_lines)]
+impl HabitRepository for PgHabitRepository {
+    async fn create_habit(&self, user_id: Uuid, habit: &Habit) -> Result<(), HabitRepositoryError> {
+        sqlx::query(
+            r"
+            INSERT INTO habits (id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ",
+        )
+        .bind(habit.id.to_string())
+        .bind(user_id.to_string())
+        .bind(&habit.name)
+        .bind(&habit.description)
+        .bind(habit.habit_type.as_str())
+        .bind(habit.target_value)
+        .bind(&habit.unit)
+        .bind(i32::from(habit.frequency_days))
+        .bind(&habit.color_hex)
+        .bind(habit.is_archived)
+        .bind(habit.current_streak)
+        .bind(habit.longest_streak)
+        .bind(habit.created_at)
+        .bind(habit.updated_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn get_habit_by_id(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Habit>, HabitRepositoryError> {
+        let row = sqlx::query(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE id = $1 AND user_id = $2
+            ",
+        )
+        .bind(habit_id.to_string())
+        .bind(user_id.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.as_ref()
+            .map(Self::map_habit_row)
+            .transpose()
+            .map_err(HabitRepositoryError::Database)
+    }
+
+    async fn list_active_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
+        let rows = sqlx::query(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE is_archived = FALSE AND user_id = $1
+            ORDER BY created_at ASC
+            ",
+        )
+        .bind(user_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter()
+            .map(Self::map_habit_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(HabitRepositoryError::Database)
+    }
+
+    async fn list_all_habits(&self, user_id: Uuid) -> Result<Vec<Habit>, HabitRepositoryError> {
+        let rows = sqlx::query(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE user_id = $1
+            ORDER BY created_at ASC
+            ",
+        )
+        .bind(user_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter()
+            .map(Self::map_habit_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(HabitRepositoryError::Database)
+    }
+
+    async fn record_check_in(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+        date: NaiveDate,
+        value: f64,
+        is_increment: bool,
+    ) -> Result<HabitLog, HabitRepositoryError> {
+        let mut tx = self.pool.begin().await?;
+
+        let habit_row = sqlx::query(
+            r"
+            SELECT id, user_id, name, description, habit_type, target_value, unit, frequency_days, color_hex, is_archived, current_streak, longest_streak, created_at, updated_at
+            FROM habits
+            WHERE id = $1 AND user_id = $2
+            FOR UPDATE
+            ",
+        )
+        .bind(habit_id.to_string())
+        .bind(user_id.to_string())
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
+        let habit = Self::map_habit_row(&habit_row)?;
+
+        let existing_log_row = sqlx::query(
+            r"
+            SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+            FROM habit_logs
+            WHERE habit_id = $1 AND log_date = $2
+            ",
+        )
+        .bind(habit_id.to_string())
+        .bind(date)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let existing_log = existing_log_row
+            .as_ref()
+            .map(Self::map_log_row)
+            .transpose()?;
+        let was_already_completed = existing_log.as_ref().is_some_and(|l| l.is_completed);
+
+        let log_id = Uuid::new_v4();
+        let now: DateTime<Utc> = Utc::now();
+        let target_value = habit.target_value;
+        let initial_completed = value >= target_value;
+
+        let log_row = if is_increment {
+            sqlx::query(
+                r"
+                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                VALUES ($1, $2, $3, $4, $5, NULL, $6)
+                ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                    actual_value = habit_logs.actual_value + EXCLUDED.actual_value,
+                    is_completed = (habit_logs.actual_value + EXCLUDED.actual_value >= $7),
+                    logged_at = EXCLUDED.logged_at
+                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                ",
+            )
+            .bind(log_id.to_string())
+            .bind(habit_id.to_string())
+            .bind(date)
+            .bind(value)
+            .bind(initial_completed)
+            .bind(now)
+            .bind(target_value)
+            .fetch_one(&mut *tx)
+            .await?
+        } else {
+            sqlx::query(
+                r"
+                INSERT INTO habit_logs (id, habit_id, log_date, actual_value, is_completed, notes, logged_at)
+                VALUES ($1, $2, $3, $4, $5, NULL, $6)
+                ON CONFLICT(habit_id, log_date) DO UPDATE SET
+                    actual_value = EXCLUDED.actual_value,
+                    is_completed = (EXCLUDED.actual_value >= $7),
+                    logged_at = EXCLUDED.logged_at
+                RETURNING id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+                ",
+            )
+            .bind(log_id.to_string())
+            .bind(habit_id.to_string())
+            .bind(date)
+            .bind(value)
+            .bind(initial_completed)
+            .bind(now)
+            .bind(target_value)
+            .fetch_one(&mut *tx)
+            .await?
+        };
+
+        let log = Self::map_log_row(&log_row)?;
+
+        if log.is_completed && !was_already_completed {
+            let has_newer_completed: bool = sqlx::query_scalar::<_, i64>(
+                r"
+                SELECT COUNT(1)
+                FROM habit_logs
+                WHERE habit_id = $1 AND log_date > $2 AND is_completed = TRUE
+                ",
+            )
+            .bind(habit_id.to_string())
+            .bind(date)
+            .fetch_one(&mut *tx)
+            .await?
+                > 0;
+
+            let (new_current_streak, new_longest_streak) = if has_newer_completed {
+                let completed_dates: Vec<NaiveDate> = sqlx::query_scalar(
+                    r"
+                    SELECT log_date
+                    FROM habit_logs
+                    WHERE habit_id = $1 AND is_completed = TRUE
+                    ORDER BY log_date ASC
+                    ",
+                )
+                .bind(habit_id.to_string())
+                .fetch_all(&mut *tx)
+                .await?;
+
+                let ref_date = completed_dates.last().copied().unwrap_or(date);
+                let metrics =
+                    StreakCalculator::calculate(&completed_dates, habit.frequency_days, ref_date);
+                (
+                    i32::try_from(metrics.current_streak).unwrap_or(0),
+                    habit
+                        .longest_streak
+                        .max(i32::try_from(metrics.longest_streak).unwrap_or(0)),
+                )
+            } else {
+                let last_completed_date: Option<NaiveDate> = sqlx::query_scalar(
+                    r"
+                    SELECT log_date
+                    FROM habit_logs
+                    WHERE habit_id = $1 AND log_date < $2 AND is_completed = TRUE
+                    ORDER BY log_date DESC
+                    LIMIT 1
+                    ",
+                )
+                .bind(habit_id.to_string())
+                .bind(date)
+                .fetch_optional(&mut *tx)
+                .await?;
+
+                StreakCalculator::update_streak_incremental(
+                    habit.current_streak,
+                    habit.longest_streak,
+                    last_completed_date,
+                    date,
+                    habit.frequency_days,
+                )
+            };
+
+            sqlx::query(
+                r"
+                UPDATE habits
+                SET current_streak = $1, longest_streak = $2, updated_at = $3
+                WHERE id = $4 AND user_id = $5
+                ",
+            )
+            .bind(new_current_streak)
+            .bind(new_longest_streak)
+            .bind(now)
+            .bind(habit_id.to_string())
+            .bind(user_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        } else if !log.is_completed && was_already_completed {
+            let completed_dates: Vec<NaiveDate> = sqlx::query_scalar(
+                r"
+                SELECT log_date
+                FROM habit_logs
+                WHERE habit_id = $1 AND is_completed = TRUE
+                ORDER BY log_date ASC
+                ",
+            )
+            .bind(habit_id.to_string())
+            .fetch_all(&mut *tx)
+            .await?;
+
+            let ref_date = completed_dates.last().copied().unwrap_or(date).max(date);
+            let metrics =
+                StreakCalculator::calculate(&completed_dates, habit.frequency_days, ref_date);
+
+            sqlx::query(
+                r"
+                UPDATE habits
+                SET current_streak = $1, longest_streak = $2, updated_at = $3
+                WHERE id = $4 AND user_id = $5
+                ",
+            )
+            .bind(i32::try_from(metrics.current_streak).unwrap_or(0))
+            .bind(i32::try_from(metrics.longest_streak).unwrap_or(0))
+            .bind(now)
+            .bind(habit_id.to_string())
+            .bind(user_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(log)
+    }
+
+    async fn get_logs_for_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<HabitLog>, HabitRepositoryError> {
+        let _habit = self
+            .get_habit_by_id(habit_id, user_id)
+            .await?
+            .ok_or(HabitRepositoryError::NotFound(habit_id))?;
+
+        let rows = sqlx::query(
+            r"
+            SELECT id, habit_id, log_date, actual_value, is_completed, notes, logged_at
+            FROM habit_logs
+            WHERE habit_id = $1 AND log_date >= $2 AND log_date <= $3
+            ORDER BY log_date ASC
+            ",
+        )
+        .bind(habit_id.to_string())
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter()
+            .map(Self::map_log_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(HabitRepositoryError::Database)
+    }
+
+    async fn archive_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), HabitRepositoryError> {
+        let rows_affected = sqlx::query(
+            r"
+            UPDATE habits
+            SET is_archived = TRUE, updated_at = $1
+            WHERE id = $2 AND user_id = $3
+            ",
+        )
+        .bind(Utc::now())
+        .bind(habit_id.to_string())
+        .bind(user_id.to_string())
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        if rows_affected == 0 {
+            return Err(HabitRepositoryError::NotFound(habit_id));
+        }
+
+        Ok(())
+    }
+
+    async fn delete_habit(
+        &self,
+        habit_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), HabitRepositoryError> {
+        let rows_affected = sqlx::query("DELETE FROM habits WHERE id = $1 AND user_id = $2")
+            .bind(habit_id.to_string())
+            .bind(user_id.to_string())
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+
+        if rows_affected == 0 {
+            return Err(HabitRepositoryError::NotFound(habit_id));
+        }
+
+        Ok(())
+    }
+
+    async fn get_completed_habit_ids_for_date(
+        &self,
+        user_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<HashSet<Uuid>, HabitRepositoryError> {
+        let habit_id_strs: Vec<String> = sqlx::query_scalar::<_, String>(
+            r"
+            SELECT hl.habit_id
+            FROM habit_logs hl
+            JOIN habits h ON hl.habit_id = h.id
+            WHERE h.user_id = $1 AND hl.log_date = $2 AND hl.is_completed = TRUE
+            ",
+        )
+        .bind(user_id.to_string())
+        .bind(date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(habit_id_strs
+            .into_iter()
+            .filter_map(|s| Uuid::parse_str(&s).ok())
+            .collect())
+    }
+
+    async fn is_habit_completed_on_date(
+        &self,
+        habit_id: Uuid,
+        date: NaiveDate,
+    ) -> Result<bool, HabitRepositoryError> {
+        let is_completed = sqlx::query_scalar::<_, bool>(
+            r"SELECT is_completed FROM habit_logs WHERE habit_id = $1 AND log_date = $2",
+        )
+        .bind(habit_id.to_string())
+        .bind(date)
+        .fetch_optional(&self.pool)
+        .await?
+        .unwrap_or(false);
+
+        Ok(is_completed)
+    }
+
+    async fn list_active_habits_with_streaks(
+        &self,
+        user_id: Uuid,
+        reference_date: NaiveDate,
+    ) -> Result<Vec<(Habit, StreakMetrics)>, HabitRepositoryError> {
+        let habits = self.list_active_habits(user_id).await?;
+        let last_completed_rows: Vec<(String, NaiveDate)> = sqlx::query_as(
+            r"
+            SELECT hl.habit_id, MAX(hl.log_date) as last_completed_date
+            FROM habit_logs hl
+            JOIN habits h ON hl.habit_id = h.id
+            WHERE h.user_id = $1 AND h.is_archived = FALSE AND hl.is_completed = TRUE AND hl.log_date <= $2
+            GROUP BY hl.habit_id
+            ",
+        )
+        .bind(user_id.to_string())
+        .bind(reference_date)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let last_completed_map: std::collections::HashMap<Uuid, NaiveDate> = last_completed_rows
+            .into_iter()
+            .filter_map(|(id_s, dt)| Uuid::parse_str(&id_s).ok().map(|id| (id, dt)))
+            .collect();
+
+        let mut result = Vec::with_capacity(habits.len());
+        for mut habit in habits {
+            let last_completed_date = last_completed_map.get(&habit.id).copied();
+            let is_active_today = last_completed_date == Some(reference_date);
+            let current_streak = StreakCalculator::effective_current_streak(
+                habit.current_streak,
+                last_completed_date,
+                reference_date,
+                habit.frequency_days,
+            );
+            let longest_streak = u32::try_from(habit.longest_streak.max(0))
+                .unwrap_or(0)
+                .max(current_streak);
+            habit.current_streak = i32::try_from(current_streak).unwrap_or(0);
+
+            let streak = StreakMetrics {
+                current_streak,
+                longest_streak,
                 is_active_today,
             };
             result.push((habit, streak));
@@ -798,5 +1431,78 @@ mod tests {
             .find(|(h, _)| h.id == habit2.id)
             .unwrap();
         assert!(!h2_res.1.is_active_today);
+    }
+
+    #[tokio::test]
+    async fn test_streak_decay_reversion_and_backdated_checkins() {
+        let repo = setup_repo().await;
+        let user_id = Uuid::new_v4();
+        seed_test_user(repo.pool(), user_id).await.unwrap();
+
+        let habit = Habit::new_binary("Daily Reading", None).with_user_id(user_id);
+        repo.create_habit(user_id, &habit).await.unwrap();
+
+        let d1 = NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap();
+        let d3 = NaiveDate::from_ymd_opt(2026, 11, 3).unwrap();
+        let d4 = NaiveDate::from_ymd_opt(2026, 11, 4).unwrap();
+        let d5 = NaiveDate::from_ymd_opt(2026, 11, 5).unwrap();
+
+        // 1. Check in on d1 and d3 (skipping d2 initially)
+        repo.record_check_in(habit.id, user_id, d1, 1.0, false)
+            .await
+            .unwrap();
+        repo.record_check_in(habit.id, user_id, d3, 1.0, false)
+            .await
+            .unwrap();
+
+        let after_gap = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(after_gap.current_streak, 1);
+        assert_eq!(after_gap.longest_streak, 1);
+
+        // 2. Backdated check-in on d2 bridges d1..d3 -> current_streak = 3, longest_streak = 3
+        repo.record_check_in(habit.id, user_id, d2, 1.0, false)
+            .await
+            .unwrap();
+        let after_backdate = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(after_backdate.current_streak, 3);
+        assert_eq!(after_backdate.longest_streak, 3);
+
+        // 3. On d4 (grace period for today before checking in): streak is still 3
+        let list_d4 = repo
+            .list_active_habits_with_streaks(user_id, d4)
+            .await
+            .unwrap();
+        assert_eq!(list_d4[0].1.current_streak, 3);
+        assert!(!list_d4[0].1.is_active_today);
+
+        // 4. On d5 (missed d4 completely): current_streak decays to 0 while longest_streak remains 3
+        let list_d5 = repo
+            .list_active_habits_with_streaks(user_id, d5)
+            .await
+            .unwrap();
+        assert_eq!(list_d5[0].1.current_streak, 0);
+        assert_eq!(list_d5[0].1.longest_streak, 3);
+        assert!(!list_d5[0].1.is_active_today);
+
+        // 5. Overwrite d3 check-in with 0.0 (incomplete) -> streak recalculates (d1..d2 = 2, on d3 = 2)
+        repo.record_check_in(habit.id, user_id, d3, 0.0, false)
+            .await
+            .unwrap();
+        let after_revert = repo
+            .get_habit_by_id(habit.id, user_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(after_revert.current_streak, 2);
+        assert_eq!(after_revert.longest_streak, 2);
     }
 }

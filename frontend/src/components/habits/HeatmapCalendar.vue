@@ -35,6 +35,13 @@ const hoveredCell = ref<{
   y: number
 } | null>(null)
 
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
 // Generate weeks structure ending on the week of props.endDate
 const weeks = computed<HeatmapWeek[]>(() => {
   const result: HeatmapWeek[] = []
@@ -69,12 +76,7 @@ const weeks = computed<HeatmapWeek[]>(() => {
         else if (count >= 2) level = 2
         else if (count >= 1) level = 1
 
-        const formattedDate = cursor.toLocaleDateString('pt-BR', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        })
+        const formattedDate = dateFormatter.format(cursor)
 
         days.push({
           date: dateStr,
@@ -108,8 +110,9 @@ function getLevelColor(level: number): string {
   }
 }
 
-function handleMouseEnter(event: MouseEvent, day: HeatmapDay) {
+function showTooltip(event: UIEvent, day: HeatmapDay) {
   const target = event.target as HTMLElement
+  if (!target || typeof target.getBoundingClientRect !== 'function') return
   const rect = target.getBoundingClientRect()
   hoveredCell.value = {
     date: day.date,
@@ -120,7 +123,7 @@ function handleMouseEnter(event: MouseEvent, day: HeatmapDay) {
   }
 }
 
-function handleMouseLeave() {
+function hideTooltip() {
   hoveredCell.value = null
 }
 </script>
@@ -173,11 +176,16 @@ function handleMouseLeave() {
           <div
             v-for="(day, dayIdx) in week.days"
             :key="dayIdx"
-            class="w-3 h-3 rounded-[3px] transition-transform duration-150"
-            :class="day ? 'hover:scale-125 cursor-pointer border border-black/20' : 'opacity-0 pointer-events-none'"
+            :role="day ? 'gridcell' : undefined"
+            :tabindex="day ? 0 : undefined"
+            :aria-label="day ? `${day.count} ${day.count === 1 ? 'check-in' : 'check-ins'} em ${day.formattedDate}` : undefined"
+            class="w-3 h-3 rounded-[3px] transition-transform duration-150 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            :class="day ? 'hover:scale-125 focus:scale-125 cursor-pointer border border-black/20' : 'opacity-0 pointer-events-none'"
             :style="day ? { backgroundColor: getLevelColor(day.level) } : {}"
-            @mouseenter="day && handleMouseEnter($event, day)"
-            @mouseleave="handleMouseLeave"
+            @mouseenter="day && showTooltip($event, day)"
+            @mouseleave="hideTooltip"
+            @focus="day && showTooltip($event, day)"
+            @blur="hideTooltip"
           />
         </div>
       </div>

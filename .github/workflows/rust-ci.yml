@@ -51,8 +51,31 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    name: Automated Tests
+    name: Automated Tests (SQLite, PostgreSQL & Redis)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: roubit_test
+          POSTGRES_USER: roubit_user
+          POSTGRES_PASSWORD: roubit_secure_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U roubit_user -d roubit_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,6 +89,9 @@ jobs:
           workspaces: api
 
       - name: Run Workspace Tests
+        env:
+          TEST_POSTGRES_URL: postgres://roubit_user:roubit_secure_password@localhost:5432/roubit_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379
         run: cargo test --workspace --verbose
 
   audit:

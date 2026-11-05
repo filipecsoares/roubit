@@ -1,7 +1,8 @@
-//! User Repository and SQLite Persistence (RF05)
+//! User Repository and SQLite / PostgreSQL Persistence (RF05)
 
 use async_trait::async_trait;
-use sqlx::{Row, SqlitePool};
+use chrono::{DateTime, Utc};
+use sqlx::{PgPool, Row, SqlitePool};
 use uuid::Uuid;
 
 use super::models::User;
@@ -113,6 +114,96 @@ impl UserRepository for SqliteUserRepository {
         .map_err(|err| {
             if let sqlx::Error::Database(db_err) = &err {
                 if db_err.is_unique_violation() {
+                    return UserRepositoryError::AlreadyExists(user.email.clone());
+                }
+            }
+            UserRepositoryError::Database(err)
+        })?;
+
+        Ok(())
+    }
+}
+
+/// PostgreSQL-backed implementation of [`UserRepository`].
+#[derive(Debug, Clone)]
+pub struct PgUserRepository {
+    pool: PgPool,
+}
+
+impl PgUserRepository {
+    /// Creates a new `PgUserRepository` wrapping an active PostgreSQL connection pool.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Accesses the underlying `SQLx` PostgreSQL connection pool.
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    fn map_row(row: &sqlx::postgres::PgRow) -> Result<User, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let email: String = row.try_get("email")?;
+        let password_hash: String = row.try_get("password_hash")?;
+        let created_at = row
+            .try_get::<DateTime<Utc>, _>("created_at")
+            .map(|dt| dt.to_rfc3339())
+            .or_else(|_| row.try_get::<String, _>("created_at"))?;
+
+        Ok(User::new(id, email, password_hash, created_at))
+    }
+}
+
+#[async_trait]
+impl UserRepository for PgUserRepository {
+    async fn find_by_email(&self, email: &str) -> Result<Option<User>, UserRepositoryError> {
+        let row =
+            sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE email = $1")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        row.as_ref()
+            .map(Self::map_row)
+            .transpose()
+            .map_err(UserRepositoryError::Database)
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, UserRepositoryError> {
+        let row =
+            sqlx::query("SELECT id, email, password_hash, created_at FROM users WHERE id = $1")
+                .bind(id.to_string())
+                .fetch_optional(&self.pool)
+                .await?;
+
+        row.as_ref()
+            .map(Self::map_row)
+            .transpose()
+            .map_err(UserRepositoryError::Database)
+    }
+
+    async fn create_user(&self, user: &User) -> Result<(), UserRepositoryError> {
+        let created_at_dt = DateTime::parse_from_rfc3339(&user.created_at)
+            .map_or_else(|_| Utc::now(), |dt| dt.with_timezone(&Utc));
+
+        sqlx::query(
+            r"
+            INSERT INTO users (id, email, password_hash, created_at)
+            VALUES ($1, $2, $3, $4)
+            ",
+        )
+        .bind(user.id.to_string())
+        .bind(&user.email)
+        .bind(&user.password_hash)
+        .bind(created_at_dt)
+        .execute(&self.pool)
+        .await
+        .map_err(|err| {
+            if let sqlx::Error::Database(db_err) = &err {
+                if db_err.is_unique_violation() || db_err.code().as_deref() == Some("23505") {
                     return UserRepositoryError::AlreadyExists(user.email.clone());
                 }
             }

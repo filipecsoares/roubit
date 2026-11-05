@@ -1,0 +1,38 @@
+# Activity 02.4: PostgreSQL & Redis Automated Integration Test Suite
+
+## 1. Objective & Context
+Create an automated integration test suite validating the PostgreSQL domain repositories (`Pg*Repository`), PostgreSQL schema migrations (`migrations_pg/`), the `migrate_sqlite_to_postgres` data migrator, and Redis locks/caching against real or test-configured PostgreSQL and Redis instances (with graceful fallback/skip when `TEST_DATABASE_URL` / `TEST_REDIS_URL` are not set in local offline environments, plus CI service containers in `.github/workflows/rust-ci.yml`).
+
+- **Priority:** P1 (Quality Assurance for Prod Database & Cache Layer)
+- **Prerequisites:** Activities 02.1, 02.2, and 02.3.
+- **Target Locations:**
+  - `api/crates/core/tests/postgres_integration.rs`
+  - `api/crates/server/tests/postgres_api_e2e.rs`
+  - `.github/workflows/rust-ci.yml`
+  - `README.md`
+
+## 2. Technical Scope & Specifications
+1. **Core PostgreSQL & Migration Integration Test (`api/crates/core/tests/postgres_integration.rs`):**
+   - Connect to `TEST_POSTGRES_URL` (or `postgres://roubit_user:roubit_secure_password@localhost:5432/roubit_test` when available).
+   - Verify `DatabasePool::Postgres` applies all migrations in `migrations_pg/` cleanly.
+   - Verify CRUD, multi-tenant isolation, streak calculation, and OKR sync across `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository`.
+   - Seed an in-memory SQLite database with users, routines, blocks, habits, logs, OKRs, and encrypted journal entries, run `migrate_sqlite_to_postgres`, and assert 100% data and timestamp fidelity in PostgreSQL (including idempotent re-execution).
+2. **Server E2E Test with PostgreSQL (`api/crates/server/tests/postgres_api_e2e.rs`):**
+   - Boot `build_router(AppState::from_pool(DatabasePool::Postgres(pg_pool), ...))` and test registration, login, idempotency (`Idempotency-Key`), routine creation, habit check-in, OKR creation, and journal creation against PostgreSQL.
+3. **CI Pipeline Service Containers (`.github/workflows/rust-ci.yml`):**
+   - Configure `postgres:16-alpine` and `redis:7-alpine` service containers in `.github/workflows/rust-ci.yml` and pass `TEST_POSTGRES_URL` and `TEST_REDIS_URL` so every CI run validates both SQLite and PostgreSQL!
+4. **Update `README.md`:**
+   - Document how to run the test suite locally in SQLite mode (`cargo test --workspace`) and with PostgreSQL + Redis (`TEST_POSTGRES_URL=... TEST_REDIS_URL=... cargo test --workspace`).
+
+## 3. Implementation Steps
+1. Create `api/crates/core/tests/postgres_integration.rs` testing `Pg*Repository` and `migrate_sqlite_to_postgres`.
+2. Create `api/crates/server/tests/postgres_api_e2e.rs` testing the Axum REST API backed by PostgreSQL.
+3. Update `.github/workflows/rust-ci.yml` with PostgreSQL and Redis service containers.
+4. Update `README.md`, `docs/02-status-atividades.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] `postgres_integration.rs` and `postgres_api_e2e.rs` validate all 5 PostgreSQL repositories, `migrate_sqlite_to_postgres`, and REST endpoints.
+- [x] `.github/workflows/rust-ci.yml` provisions PostgreSQL and Redis service containers during CI test runs.
+- [x] `README.md` documents how to run integration tests against PostgreSQL and Redis.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

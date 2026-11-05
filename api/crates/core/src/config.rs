@@ -25,6 +25,15 @@ pub struct AppConfig {
 
     #[serde(default)]
     pub redis_url: Option<String>,
+
+    #[serde(default = "default_rate_limit_enabled")]
+    pub rate_limit_enabled: bool,
+
+    #[serde(default = "default_auth_rate_limit")]
+    pub auth_rate_limit: u32,
+
+    #[serde(default = "default_general_rate_limit")]
+    pub general_rate_limit: u32,
 }
 
 fn default_database_url() -> String {
@@ -51,6 +60,18 @@ fn default_allowed_origins() -> String {
     "http://localhost:5173,http://127.0.0.1:5173".to_string()
 }
 
+const fn default_rate_limit_enabled() -> bool {
+    true
+}
+
+const fn default_auth_rate_limit() -> u32 {
+    20
+}
+
+const fn default_general_rate_limit() -> u32 {
+    300
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -61,6 +82,9 @@ impl Default for AppConfig {
             jwt_secret: default_jwt_secret(),
             allowed_origins: default_allowed_origins(),
             redis_url: None,
+            rate_limit_enabled: default_rate_limit_enabled(),
+            auth_rate_limit: default_auth_rate_limit(),
+            general_rate_limit: default_general_rate_limit(),
         }
     }
 }
@@ -84,6 +108,32 @@ impl AppConfig {
             .map(ToString::to_string)
             .collect()
     }
+
+    /// Validates configuration invariants (e.g. JWT secret length and production safety).
+    ///
+    /// # Errors
+    /// Returns error if `jwt_secret` is less than 32 characters or uses the default insecure secret
+    /// in production or remote PostgreSQL environments.
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        if self.jwt_secret.len() < 32 {
+            anyhow::bail!("JWT_SECRET must be at least 32 characters long");
+        }
+
+        let is_prod_env =
+            std::env::var("ROUBIT_ENV").is_ok_and(|v| v.trim().eq_ignore_ascii_case("production"));
+
+        let is_remote_postgres = self.database_url.starts_with("postgres://")
+            && !self.database_url.contains("127.0.0.1")
+            && !self.database_url.contains("localhost");
+
+        if (is_prod_env || is_remote_postgres) && self.jwt_secret == default_jwt_secret() {
+            anyhow::bail!(
+                "Default development JWT_SECRET cannot be used in production or remote PostgreSQL environments. Please set an explicit JWT_SECRET."
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +147,29 @@ mod tests {
         assert_eq!(config.server_host, "127.0.0.1");
         assert_eq!(config.database_url, "sqlite://roubit.db?mode=rwc");
         assert_eq!(config.log_level, "roubit=info,tower_http=info");
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_short_jwt_secret_rejected() {
+        let config = AppConfig {
+            jwt_secret: "short_secret".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_default_jwt_secret_rejected_on_remote_postgres() {
+        let mut config = AppConfig {
+            database_url: "postgres://user:pass@db.prod.internal:5432/roubit".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // With explicit custom 32+ char secret, it passes
+        config.jwt_secret = "custom_production_secure_secret_key_32_bytes!".to_string();
+        assert!(config.validate().is_ok());
     }
 
     #[test]

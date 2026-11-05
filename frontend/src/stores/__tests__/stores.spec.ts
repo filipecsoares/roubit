@@ -37,15 +37,35 @@ describe('Pinia Core Domain Stores', () => {
       expect(localStorage.getItem('roubit_token')).toBe('new-jwt-token')
     })
 
-    it('logout clears state and removes token from localStorage', () => {
-      const store = useAuthStore()
-      store.token = 'active-token'
+    it('logout clears state, calls API, locks vault, clears offline queue and resets stores', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: {} } as any)
+      const authStore = useAuthStore()
+      const routineStore = useRoutineStore()
+      const habitStore = useHabitStore()
+      const okrStore = useOkrStore()
+      const journalStore = useJournalStore()
+
+      authStore.token = 'active-token'
+      authStore.user = { id: 'u1', email: 'user@roubit.app' } as any
       localStorage.setItem('roubit_token', 'active-token')
 
-      store.logout()
-      expect(store.token).toBeNull()
-      expect(store.user).toBeNull()
+      routineStore.blocks = [{ id: 'b1', name: 'Test Block' } as any]
+      habitStore.habits = [{ habit: { id: 'h1', name: 'Exercise' } } as any]
+      okrStore.objectives = [{ id: 'o1', title: 'Objective 1' } as any]
+      journalStore.metadataList = [{ id: 'j1', entry_date: '2026-11-04' } as any]
+
+      await authStore.logout()
+
+      expect(postSpy).toHaveBeenCalledWith('/auth/logout', {}, expect.anything())
+      expect(authStore.token).toBeNull()
+      expect(authStore.user).toBeNull()
       expect(localStorage.getItem('roubit_token')).toBeNull()
+
+      // Domain stores reset
+      expect(routineStore.blocks).toHaveLength(0)
+      expect(habitStore.habits).toHaveLength(0)
+      expect(okrStore.objectives).toHaveLength(0)
+      expect(journalStore.metadataList).toHaveLength(0)
     })
   })
 

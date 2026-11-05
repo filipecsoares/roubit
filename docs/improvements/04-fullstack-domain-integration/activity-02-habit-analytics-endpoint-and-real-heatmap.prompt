@@ -1,0 +1,43 @@
+# Activity 04.2: Habit Analytics REST Endpoint, Real 365-Day Heatmap & Numeric/Timer Check-ins
+
+## 1. Objective & Context
+Expose the backend's `HabitAnalyticsService` (`30d`/`90d` adherence rates and `365-day` contribution heatmap) and `archive_habit` via REST endpoints in `habit_controller.rs`, replace the frontend's synthesized fake heatmap in `HabitsView.vue` with real historical check-in data, optimize `HeatmapCalendar.vue` date formatting, and fix `numeric` and `timer` habit incremental check-ins in `DashboardView.vue`, `HabitChecklist.vue`, and `HabitCheckinRow.vue`.
+
+- **Priority:** P2 (Full-Stack Domain Integration & UX Accuracy)
+- **Target Locations:**
+  - `api/crates/server/src/controllers/habit_controller.rs`
+  - `frontend/src/types/index.ts`
+  - `frontend/src/stores/habit.ts`
+  - `frontend/src/views/HabitsView.vue` (`#L36-L53`)
+  - `frontend/src/components/habits/HeatmapCalendar.vue` (`#L53-L90`)
+  - `frontend/src/views/DashboardView.vue` (`#L135-L163`)
+  - `frontend/src/components/dashboard/HabitChecklist.vue` (`#L114-L122`)
+  - `frontend/src/components/dashboard/HabitCheckinRow.vue` (`#L11`, `#L25-L29`, `#L102-L112`)
+
+## 2. Technical Scope & Specifications
+1. **Expose Analytics, Archive & `today_value` in `habit_controller.rs`:**
+   - Add `today_value: f64` to `HabitSummaryDto` (populated from today's `HabitLog.actual_value` if present, or `0.0`).
+   - Add `GET /api/v1/habits/analytics` returning aggregated 365-day activity counts (`BTreeMap<NaiveDate, u32>` / `Vec<HeatmapCell>`) and per-habit adherence summaries computed via `HabitAnalyticsService`.
+   - Add `POST /api/v1/habits/{id}/archive` calling `state.habit_repo.archive_habit(id, user.id)` and invalidating the user's habit summary cache.
+2. **Connect Real 365-Day Heatmap & Optimize `HeatmapCalendar.vue`:**
+   - Add `fetchAnalytics()` to `useHabitStore` (`frontend/src/stores/habit.ts`) and bind `HabitsView.vue` (`aggregatedActivityMap`) to the real historical check-in map from the backend so past completions are preserved even when `current_streak === 0`.
+   - In `HeatmapCalendar.vue#L53-L90`, hoist a single `const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })` outside the 365-day loop instead of calling `cursor.toLocaleDateString` 364 times per render.
+3. **Fix Numeric & Timer Incremental Check-Ins (`HabitChecklist.vue`, `HabitCheckinRow.vue`, `DashboardView.vue`):**
+   - Pass `:current-value="item.today_value"` from `HabitChecklist.vue` to `<HabitCheckinRow />` so numeric/timer habits accurately display `250 / 2000 ml`.
+   - In `DashboardView.vue#L144`, compute optimistic completion as `(currentValue + value) >= habitItem.habit.target_value` when `isIncrement` is `true` (instead of unconditionally setting `willBeActive = true` on the first partial increment), and display `'Progresso registrado!'` when a partial increment has not yet reached `target_value`.
+   - In `HabitCheckinRow.vue#L45`, pass `props.habit.target_value` when toggling completion so habits with `target_value > 1` complete in one click on the checkmark button.
+
+## 3. Implementation Steps
+1. Update `HabitSummaryDto` in `habit_controller.rs` to include `today_value` and add `GET /api/v1/habits/analytics` and `POST /api/v1/habits/{id}/archive`.
+2. Update `frontend/src/types/index.ts` and `frontend/src/stores/habit.ts` to map `today_value`, `fetchAnalytics()`, and `archiveHabit()`.
+3. Update `HabitsView.vue` and `HeatmapCalendar.vue` to render real 365-day logs and use a hoisted `Intl.DateTimeFormat`.
+4. Fix `HabitChecklist.vue`, `HabitCheckinRow.vue`, and `DashboardView.vue` for partial increments on numeric/timer habits.
+5. Add backend and frontend tests for `/api/v1/habits/analytics`, `/archive`, and numeric habit increments.
+6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] `GET /api/v1/habits/analytics` and `POST /api/v1/habits/{id}/archive` are implemented and tested.
+- [x] `HabitsView.vue` displays real 365-day check-in history from the backend.
+- [x] Numeric and timer habits display current daily progress (`today_value / target_value`) and only mark as completed when `today_value >= target_value`.
+- [x] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+

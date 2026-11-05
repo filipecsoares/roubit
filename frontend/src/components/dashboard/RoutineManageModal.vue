@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { X, Clock, Plus, Trash2 } from 'lucide-vue-next'
 import { useModal } from '@/composables/useModal'
+import { useRoutineStore } from '@/stores/routine'
 
 const props = withDefaults(
   defineProps<{
@@ -30,7 +31,10 @@ const emit = defineEmits<{
   }): void
 }>()
 
-useModal(() => props.isOpen, () => emit('close'))
+const modalContainer = ref<HTMLElement | null>(null)
+useModal(() => props.isOpen, () => emit('close'), modalContainer)
+
+const routineStore = useRoutineStore()
 
 const routineName = ref('Rotina Diária de Foco')
 const routineDescription = ref('')
@@ -44,7 +48,7 @@ interface BlockDraft {
   color_hex: string
 }
 
-const blocks = ref<BlockDraft[]>([
+const defaultBlocks: BlockDraft[] = [
   {
     id: 'b-1',
     name: 'Foco Profundo / Deep Work',
@@ -69,9 +73,36 @@ const blocks = ref<BlockDraft[]>([
     category: 'Trabalho',
     color_hex: '#3b82f6',
   },
-])
+]
 
+const blocks = ref<BlockDraft[]>([...defaultBlocks])
 const validationError = ref<string | null>(null)
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      validationError.value = null
+      if (routineStore.routine && routineStore.blocks.length > 0) {
+        routineName.value = routineStore.routine.name
+        routineDescription.value = routineStore.routine.description || ''
+        blocks.value = routineStore.blocks.map((b) => ({
+          id: b.id,
+          name: b.name,
+          start_time: b.start_time.slice(0, 5),
+          end_time: b.end_time.slice(0, 5),
+          category: b.category,
+          color_hex: b.color_hex,
+        }))
+      } else {
+        routineName.value = 'Rotina Diária de Foco'
+        routineDescription.value = ''
+        blocks.value = [...defaultBlocks]
+      }
+    }
+  },
+  { immediate: true }
+)
 
 function addBlock() {
   const lastBlock = blocks.value[blocks.value.length - 1]
@@ -125,6 +156,16 @@ function handleSave() {
   // Sort blocks chronologically
   validBlocks.sort((a, b) => a.start_time.localeCompare(b.start_time))
 
+  // Validate non-overlapping blocks
+  for (let i = 0; i < validBlocks.length - 1; i++) {
+    const current = validBlocks[i]
+    const next = validBlocks[i + 1]
+    if (current.end_time > next.start_time) {
+      validationError.value = `Conflito de horários: o bloco "${current.name}" termina às ${current.end_time}, sobrepondo "${next.name}" que inicia às ${next.start_time}.`
+      return
+    }
+  }
+
   emit('save', {
     name: routineName.value.trim(),
     description: routineDescription.value.trim() || undefined,
@@ -149,6 +190,10 @@ function handleSave() {
       @click="emit('close')"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="routine-modal-title"
         class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
@@ -159,13 +204,14 @@ function handleSave() {
               <Clock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Criar / Configurar Rotina</h3>
+              <h2 id="routine-modal-title" class="text-base sm:text-lg font-bold text-white font-outfit">Criar / Configurar Rotina</h2>
               <p class="text-xs text-zinc-400">Estruture seus blocos de tempo diários e rotina ativa</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
+            aria-label="Fechar modal"
             class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
@@ -185,10 +231,11 @@ function handleSave() {
           <!-- Routine Info -->
           <div class="space-y-3">
             <div>
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              <label for="routine-name" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Nome da Rotina *
               </label>
               <input
+                id="routine-name"
                 v-model="routineName"
                 type="text"
                 required
@@ -198,10 +245,11 @@ function handleSave() {
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              <label for="routine-description" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Descrição (opcional)
               </label>
               <input
+                id="routine-description"
                 v-model="routineDescription"
                 type="text"
                 placeholder="Ex: Cronograma otimizado para dias úteis"

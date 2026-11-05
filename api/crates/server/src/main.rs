@@ -1,11 +1,12 @@
 //! Roubit REST API Server
 
-use roubit_core::{create_sqlite_pool, init_telemetry, run_migrations, AppConfig};
+use roubit_core::{init_telemetry, AppConfig, DatabasePool};
 use roubit_server::run_server;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::from_env().unwrap_or_default();
+    config.validate()?;
     init_telemetry(&config.log_level);
     tracing::info!(
         host = %config.server_host,
@@ -14,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
         roubit_core::VERSION
     );
 
-    let pool = create_sqlite_pool(&config.database_url).await?;
-    run_migrations(&pool).await?;
+    let pool = DatabasePool::from_url(&config.database_url).await?;
+    pool.run_migrations().await?;
     tracing::info!("Database migrations applied successfully");
 
     run_server(config, pool).await?;

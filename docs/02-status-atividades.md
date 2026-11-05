@@ -195,5 +195,80 @@
 | **16.3** | UI de Conectividade, Banner de Instalação & Badging | [activity-03-pwa-ui-network-status-install-prompt.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-03-pwa-ui-network-status-install-prompt.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
 | **16.4** | Suíte de Testes Vitest Offline & Validação de Build | [activity-04-pwa-offline-vitest-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/features/16-pwa-offline-app-shell/activity-04-pwa-offline-vitest-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-03 |
 
+---
+
+## Ciclo de Melhorias, Correções e Estabilização (v3.0 — `docs/improvements/`)
+
+> **Plano de Referência:** [04-plano-de-melhorias-e-correcoes.md](file:///home/filipe/Documents/projects/roubit/docs/04-plano-de-melhorias-e-correcoes.md) | [Índice `docs/improvements/`](file:///home/filipe/Documents/projects/roubit/docs/improvements/README.md)
+
+| Fase de Melhoria (Ordem de Criticidade) | Prioridade | Total | Concluídas | Em Progresso | Não Iniciadas | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **Fase 02. Dual DB: SQLite (Dev) & PostgreSQL (Prod/Test)** | 🔴 P0/P1 | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 3 | 0 | 0 | 🟢 Concluído |
+| **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **Fase 05. Conclusão do Modo Híbrido Remoto da CLI** | 🟡 P2 | 3 | 3 | 0 | 0 | 🟢 Concluído |
+| **Fase 06. UX, Acessibilidade, Testes de Views & Docs** | 🟢 P3 | 4 | 4 | 0 | 0 | 🟢 Concluído |
+| **TOTAL (MELHORIAS v3.0)** | — | **22** | **22** | **0** | **0** | **100%** |
+
+---
+
+### Fase 01 (P0): Correções Críticas de Dados, Cofre, Notificações & Build
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-01.1** | Restauração do Build TS/Docker (`tsconfig.app.json`) & Tailwind | [activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-01-frontend-build-tsconfig-and-tailwind-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-01.2** | Segurança Transacional SQLite (`RAII`) & Decaimento de Streaks | [activity-02-sqlite-transaction-safety-and-streak-decay.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-02-sqlite-transaction-safety-and-streak-decay.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-01.3** | Derivação por Salt no Cofre do Diário, Auto-Lock & Uniqueness | [activity-03-journal-vault-salt-derivation-and-autolock.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-03-journal-vault-salt-derivation-and-autolock.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-01.4** | Correção SQL do Reminder Worker, Agendamento Redis, SSE & Nginx | [activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/01-critical-data-and-vault-fixes/activity-04-reminder-worker-sql-sse-and-nginx-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+
+---
+
+### Fase 02 (P0/P1): Suporte Dual SQLite (Dev Local) & PostgreSQL (Prod / Testes)
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-02.1** | Correção das Migrations PG & Migrador `SQLite -> Postgres` | [activity-01-postgres-migrations-and-data-migrator-fixes.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-01-postgres-migrations-and-data-migrator-fixes.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-02.2** | Implementação dos Repositórios de Domínio PostgreSQL (`roubit-core`) | [activity-02-postgres-domain-repositories-core.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-02-postgres-domain-repositories-core.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-02.3** | Roteamento Dinâmico no Servidor, Docker Compose & Guia no `README.md` | [activity-03-server-dynamic-db-wiring-and-docker-compose.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-03-server-dynamic-db-wiring-and-docker-compose.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-02.4** | Suíte de Testes de Integração Automatizados PostgreSQL & Redis | [activity-04-postgres-and-redis-integration-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/02-dual-database-postgres-prod/activity-04-postgres-and-redis-integration-test-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+
+---
+
+### Fase 03 (P1): Blindagem de Segurança, Autenticação & Idempotência
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-03.1** | Hardening de Idempotência (Body Limit 2MB, Path Validation & Locks) | [activity-01-idempotency-middleware-security-hardening.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-01-idempotency-middleware-security-hardening.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-03.2** | Argon2id `spawn_blocking`, Timing Attack Defense & Redação de Logs | [activity-02-auth-argon2-blocking-and-timing-defense.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-02-auth-argon2-blocking-and-timing-defense.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-03.3** | Rate Limiting, Cookies Seguros & Logout Completo (Backend + Frontend) | [activity-03-rate-limiting-secure-cookies-and-logout.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-03-rate-limiting-secure-cookies-and-logout.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+
+---
+
+### Fase 04 (P2): Completude Funcional Full-Stack — API ↔ Frontend
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-04.1** | Hidratação do Progresso Diário de Rotinas, Status `Skipped` & Editor | [activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.2** | Endpoint de Analytics de Hábitos, Heatmap Real de 365d & Numéricos | [activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+
+---
+
+### Fase 05 (P2): Conclusão do Modo Híbrido Remoto da CLI
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-05.1** | Alinhamento de Contratos REST e DTOs no `HttpClient` da CLI | [activity-01-cli-remote-dto-and-endpoint-alignment.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-01-cli-remote-dto-and-endpoint-alignment.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+| **IMP-05.2** | Habilitação Remota de `routine`, `okr`, `journal` & `config set` | [activity-02-cli-remote-routine-okr-journal-commands.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-02-cli-remote-routine-okr-journal-commands.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+| **IMP-05.3** | Suíte Completa de Testes E2E da CLI em Modo Remoto | [activity-03-cli-remote-full-e2e-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-03-cli-remote-full-e2e-test-suite.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+
+---
+
+### Fase 06 (P3): UX, Acessibilidade (a11y), Qualidade de Testes & Documentação
+| ID | Atividade | Arquivo | Estado | Commit / Data |
+| :---: | :--- | :--- | :---: | :---: |
+| **IMP-06.1** | Toasts RFC 7807, Preservação de Modais & Correção de Leaks | [activity-01-frontend-error-toasts-modals-and-memory-leaks.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-01-frontend-error-toasts-modals-and-memory-leaks.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+| **IMP-06.2** | Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado) | [activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+| **IMP-06.3** | Testes Vitest para as 5 Views Principais & ESLint no CI | [activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+| **IMP-06.4** | Correção de Benchmarks (`k6`/`P99`), Limpeza & Consolidação de Docs | [activity-04-benchmarks-cleanup-and-docs-consolidation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-04-benchmarks-cleanup-and-docs-consolidation.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
+
+
 
 

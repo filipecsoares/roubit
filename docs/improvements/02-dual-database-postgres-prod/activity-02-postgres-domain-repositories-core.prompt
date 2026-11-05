@@ -1,0 +1,39 @@
+# Activity 02.2: PostgreSQL Domain Repositories Implementation (`roubit-core`)
+
+## 1. Objective & Context
+Implement PostgreSQL repositories (`PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository`) in `roubit-core` backed by `sqlx::PgPool`, fulfilling the exact same domain repository traits (`UserRepository`, `RoutineRepository`, `HabitRepository`, `OkrRepository`, `JournalRepository`) used by the SQLite implementations.
+
+- **Priority:** P0/P1 (Required to Run Server with PostgreSQL in Prod & Test Environments)
+- **Prerequisites:** Activity 02.1.
+- **Target Locations:**
+  - `api/crates/core/src/domain/user/repository.rs`
+  - `api/crates/core/src/domain/routine/repository.rs`
+  - `api/crates/core/src/domain/habit/repository.rs`
+  - `api/crates/core/src/domain/okr/repository.rs`
+  - `api/crates/core/src/domain/journal/repository.rs`
+
+## 2. Technical Scope & Specifications
+1. **Dialect Alignment (`$1, $2...` & Native Types):**
+   - Implement `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository` accepting `PgPool`.
+   - Use PostgreSQL positional parameters (`$1`, `$2`, ...) and native PostgreSQL bindings (`BOOLEAN` instead of `0`/`1`, `TIMESTAMPTZ` / `DATE` / `TIME` / `TEXT` or `UUID` matching `migrations_pg/`).
+2. **Parity with SQLite Repository Behavior & Security:**
+   - **Multi-Tenancy:** Every query must enforce `user_id` scoping identical to `Sqlite*Repository`.
+   - **Transactions:** `PgRoutineRepository::create_routine_with_blocks`, `PgRoutineRepository::set_active_routine`, and `PgHabitRepository::record_check_in` must execute inside `self.pool.begin().await?` transactions.
+   - **Streak Decay & Recalculation:** `PgHabitRepository` must include the same streak decay and recalculation logic implemented in Activity 01.2.
+   - **Constraint Violations:** Map PostgreSQL unique violation SQLSTATE `"23505"` and foreign key violation `"23503"` to the corresponding domain `Conflict` / `Duplicate` / `NotFound` errors (`RoutineRepositoryError`, `HabitRepositoryError`, `UserRepositoryError`, etc.).
+
+## 3. Implementation Steps
+1. Implement `PgUserRepository` in `api/crates/core/src/domain/user/repository.rs` (or `pg_repository.rs` submodule re-exported from `user`).
+2. Implement `PgRoutineRepository` in `api/crates/core/src/domain/routine/`.
+3. Implement `PgHabitRepository` in `api/crates/core/src/domain/habit/`.
+4. Implement `PgOkrRepository` in `api/crates/core/src/domain/okr/`.
+5. Implement `PgJournalRepository` in `api/crates/core/src/domain/journal/`.
+6. Re-export all 5 `Pg*Repository` structs from `roubit_core::domain`.
+7. Verify compilation and clippy lints across `roubit-core`.
+8. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] `PgUserRepository`, `PgRoutineRepository`, `PgHabitRepository`, `PgOkrRepository`, and `PgJournalRepository` implement their respective domain traits.
+- [x] All PostgreSQL queries use `$1, $2...` parameters, strict `user_id` isolation, and proper SQLSTATE `"23505"` conflict mapping.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with 0 warnings.
+

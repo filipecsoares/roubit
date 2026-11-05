@@ -9,18 +9,20 @@ import HabitChecklist from '@/components/dashboard/HabitChecklist.vue'
 import DailyProgressGauge from '@/components/dashboard/DailyProgressGauge.vue'
 import RoutineManageModal from '@/components/dashboard/RoutineManageModal.vue'
 import type { BlockStatusType } from '@/types'
+import { formatLocalDate } from '@/utils/date'
+import { useToast } from '@/composables/useToast'
 
 const routineStore = useRoutineStore()
 const habitStore = useHabitStore()
 const focusStore = useFocusStore()
+const { toastMessage, showToast } = useToast()
 
 const now = ref(new Date())
 let timerId: ReturnType<typeof setInterval> | null = null
 
-const completedBlockIds = ref<string[]>([])
-const skippedBlockIds = ref<string[]>([])
+const completedBlockIds = computed(() => routineStore.completedBlockIds)
+const skippedBlockIds = computed(() => routineStore.skippedBlockIds)
 const isRoutineModalOpen = ref(false)
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
 // Format today's date in Portuguese (e.g., Sexta-feira, 30 de Outubro de 2026)
 const currentDateFormatted = computed(() => {
@@ -56,6 +58,9 @@ const activeBlock = computed(() => {
 
 // Adherence & Progress calculations
 const routinePercentage = computed(() => {
+  if (routineStore.progress?.adherence_percentage !== undefined && routineStore.progress !== null) {
+    return Math.round(routineStore.progress.adherence_percentage)
+  }
   const total = routineStore.blocks.length
   if (total === 0) return 0
   const completed = completedBlockIds.value.length
@@ -78,35 +83,12 @@ const combinedProgressPercentage = computed(() => {
   return Math.round((routinePercentage.value + habitPercentage.value) / 2)
 })
 
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
-
 async function handleCompleteBlock(blockId: string, status: BlockStatusType) {
   try {
-    if (status === 'completed') {
-      if (!completedBlockIds.value.includes(blockId)) {
-        completedBlockIds.value.push(blockId)
-      }
-      skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
-    } else if (status === 'skipped') {
-      if (!skippedBlockIds.value.includes(blockId)) {
-        skippedBlockIds.value.push(blockId)
-      }
-      completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
-    }
     await routineStore.completeBlock(blockId, status)
     showToast(`Bloco atualizado como ${status === 'completed' ? 'concluído' : 'pulado'}`)
   } catch (err: any) {
-    // Revert optimistic update
-    completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
-    skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
-    showToast(err.message || 'Erro ao registrar progresso do bloco', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -128,7 +110,7 @@ async function handleCreateRoutine(payload: {
     isRoutineModalOpen.value = false
     showToast('Rotina e cronograma de blocos salvos com sucesso!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criar rotina', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -139,9 +121,12 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
   // Save previous state for optimistic rollback
   const prevActive = habitItem.streak.is_active_today
   const prevStreak = habitItem.streak.current_streak
+  const prevValue = habitItem.today_value ?? 0
 
   // Optimistic update
-  const willBeActive = isIncrement ? true : value > 0
+  const nextValue = isIncrement ? prevValue + value : value
+  const willBeActive = nextValue >= habitItem.habit.target_value
+  habitItem.today_value = nextValue
   habitItem.streak.is_active_today = willBeActive
   if (willBeActive && !prevActive) {
     habitItem.streak.current_streak += 1
@@ -149,16 +134,23 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
     habitItem.streak.current_streak = Math.max(0, habitItem.streak.current_streak - 1)
   }
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = formatLocalDate()
 
   try {
     await habitStore.checkin(habitId, todayStr, value, isIncrement)
-    showToast(willBeActive ? 'Hábito concluído!' : 'Check-in desfeito')
+    if (willBeActive) {
+      showToast('Hábito concluído!')
+    } else if (isIncrement) {
+      showToast('Progresso registrado!')
+    } else {
+      showToast('Check-in desfeito')
+    }
   } catch (err: any) {
     // Rollback on failure
+    habitItem.today_value = prevValue
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
-    showToast(err.message || 'Falha ao registrar check-in', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -190,6 +182,8 @@ onUnmounted(() => {
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
+      role="status"
+      aria-live="polite"
       class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'

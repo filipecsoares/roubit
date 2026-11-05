@@ -33,9 +33,20 @@ const sortedBlocks = computed(() => {
 
 <template>
   <div class="space-y-4">
+    <!-- Loading skeleton -->
+    <div
+      v-if="loading && blocks.length === 0"
+      class="text-center py-8 sm:py-12 px-4 rounded-xl border border-dashed border-surface-border/40 space-y-3 animate-pulse"
+    >
+      <div class="inline-flex p-3 rounded-2xl bg-surface-border/30 text-slate-500">
+        <Calendar class="w-6 h-6 animate-spin" />
+      </div>
+      <p class="text-xs text-slate-500">Carregando cronograma de rotinas...</p>
+    </div>
+
     <!-- Empty state -->
     <div
-      v-if="blocks.length === 0"
+      v-else-if="blocks.length === 0"
       class="text-center py-8 sm:py-12 px-4 rounded-xl border border-dashed border-surface-border space-y-3"
     >
       <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400">

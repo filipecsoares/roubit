@@ -1,11 +1,11 @@
-//! Asynchronous SQLite repository for Objectives and Key Results (RF03).
+//! Asynchronous SQLite and PostgreSQL repositories for Objectives and Key Results (RF03).
 
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{PgPool, Row, SqlitePool};
 use uuid::Uuid;
 
 use super::models::{KeyResult, Objective};
@@ -90,6 +90,17 @@ pub trait OkrRepository: Send + Sync {
         user_id: Uuid,
         kr_id: Uuid,
         new_value: f64,
+    ) -> Result<KeyResult, OkrRepositoryError>;
+
+    /// Updates a Key Result's linked habit and/or current value, updating progress for both KR and parent Objective.
+    #[allow(clippy::option_option)]
+    #[allow(clippy::option_option)]
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
     ) -> Result<KeyResult, OkrRepositoryError>;
 
     /// Explicitly updates an objective's progress percentage.
@@ -395,6 +406,18 @@ impl OkrRepository for SqliteOkrRepository {
         kr_id: Uuid,
         new_value: f64,
     ) -> Result<KeyResult, OkrRepositoryError> {
+        self.update_key_result_link_or_value(user_id, kr_id, None, Some(new_value))
+            .await
+    }
+
+    #[allow(clippy::option_option)]
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
+    ) -> Result<KeyResult, OkrRepositoryError> {
         let mut tx = self.pool.begin().await?;
 
         // 1. Fetch KeyResult and verify ownership via parent Objective
@@ -413,16 +436,24 @@ impl OkrRepository for SqliteOkrRepository {
 
         let mut kr = kr_opt.ok_or(OkrRepositoryError::KeyResultNotFound(kr_id))?;
 
-        // 2. Update KR value and progress
-        kr.update_current_value(new_value);
+        if let Some(link_opt) = linked_habit_id {
+            kr.linked_habit_id = link_opt;
+        }
+
+        if let Some(val) = new_value {
+            kr.update_current_value(val);
+        } else {
+            kr.updated_at = Utc::now();
+        }
 
         sqlx::query(
             r"
             UPDATE key_results
-            SET current_value = ?, progress_percentage = ?, updated_at = ?
+            SET linked_habit_id = ?, current_value = ?, progress_percentage = ?, updated_at = ?
             WHERE id = ?
             ",
         )
+        .bind(kr.linked_habit_id)
         .bind(kr.current_value)
         .bind(kr.progress_percentage)
         .bind(kr.updated_at)
@@ -568,6 +599,604 @@ impl OkrRepository for SqliteOkrRepository {
             .bind(obj.updated_at)
             .bind(obj.id)
             .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+}
+
+/// PostgreSQL-backed implementation of [`OkrRepository`].
+#[derive(Debug, Clone)]
+pub struct PgOkrRepository {
+    pool: PgPool,
+}
+
+impl PgOkrRepository {
+    /// Creates a new `PgOkrRepository` instance with the provided PostgreSQL connection pool.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Returns a reference to the underlying [`PgPool`].
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn map_objective_row(row: &sqlx::postgres::PgRow) -> Result<Objective, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let user_id_str: Option<String> = row.try_get("user_id").ok().flatten();
+        let user_id = user_id_str.as_deref().and_then(|s| Uuid::parse_str(s).ok());
+        let title: String = row.try_get("title")?;
+        let description: Option<String> = row.try_get("description")?;
+        let quarter: String = row.try_get("quarter")?;
+        let start_date: NaiveDate = row.try_get("start_date")?;
+        let end_date: NaiveDate = row.try_get("end_date")?;
+        let progress_f64: f64 = row.try_get("progress_percentage")?;
+        let is_completed: bool = row.try_get("is_completed")?;
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+
+        Ok(Objective {
+            id,
+            user_id,
+            title,
+            description,
+            quarter,
+            start_date,
+            end_date,
+            progress_percentage: progress_f64 as f32,
+            is_completed,
+            created_at,
+            updated_at,
+        })
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn map_kr_row(row: &sqlx::postgres::PgRow) -> Result<KeyResult, sqlx::Error> {
+        let id_str: String = row.try_get("id")?;
+        let id = Uuid::parse_str(&id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let objective_id_str: String = row.try_get("objective_id")?;
+        let objective_id =
+            Uuid::parse_str(&objective_id_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let linked_habit_id_str: Option<String> = row.try_get("linked_habit_id").ok().flatten();
+        let linked_habit_id = linked_habit_id_str
+            .as_deref()
+            .and_then(|s| Uuid::parse_str(s).ok());
+        let title: String = row.try_get("title")?;
+        let initial_value: f64 = row.try_get("initial_value")?;
+        let target_value: f64 = row.try_get("target_value")?;
+        let current_value: f64 = row.try_get("current_value")?;
+        let unit: String = row.try_get("unit")?;
+        let weight_f64: f64 = row.try_get("weight")?;
+        let progress_f64: f64 = row.try_get("progress_percentage")?;
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+
+        Ok(KeyResult {
+            id,
+            objective_id,
+            linked_habit_id,
+            title,
+            initial_value,
+            target_value,
+            current_value,
+            unit,
+            weight: weight_f64 as f32,
+            progress_percentage: progress_f64 as f32,
+            created_at,
+            updated_at,
+        })
+    }
+}
+
+#[async_trait]
+impl OkrRepository for PgOkrRepository {
+    async fn create_objective(
+        &self,
+        user_id: Uuid,
+        objective: &Objective,
+    ) -> Result<(), OkrRepositoryError> {
+        sqlx::query(
+            r"
+            INSERT INTO objectives (id, user_id, title, description, quarter, start_date, end_date, progress_percentage, is_completed, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ",
+        )
+        .bind(objective.id.to_string())
+        .bind(user_id.to_string())
+        .bind(&objective.title)
+        .bind(&objective.description)
+        .bind(&objective.quarter)
+        .bind(objective.start_date)
+        .bind(objective.end_date)
+        .bind(f64::from(objective.progress_percentage))
+        .bind(objective.is_completed)
+        .bind(objective.created_at)
+        .bind(objective.updated_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn create_key_result(
+        &self,
+        user_id: Uuid,
+        kr: &KeyResult,
+    ) -> Result<(), OkrRepositoryError> {
+        let mut tx = self.pool.begin().await?;
+
+        let objective_row = sqlx::query("SELECT * FROM objectives WHERE id = $1 AND user_id = $2")
+            .bind(kr.objective_id.to_string())
+            .bind(user_id.to_string())
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        let obj_row =
+            objective_row.ok_or(OkrRepositoryError::ObjectiveNotFound(kr.objective_id))?;
+        let mut obj = Self::map_objective_row(&obj_row)?;
+
+        if let Some(habit_id) = kr.linked_habit_id {
+            let habit_exists: Option<String> =
+                sqlx::query_scalar("SELECT id FROM habits WHERE id = $1 AND user_id = $2")
+                    .bind(habit_id.to_string())
+                    .bind(user_id.to_string())
+                    .fetch_optional(&mut *tx)
+                    .await?;
+
+            if habit_exists.is_none() {
+                return Err(OkrRepositoryError::Habit(format!(
+                    "Habit {habit_id} not found"
+                )));
+            }
+        }
+
+        sqlx::query(
+            r"
+            INSERT INTO key_results (id, objective_id, linked_habit_id, title, initial_value, target_value, current_value, unit, weight, progress_percentage, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ",
+        )
+        .bind(kr.id.to_string())
+        .bind(kr.objective_id.to_string())
+        .bind(kr.linked_habit_id.map(|id| id.to_string()))
+        .bind(&kr.title)
+        .bind(kr.initial_value)
+        .bind(kr.target_value)
+        .bind(kr.current_value)
+        .bind(&kr.unit)
+        .bind(f64::from(kr.weight))
+        .bind(f64::from(kr.progress_percentage))
+        .bind(kr.created_at)
+        .bind(kr.updated_at)
+        .execute(&mut *tx)
+        .await?;
+
+        let kr_rows = sqlx::query(
+            "SELECT * FROM key_results WHERE objective_id = $1 ORDER BY created_at ASC",
+        )
+        .bind(kr.objective_id.to_string())
+        .fetch_all(&mut *tx)
+        .await?;
+
+        let all_krs = kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        obj.update_progress(&all_krs);
+
+        sqlx::query(
+            r"
+            UPDATE objectives
+            SET progress_percentage = $1, is_completed = $2, updated_at = $3
+            WHERE id = $4 AND user_id = $5
+            ",
+        )
+        .bind(f64::from(obj.progress_percentage))
+        .bind(obj.is_completed)
+        .bind(obj.updated_at)
+        .bind(obj.id.to_string())
+        .bind(user_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn get_objective_with_krs(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<ObjectiveWithKeyResults>, OkrRepositoryError> {
+        let objective_row = sqlx::query("SELECT * FROM objectives WHERE id = $1 AND user_id = $2")
+            .bind(id.to_string())
+            .bind(user_id.to_string())
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let Some(obj_row) = objective_row else {
+            return Ok(None);
+        };
+        let obj = Self::map_objective_row(&obj_row)?;
+
+        let kr_rows = sqlx::query(
+            "SELECT * FROM key_results WHERE objective_id = $1 ORDER BY created_at ASC",
+        )
+        .bind(id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        let key_results = kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Some(ObjectiveWithKeyResults {
+            objective: obj,
+            key_results,
+        }))
+    }
+
+    async fn list_objectives_by_quarter(
+        &self,
+        user_id: Uuid,
+        quarter: &str,
+    ) -> Result<Vec<ObjectiveWithKeyResults>, OkrRepositoryError> {
+        let obj_rows = sqlx::query(
+            "SELECT * FROM objectives WHERE user_id = $1 AND quarter = $2 ORDER BY start_date ASC, created_at ASC",
+        )
+        .bind(user_id.to_string())
+        .bind(quarter)
+        .fetch_all(&self.pool)
+        .await?;
+
+        if obj_rows.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let objectives = obj_rows
+            .iter()
+            .map(Self::map_objective_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let kr_rows = sqlx::query(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE o.user_id = $1 AND o.quarter = $2
+            ORDER BY kr.created_at ASC
+            ",
+        )
+        .bind(user_id.to_string())
+        .bind(quarter)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let all_key_results = kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut kr_map: HashMap<Uuid, Vec<KeyResult>> = HashMap::new();
+        for kr in all_key_results {
+            kr_map.entry(kr.objective_id).or_default().push(kr);
+        }
+
+        let results = objectives
+            .into_iter()
+            .map(|obj| {
+                let key_results = kr_map.remove(&obj.id).unwrap_or_default();
+                ObjectiveWithKeyResults {
+                    objective: obj,
+                    key_results,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    async fn list_all_objectives(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<ObjectiveWithKeyResults>, OkrRepositoryError> {
+        let obj_rows = sqlx::query(
+            "SELECT * FROM objectives WHERE user_id = $1 ORDER BY quarter DESC, start_date ASC",
+        )
+        .bind(user_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        if obj_rows.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let objectives = obj_rows
+            .iter()
+            .map(Self::map_objective_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let kr_rows = sqlx::query(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE o.user_id = $1
+            ORDER BY kr.created_at ASC
+            ",
+        )
+        .bind(user_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        let all_key_results = kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut kr_map: HashMap<Uuid, Vec<KeyResult>> = HashMap::new();
+        for kr in all_key_results {
+            kr_map.entry(kr.objective_id).or_default().push(kr);
+        }
+
+        let results = objectives
+            .into_iter()
+            .map(|obj| {
+                let key_results = kr_map.remove(&obj.id).unwrap_or_default();
+                ObjectiveWithKeyResults {
+                    objective: obj,
+                    key_results,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    async fn list_key_results_by_habit(
+        &self,
+        user_id: Uuid,
+        habit_id: Uuid,
+    ) -> Result<Vec<KeyResult>, OkrRepositoryError> {
+        let kr_rows = sqlx::query(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE kr.linked_habit_id = $1 AND o.user_id = $2
+            ORDER BY kr.created_at ASC
+            ",
+        )
+        .bind(habit_id.to_string())
+        .bind(user_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(OkrRepositoryError::Database)
+    }
+
+    async fn update_key_result_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        new_value: f64,
+    ) -> Result<KeyResult, OkrRepositoryError> {
+        self.update_key_result_link_or_value(user_id, kr_id, None, Some(new_value))
+            .await
+    }
+
+    #[allow(clippy::option_option)]
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
+    ) -> Result<KeyResult, OkrRepositoryError> {
+        let mut tx = self.pool.begin().await?;
+
+        let kr_row_opt = sqlx::query(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE kr.id = $1 AND o.user_id = $2
+            ",
+        )
+        .bind(kr_id.to_string())
+        .bind(user_id.to_string())
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let kr_row = kr_row_opt.ok_or(OkrRepositoryError::KeyResultNotFound(kr_id))?;
+        let mut kr = Self::map_kr_row(&kr_row)?;
+
+        if let Some(link_opt) = linked_habit_id {
+            kr.linked_habit_id = link_opt;
+        }
+
+        if let Some(val) = new_value {
+            kr.update_current_value(val);
+        } else {
+            kr.updated_at = Utc::now();
+        }
+
+        let habit_id_str = kr.linked_habit_id.map(|id| id.to_string());
+
+        sqlx::query(
+            r"
+            UPDATE key_results
+            SET linked_habit_id = $1, current_value = $2, progress_percentage = $3, updated_at = $4
+            WHERE id = $5
+            ",
+        )
+        .bind(habit_id_str)
+        .bind(kr.current_value)
+        .bind(f64::from(kr.progress_percentage))
+        .bind(kr.updated_at)
+        .bind(kr.id.to_string())
+        .execute(&mut *tx)
+        .await?;
+
+        let obj_row_opt = sqlx::query("SELECT * FROM objectives WHERE id = $1 AND user_id = $2")
+            .bind(kr.objective_id.to_string())
+            .bind(user_id.to_string())
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        let obj_row = obj_row_opt.ok_or(OkrRepositoryError::ObjectiveNotFound(kr.objective_id))?;
+        let mut obj = Self::map_objective_row(&obj_row)?;
+
+        let kr_rows = sqlx::query(
+            "SELECT * FROM key_results WHERE objective_id = $1 ORDER BY created_at ASC",
+        )
+        .bind(kr.objective_id.to_string())
+        .fetch_all(&mut *tx)
+        .await?;
+
+        let all_krs = kr_rows
+            .iter()
+            .map(Self::map_kr_row)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        obj.update_progress(&all_krs);
+
+        sqlx::query(
+            r"
+            UPDATE objectives
+            SET progress_percentage = $1, is_completed = $2, updated_at = $3
+            WHERE id = $4 AND user_id = $5
+            ",
+        )
+        .bind(f64::from(obj.progress_percentage))
+        .bind(obj.is_completed)
+        .bind(obj.updated_at)
+        .bind(obj.id.to_string())
+        .bind(user_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(kr)
+    }
+
+    async fn update_objective_progress(
+        &self,
+        user_id: Uuid,
+        objective_id: Uuid,
+        progress: f32,
+    ) -> Result<(), OkrRepositoryError> {
+        let is_completed = progress >= 100.0;
+        let now = Utc::now();
+
+        let result = sqlx::query(
+            r"
+            UPDATE objectives
+            SET progress_percentage = $1, is_completed = $2, updated_at = $3
+            WHERE id = $4 AND user_id = $5
+            ",
+        )
+        .bind(f64::from(progress.clamp(0.0, 100.0)))
+        .bind(is_completed)
+        .bind(now)
+        .bind(objective_id.to_string())
+        .bind(user_id.to_string())
+        .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(OkrRepositoryError::ObjectiveNotFound(objective_id));
+        }
+
+        Ok(())
+    }
+
+    async fn delete_objective(&self, id: Uuid, user_id: Uuid) -> Result<(), OkrRepositoryError> {
+        let result = sqlx::query("DELETE FROM objectives WHERE id = $1 AND user_id = $2")
+            .bind(id.to_string())
+            .bind(user_id.to_string())
+            .execute(&self.pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(OkrRepositoryError::ObjectiveNotFound(id));
+        }
+
+        Ok(())
+    }
+
+    async fn delete_key_result(&self, id: Uuid, user_id: Uuid) -> Result<(), OkrRepositoryError> {
+        let mut tx = self.pool.begin().await?;
+
+        let kr_row_opt = sqlx::query(
+            r"
+            SELECT kr.id, kr.objective_id, kr.linked_habit_id, kr.title, kr.initial_value, kr.target_value, kr.current_value, kr.unit, kr.weight, kr.progress_percentage, kr.created_at, kr.updated_at
+            FROM key_results kr
+            JOIN objectives o ON kr.objective_id = o.id
+            WHERE kr.id = $1 AND o.user_id = $2
+            ",
+        )
+        .bind(id.to_string())
+        .bind(user_id.to_string())
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let kr_row = kr_row_opt.ok_or(OkrRepositoryError::KeyResultNotFound(id))?;
+        let kr = Self::map_kr_row(&kr_row)?;
+
+        sqlx::query("DELETE FROM key_results WHERE id = $1")
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+
+        let obj_row_opt = sqlx::query("SELECT * FROM objectives WHERE id = $1 AND user_id = $2")
+            .bind(kr.objective_id.to_string())
+            .bind(user_id.to_string())
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        if let Some(obj_row) = obj_row_opt {
+            let mut obj = Self::map_objective_row(&obj_row)?;
+            let remaining_rows = sqlx::query(
+                "SELECT * FROM key_results WHERE objective_id = $1 ORDER BY created_at ASC",
+            )
+            .bind(kr.objective_id.to_string())
+            .fetch_all(&mut *tx)
+            .await?;
+
+            let remaining_krs = remaining_rows
+                .iter()
+                .map(Self::map_kr_row)
+                .collect::<Result<Vec<_>, _>>()?;
+
+            obj.update_progress(&remaining_krs);
+
+            sqlx::query(
+                r"
+                UPDATE objectives
+                SET progress_percentage = $1, is_completed = $2, updated_at = $3
+                WHERE id = $4 AND user_id = $5
+                ",
+            )
+            .bind(f64::from(obj.progress_percentage))
+            .bind(obj.is_completed)
+            .bind(obj.updated_at)
+            .bind(obj.id.to_string())
+            .bind(user_id.to_string())
             .execute(&mut *tx)
             .await?;
         }

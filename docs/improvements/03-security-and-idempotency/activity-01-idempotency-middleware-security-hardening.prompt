@@ -1,0 +1,42 @@
+# Activity 03.1: Idempotency Middleware Security Hardening (Body Limit, Path Validation & Lock Hygiene)
+
+## 1. Objective & Context
+Eliminate critical security and concurrency vulnerabilities in `api/crates/server/src/middleware/idempotency.rs`: unbounded memory allocation (`usize::MAX`), cross-endpoint response replay due to missing `request_path` / HTTP method validation, caching of unauthenticated `/api/v1/auth/*` responses under `"anonymous"`, Redis lock leaks on conflict, 5xx database lock retention, and unused `purge_expired_keys`.
+
+- **Priority:** P1 (High — Security & Concurrency Hardening)
+- **Target Locations:**
+  - `api/crates/server/src/middleware/idempotency.rs` (`#L1-L461`)
+  - `api/crates/server/src/server.rs`
+
+## 2. Technical Scope & Specifications
+1. **Bounded Request & Response Body Size (`idempotency.rs#L109`, `#L318`):**
+   - Replace `to_bytes(body, usize::MAX)` with a strict constant `MAX_IDEMPOTENT_BODY_BYTES: usize = 2 * 1024 * 1024` (2 MiB). Return `413 Payload Too Large` (RFC 7807 `ProblemDetails`) if the request body exceeds this limit.
+2. **Enforce `request_path` & HTTP Method Validation on Cache Hits:**
+   - Include the HTTP method (`POST`, `PUT`, `PATCH`, `DELETE`) in `request_path` (e.g. `format!("{} {}", method, uri_path)`) and include `request_path` inside the SHA-256 `request_hash` (computing `SHA-256(method + ":" + uri_path + ":" + body_bytes)`).
+   - Additionally, verify `saved_path == current_request_path` on database lookup (`#L183-L239`). If a client reuses the same `Idempotency-Key` on a different endpoint or method, return `409 Conflict` (`"Idempotency-Key already used with a different request path or payload"`).
+3. **Support `DELETE` Method & Bypass `/api/v1/auth/*` Routes:**
+   - Add `Method::DELETE` to the intercepted methods (`#L82`) to match the frontend Axios interceptor (`frontend/src/services/api.ts#L31`).
+   - Bypass idempotency caching for `/api/v1/auth/*` routes (or reject `Idempotency-Key` when `user_id` is not authenticated) so login/registration JWT responses are never cached in plaintext under the shared `"anonymous"` partition.
+4. **Fix Redis Lock Leak, 5xx Lock Retention, Expired Lock TOCTOU & Background Purge:**
+   - Ensure `redis_svc.release_idempotency_lock(&user_id, &idempotency_key).await` is always executed if the database check subsequently returns `409 Conflict` or an error (`#L261-L265`, `#L300-L310`).
+   - When the downstream handler returns a `5xx` server error (`status.is_server_error()`), delete the pending row (`WHERE idempotency_key = ? AND user_id = ? AND response_status IS NULL`) in addition to releasing the Redis lock so legitimate client retries are not blocked for 30 seconds.
+   - Fix the TOCTOU race when taking over an expired lock (`#L269-L281`) by checking `AND locked_at = ?` (the expired timestamp observed) and verifying `rows_affected() == 1`.
+   - Spawn a periodic background cleanup task in `server.rs` calling `purge_expired_keys` every hour.
+
+## 3. Implementation Steps
+1. Update `idempotency_middleware` in `api/crates/server/src/middleware/idempotency.rs` to enforce `MAX_IDEMPOTENT_BODY_BYTES` (2 MiB), include `DELETE`, skip `/api/v1/auth/*`, and bind `method + path` into `request_hash` and `request_path` verification.
+2. Fix Redis lock release on conflict paths, delete pending DB lock rows on `5xx` responses, and make expired lock takeover atomic (`rows_affected() == 1`).
+3. Schedule a background task in `server.rs` to run `purge_expired_keys`.
+4. Add integration tests in `api/crates/server/tests/idempotency_stress.rs` testing:
+   - Reusing the same `Idempotency-Key` across two different endpoints (`POST /blocks/{id1}/complete` vs `POST /blocks/{id2}/complete`) returns `409 Conflict`.
+   - Oversized payload returns `413` instead of OOM.
+   - `5xx` response cleans up the pending lock allowing immediate retry.
+5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] `usize::MAX` is removed from `idempotency.rs` and replaced with a 2 MiB limit.
+- [x] Reusing an `Idempotency-Key` on a different URL path or HTTP method returns `409 Conflict`.
+- [x] `/api/v1/auth/*` responses are never stored in the idempotency cache.
+- [x] Redis locks are never leaked on DB conflicts, and `5xx` errors delete pending DB locks immediately.
+- [x] All integration tests in `idempotency_stress.rs` pass.
+

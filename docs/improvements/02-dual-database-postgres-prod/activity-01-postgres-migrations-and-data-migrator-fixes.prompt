@@ -1,0 +1,38 @@
+# Activity 02.1: PostgreSQL Migrations & `migrate_sqlite_to_postgres` Data Migrator Fixes
+
+## 1. Objective & Context
+Fix fatal SQL syntax and schema discrepancies in the PostgreSQL migrations directory (`api/crates/core/migrations_pg/`) and fix data corruption bugs in `migrate_sqlite_to_postgres` (`api/crates/core/src/db/mod.rs`), where binary SQLite UUIDs (`BLOB`) and SQLite datetime strings fail to parse and migrations run outside a PostgreSQL transaction.
+
+- **Priority:** P0/P1 (Database Foundation for Prod & Test Environments)
+- **Target Locations:**
+  - `api/crates/core/migrations_pg/0007_add_user_id_multi_tenancy.sql`
+  - `api/crates/core/migrations_pg/0008_habit_streak_denormalization.sql`
+  - `api/crates/core/migrations_pg/0009_Drop_Legacy_Unique_Constraints.sql`
+  - `api/crates/core/src/db/mod.rs` (`#L139-L631`)
+
+## 2. Technical Scope & Specifications
+1. **Fix Boolean Comparison Error in `migrations_pg/0008_habit_streak_denormalization.sql` (`#L8-L18`):**
+   - In `migrations_pg/0002_create_habits.sql#L26`, `habit_logs.is_completed` is `BOOLEAN NOT NULL DEFAULT FALSE`.
+   - In `migrations_pg/0008_habit_streak_denormalization.sql`, lines `#L12` and `#L17` execute `AND habit_logs.is_completed = 1`, which fails in PostgreSQL with `operator does not exist: boolean = integer`.
+   - Replace `habit_logs.is_completed = 1` with `habit_logs.is_completed = TRUE`.
+2. **Fix Foreign Key Constraints in `migrations_pg/0007_add_user_id_multi_tenancy.sql` (`#L10-L27`):**
+   - `migrations_pg/0001..0004` already create `user_id TEXT NOT NULL DEFAULT 'default'` without foreign keys.
+   - Consequently, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE` in `0007` is a silent no-op in PostgreSQL!
+   - Ensure `0007` (or a corrective constraint statement) explicitly adds the foreign key constraints (`REFERENCES users(id) ON DELETE CASCADE`) and consistent UUID/TEXT typing across `users`, `routines`, `habits`, `objectives`, and `journal_entries`.
+3. **Fix UUID & Timestamp Extraction and Add Transaction in `migrate_sqlite_to_postgres` (`api/crates/core/src/db/mod.rs#L139-L631`):**
+   - **UUID Extraction:** SQLx stores `uuid::Uuid` in SQLite as a 16-byte binary `BLOB` (or 36-char string in legacy rows). Reading `row.get::<String, _>("id")` panics or corrupts binary UUIDs. Add a helper `extract_uuid(row: &SqliteRow, col: &str) -> Result<Uuid, DatabaseError>` that tries `row.try_get::<Uuid, _>(col)` first and falls back to `row.try_get::<String, _>(col)` parsed as `Uuid`.
+   - **Timestamp Extraction:** SQLx stores `DateTime<Utc>` in SQLite as `"YYYY-MM-DD HH:MM:SS.f UTC"` or RFC 3339. Use `row.try_get::<DateTime<Utc>, _>(col)` before falling back to RFC 3339 parsing so historical `created_at` and `updated_at` timestamps are never overwritten with `Utc::now()`.
+   - **Atomicity:** Wrap the PostgreSQL data insertion loops inside a single `let mut pg_tx = pg_pool.begin().await?; ... pg_tx.commit().await?;` transaction so partial failures roll back cleanly.
+
+## 3. Implementation Steps
+1. Fix `migrations_pg/0007_add_user_id_multi_tenancy.sql` and `migrations_pg/0008_habit_streak_denormalization.sql`.
+2. Implement `extract_uuid` and `extract_datetime` helpers in `api/crates/core/src/db/mod.rs`.
+3. Refactor `migrate_sqlite_to_postgres` to use `pg_pool.begin().await?` and the new extraction helpers across all tables (`users`, `routines`, `time_blocks`, `daily_routine_logs`, `habits`, `habit_logs`, `objectives`, `key_results`, `journal_entries`).
+4. Add unit tests in `api/crates/core/src/db/mod.rs` verifying `extract_uuid` (both 16-byte BLOB and TEXT UUIDs) and `extract_datetime`.
+5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
+
+## 4. Definition of Done (DoD)
+- [x] All SQL files in `api/crates/core/migrations_pg/` are valid PostgreSQL syntax with proper foreign keys and boolean types.
+- [x] `migrate_sqlite_to_postgres` accurately reads 16-byte binary SQLite UUIDs and preserves original `created_at`/`updated_at` timestamps inside an atomic PostgreSQL transaction.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+

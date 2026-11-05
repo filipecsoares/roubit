@@ -9,10 +9,12 @@ import PwaUpdatePrompt from '@/components/pwa/PwaUpdatePrompt.vue'
 import { useFocusStore } from '@/stores/focus'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useRoutineStore } from '@/stores/routine'
 
 const focusStore = useFocusStore()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
+const routineStore = useRoutineStore()
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
@@ -51,10 +53,12 @@ onUnmounted(() => {
     </main>
 
     <!-- Global Floating Focus Pill (When timer is running in background) -->
-    <div
+    <button
+      type="button"
       v-if="focusStore.isRunning && !focusStore.isModalOpen"
       @click="focusStore.openFocusModal()"
-      class="fixed bottom-20 md:bottom-8 right-3 sm:right-6 z-40 bg-zinc-900/95 border border-zinc-700/80 shadow-2xl rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 sm:gap-3 backdrop-blur-xl cursor-pointer hover:border-zinc-500 active:scale-95 transition-all"
+      aria-label="Retornar ao Modo Foco"
+      class="fixed bottom-20 md:bottom-8 right-3 sm:right-6 z-40 bg-zinc-900/95 border border-zinc-700/80 shadow-2xl rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 sm:gap-3 backdrop-blur-xl cursor-pointer hover:border-zinc-500 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 text-left"
       title="Retornar ao Modo Foco"
     >
       <div class="p-1.5 sm:p-2 rounded-xl bg-zinc-800 text-emerald-400 border border-zinc-700">
@@ -66,10 +70,10 @@ onUnmounted(() => {
           {{ focusStore.isBreak ? 'Pausa Ativa' : (focusStore.associatedBlockName || 'Foco Livre') }}
         </span>
       </div>
-    </div>
+    </button>
 
     <!-- Global Focus Mode Modal -->
-    <FocusModeModal />
+    <FocusModeModal @complete-block="(id) => routineStore.completeBlock(id)" />
 
     <!-- Global Real-Time Notification Toast Stack -->
     <NotificationToast />

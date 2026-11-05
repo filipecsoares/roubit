@@ -42,6 +42,10 @@ impl ClientFactory {
                 base_url: remote_url.to_string(),
                 auth_token: auth_token(),
             }
+        } else if let Some(db_url) = db_flag.filter(|s| !s.trim().is_empty()) {
+            ClientMode::Local {
+                db_url: Some(db_url.to_string()),
+            }
         } else if let Ok(env_remote) =
             std::env::var("ROUBIT_API_URL").or_else(|_| std::env::var("ROUBIT_REMOTE_URL"))
         {
@@ -54,6 +58,17 @@ impl ClientFactory {
                 ClientMode::Remote {
                     base_url: trimmed.to_string(),
                     auth_token: auth_token(),
+                }
+            }
+        } else if let Some(cfg) = super::config::CliConfigManager::load_config() {
+            if let Some(api_url) = cfg.api_url.filter(|s| !s.trim().is_empty()) {
+                ClientMode::Remote {
+                    base_url: api_url,
+                    auth_token: auth_token(),
+                }
+            } else {
+                ClientMode::Local {
+                    db_url: db_flag.map(ToString::to_string).or(cfg.database_url),
                 }
             }
         } else {

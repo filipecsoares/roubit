@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -15,10 +15,11 @@ use uuid::Uuid;
 use validator::Validate;
 
 use roubit_core::{
-    BlockStatus, CurrentRoutineProgress, Routine, RoutineProgressTracker, RoutineRepository,
-    RoutineRepositoryError, SqliteRoutineRepository, TimeBlock, TimeBlockValidator,
+    BlockStatus, CurrentRoutineProgress, Routine, RoutineProgressTracker, RoutineRepositoryError,
+    TimeBlock, TimeBlockValidator,
 };
 
+use super::{extract_local_date, extract_local_time};
 use crate::{auth::AuthenticatedUser, errors::ApiError, state::AppState};
 
 /// Request payload to create an individual time block within a routine
@@ -57,6 +58,12 @@ pub struct RoutineWithProgressResponse {
     pub routine: Option<Routine>,
     pub blocks: Vec<TimeBlock>,
     pub progress: Option<CurrentRoutineProgress>,
+    #[serde(default)]
+    pub completed_block_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub skipped_block_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub block_statuses: HashMap<Uuid, BlockStatus>,
 }
 
 fn parse_time(time_str: &str) -> Result<NaiveTime, ApiError> {
@@ -76,9 +83,10 @@ fn parse_time(time_str: &str) -> Result<NaiveTime, ApiError> {
 pub async fn get_routine(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    headers: HeaderMap,
 ) -> Result<Json<RoutineWithProgressResponse>, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
-    let routine_opt = repo
+    let routine_opt = state
+        .routine_repo
         .get_active_routine(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -88,22 +96,34 @@ pub async fn get_routine(
             routine: None,
             blocks: Vec::new(),
             progress: None,
+            completed_block_ids: Vec::new(),
+            skipped_block_ids: Vec::new(),
+            block_statuses: HashMap::new(),
         }));
     };
 
-    let blocks = repo
+    let blocks = state
+        .routine_repo
         .list_blocks_for_routine(routine.id, user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let today = Utc::now().date_naive();
-    let daily_logs = repo
+    let today = extract_local_date(&headers);
+    let daily_logs = state
+        .routine_repo
         .list_daily_logs_for_routine(routine.id, user.id, today)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    let mut completed_block_ids = Vec::new();
+    let mut skipped_block_ids = Vec::new();
     let mut log_status_map = HashMap::with_capacity(daily_logs.len());
     for log in daily_logs {
+        match log.status {
+            BlockStatus::Completed => completed_block_ids.push(log.time_block_id),
+            BlockStatus::Skipped => skipped_block_ids.push(log.time_block_id),
+            _ => {}
+        }
         log_status_map.insert(log.time_block_id, log.status);
     }
 
@@ -118,13 +138,16 @@ pub async fn get_routine(
         })
         .collect();
 
-    let progress =
-        RoutineProgressTracker::compute_progress(&blocks, &block_statuses, Utc::now().time());
+    let now_time = extract_local_time(&headers);
+    let progress = RoutineProgressTracker::compute_progress(&blocks, &block_statuses, now_time);
 
     Ok(Json(RoutineWithProgressResponse {
         routine: Some(routine),
         blocks,
         progress: Some(progress),
+        completed_block_ids,
+        skipped_block_ids,
+        block_statuses: log_status_map,
     }))
 }
 
@@ -180,10 +203,48 @@ pub async fn create_routine(
         updated_at: Utc::now(),
     };
 
-    let repo = SqliteRoutineRepository::new(state.db);
-    repo.create_routine_with_blocks(user.id, &routine, &domain_blocks)
+    state
+        .routine_repo
+        .create_routine_with_blocks(user.id, &routine, &domain_blocks)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if routine.is_active {
+        state
+            .routine_repo
+            .set_active_routine(routine.id, user.id)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+        if let Some(ref redis_svc) = state.redis {
+            let scheduler =
+                roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+            let now_time = Utc::now().time();
+            let user_id_str = user.id.to_string();
+            for block in &domain_blocks {
+                let diff_secs = block
+                    .start_time
+                    .signed_duration_since(now_time)
+                    .num_seconds();
+                let fire_in_secs = if diff_secs > 0 {
+                    usize::try_from(diff_secs).unwrap_or(60)
+                } else {
+                    usize::try_from(86_400 + diff_secs).unwrap_or(3600)
+                };
+                if let Err(err) = scheduler
+                    .schedule_reminder(
+                        &user_id_str,
+                        "time_block",
+                        &block.id.to_string(),
+                        fire_in_secs.max(1),
+                    )
+                    .await
+                {
+                    tracing::warn!(error = %err, block_id = %block.id, "Failed to schedule time_block reminder in Redis");
+                }
+            }
+        }
+    }
 
     Ok((StatusCode::CREATED, Json(routine)))
 }
@@ -196,8 +257,8 @@ pub async fn list_routines(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<Routine>>, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
-    let routines = repo
+    let routines = state
+        .routine_repo
         .list_routines(user.id)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -213,15 +274,19 @@ pub async fn complete_block(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(block_id): Path<Uuid>,
-    Json(payload): Json<Option<LogBlockStatusRequest>>,
+    headers: HeaderMap,
+    payload: Option<Json<LogBlockStatusRequest>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let req = payload.unwrap_or(LogBlockStatusRequest {
-        date: None,
-        status: None,
-        notes: None,
-    });
+    let req = payload.map_or(
+        LogBlockStatusRequest {
+            date: None,
+            status: None,
+            notes: None,
+        },
+        |Json(p)| p,
+    );
 
-    let target_date = req.date.unwrap_or_else(|| Utc::now().date_naive());
+    let target_date = req.date.unwrap_or_else(|| extract_local_date(&headers));
     let status = match req.status.as_deref().unwrap_or("completed") {
         "completed" => BlockStatus::Completed,
         "in_progress" => BlockStatus::InProgress,
@@ -234,8 +299,8 @@ pub async fn complete_block(
         }
     };
 
-    let repo = SqliteRoutineRepository::new(state.db);
-    match repo
+    match state
+        .routine_repo
         .log_block_status(block_id, user.id, target_date, status, req.notes)
         .await
     {
@@ -263,9 +328,69 @@ pub async fn delete_routine(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let repo = SqliteRoutineRepository::new(state.db);
-    match repo.delete_routine(id, user.id).await {
-        Ok(()) => Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true })))),
+    let blocks_to_cancel = if state.redis.is_some() {
+        state
+            .routine_repo
+            .list_blocks_for_routine(id, user.id)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    match state.routine_repo.delete_routine(id, user.id).await {
+        Ok(()) => {
+            if let Some(ref redis_svc) = state.redis {
+                let scheduler =
+                    roubit_core::ReminderScheduler::new(std::sync::Arc::new(redis_svc.clone()));
+                let user_id_str = user.id.to_string();
+                for block in blocks_to_cancel {
+                    let _ = scheduler
+                        .cancel_reminder(&user_id_str, "time_block", &block.id.to_string())
+                        .await;
+                }
+            }
+            Ok((StatusCode::OK, Json(serde_json::json!({ "deleted": true }))))
+        }
+        Err(RoutineRepositoryError::NotFound(_)) => {
+            Err(ApiError::NotFound(format!("Routine {id} not found")))
+        }
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
+}
+
+/// Handler for `GET /api/v1/routines/:id/blocks`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if database queries fail.
+pub async fn list_routine_blocks(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(routine_id): Path<Uuid>,
+) -> Result<Json<Vec<TimeBlock>>, ApiError> {
+    let blocks = state
+        .routine_repo
+        .list_blocks_for_routine(routine_id, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(blocks))
+}
+
+/// Handler for `POST /api/v1/routines/:id/activate`
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if routine not found or not owned by user, or [`ApiError::Internal`] on db error.
+pub async fn activate_routine(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    match state.routine_repo.set_active_routine(id, user.id).await {
+        Ok(()) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({ "activated": true, "routine_id": id })),
+        )),
         Err(RoutineRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Routine {id} not found")))
         }
@@ -279,5 +404,7 @@ pub fn routine_routes() -> Router<AppState> {
         .route("/", get(get_routine).post(create_routine))
         .route("/all", get(list_routines))
         .route("/{id}", axum::routing::delete(delete_routine))
+        .route("/{id}/activate", post(activate_routine))
+        .route("/{id}/blocks", get(list_routine_blocks))
         .route("/blocks/{id}/complete", post(complete_block))
 }

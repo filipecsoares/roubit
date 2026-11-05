@@ -4,4 +4,4 @@ pub mod models;
 pub mod repository;
 
 pub use models::User;
-pub use repository::{SqliteUserRepository, UserRepository, UserRepositoryError};
+pub use repository::{PgUserRepository, SqliteUserRepository, UserRepository, UserRepositoryError};

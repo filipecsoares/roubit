@@ -9,16 +9,19 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use roubit_core::{SqliteUserRepository, User, UserRepository, UserRepositoryError};
+use roubit_core::{User, UserRepositoryError};
 
 use crate::{
     auth::{
         extractor::AuthenticatedUser,
-        jwt::{encode_jwt, hash_password, verify_password},
+        jwt::{encode_jwt, hash_password_async, verify_password_async, DUMMY_ARGON2_HASH},
     },
     errors::ApiError,
     state::AppState,
 };
+
+/// Maximum password length in bytes to mitigate Argon2id `DoS` attacks
+pub const MAX_PASSWORD_BYTES: usize = 128;
 
 /// Registration request payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,12 +65,31 @@ fn validate_registration(req: &RegisterRequest) -> Result<(String, &str), ApiErr
         ));
     }
 
+    if req.password.len() > MAX_PASSWORD_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "Password must not exceed {MAX_PASSWORD_BYTES} characters"
+        )));
+    }
+
     Ok((email, &req.password))
 }
 
+fn is_cookie_secure() -> bool {
+    std::env::var("COOKIE_SECURE").map_or(true, |v| v != "false" && v != "0")
+}
+
 fn build_cookie_header(token: &str) -> Option<HeaderValue> {
+    let secure_flag = if is_cookie_secure() { "; Secure" } else { "" };
+    let cookie_val = format!(
+        "roubit_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600{secure_flag}"
+    );
+    HeaderValue::from_str(&cookie_val).ok()
+}
+
+fn build_logout_cookie_header() -> Option<HeaderValue> {
+    let secure_flag = if is_cookie_secure() { "; Secure" } else { "" };
     let cookie_val =
-        format!("roubit_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600");
+        format!("roubit_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0{secure_flag}");
     HeaderValue::from_str(&cookie_val).ok()
 }
 
@@ -82,8 +104,8 @@ pub async fn register(
 ) -> Result<Response, ApiError> {
     let (email, password) = validate_registration(&payload)?;
 
-    let user_repo = SqliteUserRepository::new(state.db.clone());
-    if user_repo
+    if state
+        .user_repo
         .find_by_email(&email)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
@@ -94,12 +116,13 @@ pub async fn register(
         ));
     }
 
-    let password_hash = hash_password(password)?;
+    let password_hash = hash_password_async(password.to_string()).await?;
     let user_id = Uuid::new_v4();
     let created_at = chrono::Utc::now().to_rfc3339();
     let new_user = User::new(user_id, email.clone(), password_hash, created_at);
 
-    user_repo
+    state
+        .user_repo
         .create_user(&new_user)
         .await
         .map_err(|e| match e {
@@ -128,25 +151,34 @@ pub async fn register(
 /// Handler for `POST /api/v1/auth/login`
 ///
 /// # Errors
-/// Returns [`ApiError::Unauthorized`] on invalid email or password, or [`ApiError::Internal`] on db error.
+/// Returns [`ApiError::BadRequest`] if password exceeds maximum length,
+/// [`ApiError::Unauthorized`] on invalid email or password, or [`ApiError::Internal`] on db error.
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Response, ApiError> {
+    if payload.password.len() > MAX_PASSWORD_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "Password must not exceed {MAX_PASSWORD_BYTES} characters"
+        )));
+    }
+
     let email = payload.email.trim().to_lowercase();
 
-    let user_repo = SqliteUserRepository::new(state.db.clone());
-    let Some(user) = user_repo
+    let Some(user) = state
+        .user_repo
         .find_by_email(&email)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
     else {
+        // Constant-time defense: run dummy Argon2id verification to avoid email enumeration timing attacks
+        let _ = verify_password_async(payload.password, DUMMY_ARGON2_HASH.clone()).await;
         return Err(ApiError::Unauthorized(
             "Invalid email or password".to_string(),
         ));
     };
 
-    let is_valid = verify_password(&payload.password, &user.password_hash)?;
+    let is_valid = verify_password_async(payload.password, user.password_hash).await?;
     if !is_valid {
         return Err(ApiError::Unauthorized(
             "Invalid email or password".to_string(),
@@ -178,4 +210,15 @@ pub async fn me(user: AuthenticatedUser) -> Json<UserDto> {
         id: user.id,
         email: user.email,
     })
+}
+
+/// Handler for `POST /api/v1/auth/logout`
+///
+/// Clears the `roubit_token` session cookie by setting `Max-Age=0`.
+pub async fn logout() -> Response {
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    if let Some(cookie) = build_logout_cookie_header() {
+        response.headers_mut().insert(header::SET_COOKIE, cookie);
+    }
+    response
 }

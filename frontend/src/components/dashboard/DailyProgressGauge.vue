@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    percentage: number
+    percentage?: number
     size?: number
     strokeWidth?: number
     routinePercentage?: number

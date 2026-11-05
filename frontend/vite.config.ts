@@ -69,7 +69,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/api\/v1\/(habits|routines\/active|okrs|journal\/metadata)$/i,
+            urlPattern: /\/api\/v1\/(habits(\/analytics)?|routines|okrs|journal\/metadata)(\?.*)?$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-read-cache',
