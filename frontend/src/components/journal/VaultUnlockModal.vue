@@ -20,7 +20,8 @@ const emit = defineEmits<{
   (e: 'unlock', passphrase: string): void
 }>()
 
-useModal(() => props.isOpen, handleClose)
+const modalContainer = ref<HTMLElement | null>(null)
+useModal(() => props.isOpen, handleClose, modalContainer)
 
 const passphrase = ref('')
 const showPassword = ref(false)
@@ -44,6 +45,10 @@ function handleClose() {
       @click="handleClose"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vault-modal-title"
         class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
@@ -54,13 +59,14 @@ function handleClose() {
               <Lock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Desbloquear Diário</h3>
+              <h2 id="vault-modal-title" class="text-base sm:text-lg font-bold text-white font-outfit">Desbloquear Diário</h2>
               <p class="text-xs text-zinc-400">Criptografia de Conhecimento Zero</p>
             </div>
           </div>
           <button
             type="button"
             @click="handleClose"
+            aria-label="Fechar modal"
             class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
@@ -82,11 +88,12 @@ function handleClose() {
 
         <!-- Passphrase Input -->
         <div class="space-y-1.5">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <label for="vault-passphrase" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
             Senha Mestre / Passphrase
           </label>
           <div class="relative">
             <input
+              id="vault-passphrase"
               v-model="passphrase"
               :type="showPassword ? 'text' : 'password'"
               placeholder="Digite sua senha mestre..."
@@ -97,6 +104,7 @@ function handleClose() {
             />
             <button
               type="button"
+              :aria-label="showPassword ? 'Ocultar senha' : 'Exibir senha'"
               @click="showPassword = !showPassword"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
             >

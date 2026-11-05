@@ -46,7 +46,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
 <template>
   <div class="space-y-1.5">
-    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+    <label for="tag-input" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
       Tags & Tópicos
     </label>
 
@@ -64,6 +64,7 @@ function handleKeyDown(event: KeyboardEvent) {
         <button
           v-if="!disabled"
           type="button"
+          :aria-label="'Remover tag ' + tag"
           @click="removeTag(tag)"
           class="text-brand-300 hover:text-white transition-colors"
         >
@@ -72,6 +73,7 @@ function handleKeyDown(event: KeyboardEvent) {
       </span>
 
       <input
+        id="tag-input"
         v-model="newTag"
         type="text"
         :disabled="disabled"

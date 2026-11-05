@@ -69,7 +69,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside aria-label="Notificações em tempo real" class="fixed top-16 sm:top-20 right-3 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
+  <aside
+    aria-label="Notificações em tempo real"
+    role="status"
+    aria-live="polite"
+    class="fixed top-16 sm:top-20 right-3 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
+  >
     <TransitionGroup name="toast">
       <div
         v-for="toast in activeToasts"
@@ -108,6 +113,8 @@ onUnmounted(() => {
             @click="dismissToast(toast.notification.id)"
             class="text-zinc-500 hover:text-zinc-300 p-1 rounded-lg hover:bg-zinc-800/80 transition-colors shrink-0"
             title="Fechar notificação"
+            aria-label="Fechar notificação"
+          >
           >
             <X class="w-4 h-4" />
           </button>

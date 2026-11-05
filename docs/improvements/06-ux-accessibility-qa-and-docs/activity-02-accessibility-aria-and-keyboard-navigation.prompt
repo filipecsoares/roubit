@@ -35,8 +35,8 @@ Bring the Roubit Vue 3 SPA into compliance with WAI-ARIA and keyboard accessibil
 5. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] All 6 modals have `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, and keyboard focus trapping.
-- [ ] Floating Focus Pill, Notification items, and Heatmap cells are operable via keyboard.
-- [ ] All form inputs and icon-only buttons have accessible labels, and toast regions announce via `aria-live="polite"`.
-- [ ] `npm run test` and `npm run build` pass with 0 errors.
+- [x] All 6 modals have `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, and keyboard focus trapping.
+- [x] Floating Focus Pill, Notification items, and Heatmap cells are operable via keyboard.
+- [x] All form inputs and icon-only buttons have accessible labels, and toast regions announce via `aria-live="polite"`.
+- [x] `npm run test` and `npm run build` pass with 0 errors.
 

@@ -134,9 +134,9 @@ flowchart TD
   - [x] Criar composable/store de Toast reutilizável exibindo o `detail` RFC 7807 retornado pela API em vez de `err.message` genérico do Axios.
   - [x] Impedir reset prematuro dos formulários em `HabitManageModal.vue` e `OkrManageModal.vue` antes da confirmação de sucesso da API.
   - [x] Reutilizar singleton `AudioContext` em `focus.ts`, registrar listeners de `resize`/`keydown` no `FocusModeModal.vue` apenas quando aberto, corrigir scroll lock em `useModal.ts`, corrigir ícone `/favicon.svg` em `notification.ts` e tornar o badge `"Online"` da `AppNavbar.vue` reativo.
-- [ ] **06.2 Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado)** ([activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt))
-  - [ ] Adicionar `role="dialog"`, `aria-modal="true"`, `aria-labelledby` e *focus trap* nos 6 modais.
-  - [ ] Associar `<label for="...">` aos inputs, adicionar `aria-label` em controles de ícone e habilitar suporte a teclado (`tabindex="0"`, `role="button"`, `@keydown`) na pílula do Modo Foco, itens de notificação e células do Heatmap.
+- [x] **06.2 Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado)** ([activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt))
+  - [x] Adicionar `role="dialog"`, `aria-modal="true"`, `aria-labelledby` e *focus trap* nos 6 modais.
+  - [x] Associar `<label for="...">` aos inputs, adicionar `aria-label` em controles de ícone e habilitar suporte a teclado (`tabindex="0"`, `role="button"`, `@keydown`) na pílula do Modo Foco, itens de notificação e células do Heatmap.
 - [ ] **06.3 Testes Vitest para as 5 Views Principais & ESLint no Pipeline CI** ([activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt))
   - [ ] Criar suíte de testes de integração Vitest para `LoginView.vue`, `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue` e `JournalView.vue`.
   - [ ] Configurar ESLint no frontend (`package.json`), adicioná-lo ao `.github/workflows/vue-ci.yml` e atualizar `scripts/pre-commit.sh`.

@@ -15,7 +15,8 @@ const emit = defineEmits<{
   (e: 'link', habitId: string): void
 }>()
 
-useModal(() => props.isOpen, () => emit('close'))
+const modalContainer = ref<HTMLElement | null>(null)
+useModal(() => props.isOpen, () => emit('close'), modalContainer)
 
 const selectedHabitId = ref('')
 
@@ -34,6 +35,10 @@ function handleLink() {
       @click="emit('close')"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="link-habit-modal-title"
         class="w-full max-w-md bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
@@ -43,11 +48,12 @@ function handleLink() {
             <div class="p-2 sm:p-2.5 rounded-xl bg-zinc-800 text-zinc-100 border border-zinc-700">
               <Link2 class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Vincular Hábito ao KR</h3>
+            <h2 id="link-habit-modal-title" class="text-base sm:text-lg font-bold text-white font-outfit">Vincular Hábito ao KR</h2>
           </div>
           <button
             type="button"
             @click="emit('close')"
+            aria-label="Fechar modal"
             class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
@@ -61,10 +67,11 @@ function handleLink() {
 
         <!-- Habit Select -->
         <div class="space-y-2">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <label for="select-habit-link" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
             Selecione o Hábito
           </label>
           <select
+            id="select-habit-link"
             v-model="selectedHabitId"
             class="w-full px-3.5 py-2.5 rounded-xl bg-surface-dark border border-surface-border focus:border-brand-500 text-sm text-white outline-none"
           >

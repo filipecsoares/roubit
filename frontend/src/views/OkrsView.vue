@@ -159,6 +159,8 @@ onMounted(async () => {
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
+      role="status"
+      aria-live="polite"
       class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'

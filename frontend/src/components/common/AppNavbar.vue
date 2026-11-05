@@ -168,6 +168,9 @@ onUnmounted(() => {
               class="relative p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 border border-transparent transition-all touch-target"
               :class="{ 'bg-zinc-800 text-zinc-100 border-zinc-700': isDropdownOpen }"
               title="Notificações em tempo real"
+              aria-label="Notificações em tempo real"
+              :aria-expanded="isDropdownOpen"
+              aria-haspopup="true"
             >
               <Bell class="w-4 h-4" />
               <span
@@ -232,8 +235,13 @@ onUnmounted(() => {
                 <div
                   v-for="notif in notificationStore.recentNotifications.slice(0, 5)"
                   :key="notif.id"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`Notificação: ${notif.title}`"
                   @click="handleNotificationAction(notif)"
-                  class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 group"
+                  @keydown.enter="handleNotificationAction(notif)"
+                  @keydown.space.prevent="handleNotificationAction(notif)"
+                  class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 group focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   :class="[
                     notif.read
                       ? 'bg-zinc-900/40 border-transparent hover:bg-zinc-800/50 hover:border-zinc-700/60'

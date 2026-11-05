@@ -88,6 +88,8 @@ function handleCompleteBlock() {
   }
 }
 
+const modalContainer = ref<HTMLElement | null>(null)
+
 function handleKeydown(event: KeyboardEvent) {
   if (!focusStore.isModalOpen) return
 
@@ -104,7 +106,7 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-useModal(() => focusStore.isModalOpen, focusStore.closeFocusModal)
+useModal(() => focusStore.isModalOpen, focusStore.closeFocusModal, modalContainer)
 
 watch(
   () => focusStore.isModalOpen,
@@ -138,6 +140,10 @@ onUnmounted(() => {
       @click="focusStore.closeFocusModal"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="focus-modal-title"
         class="relative w-full max-w-lg rounded-3xl bg-surface-card/90 border border-surface-border/80 shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center space-y-5 max-h-[95vh] overflow-y-auto glow-card"
         @click.stop
       >
@@ -172,6 +178,7 @@ onUnmounted(() => {
             @click="focusStore.closeFocusModal"
             class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
             title="Minimizar (mantém timer ativo no topo)"
+            aria-label="Minimizar (mantém timer ativo no topo)"
           >
             <X class="w-5 h-5" />
           </button>
@@ -180,7 +187,10 @@ onUnmounted(() => {
         <!-- Task / Focus Title -->
         <div class="w-full space-y-1">
           <div v-if="focusStore.associatedBlockId" class="space-y-0.5">
-            <h2 class="text-xl sm:text-2xl font-extrabold text-white font-outfit tracking-tight truncate">
+            <h2
+              id="focus-modal-title"
+              class="text-xl sm:text-2xl font-extrabold text-white font-outfit tracking-tight truncate"
+            >
               {{ focusStore.associatedBlockName }}
             </h2>
             <p class="text-xs text-brand-300 flex items-center justify-center gap-1 font-medium">
@@ -190,9 +200,11 @@ onUnmounted(() => {
           <div v-else class="space-y-1">
             <div class="relative max-w-sm mx-auto">
               <input
+                id="focus-modal-title"
                 v-model="focusStore.associatedBlockName"
                 type="text"
                 placeholder="Foco Livre (clique para nomear tarefa)"
+                aria-label="Nome da tarefa de foco livre"
                 class="w-full text-center text-lg sm:text-xl font-bold text-white bg-surface-dark/50 hover:bg-surface-dark/80 focus:bg-surface-dark border border-surface-border/60 focus:border-brand-500 rounded-xl px-3 py-1.5 placeholder:text-slate-500 transition-all outline-none"
               />
               <PenLine class="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />

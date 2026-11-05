@@ -57,10 +57,11 @@ async function handleSubmit() {
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">E-mail</label>
+          <label for="login-email" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">E-mail</label>
           <div class="relative">
             <Mail class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="login-email"
               v-model="email"
               type="email"
               placeholder="seu@email.com"
@@ -71,10 +72,11 @@ async function handleSubmit() {
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">Senha</label>
+          <label for="login-password" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">Senha</label>
           <div class="relative">
             <Lock class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="login-password"
               v-model="password"
               type="password"
               placeholder="••••••••••••"

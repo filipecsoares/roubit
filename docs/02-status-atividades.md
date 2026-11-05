@@ -265,7 +265,7 @@
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
 | **IMP-06.1** | Toasts RFC 7807, Preservação de Modais & Correção de Leaks | [activity-01-frontend-error-toasts-modals-and-memory-leaks.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-01-frontend-error-toasts-modals-and-memory-leaks.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
-| **IMP-06.2** | Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado) | [activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-06.2** | Acessibilidade (ARIA Dialogs, Focus Trap & Navegação por Teclado) | [activity-02-accessibility-aria-and-keyboard-navigation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-02-accessibility-aria-and-keyboard-navigation.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
 | **IMP-06.3** | Testes Vitest para as 5 Views Principais & ESLint no CI | [activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt) | ⚪ NÃO INICIADO | — |
 | **IMP-06.4** | Correção de Benchmarks (`k6`/`P99`), Limpeza & Consolidação de Docs | [activity-04-benchmarks-cleanup-and-docs-consolidation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-04-benchmarks-cleanup-and-docs-consolidation.prompt) | ⚪ NÃO INICIADO | — |
 
