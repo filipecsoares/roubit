@@ -10,10 +10,12 @@ import DailyProgressGauge from '@/components/dashboard/DailyProgressGauge.vue'
 import RoutineManageModal from '@/components/dashboard/RoutineManageModal.vue'
 import type { BlockStatusType } from '@/types'
 import { formatLocalDate } from '@/utils/date'
+import { useToast } from '@/composables/useToast'
 
 const routineStore = useRoutineStore()
 const habitStore = useHabitStore()
 const focusStore = useFocusStore()
+const { toastMessage, showToast } = useToast()
 
 const now = ref(new Date())
 let timerId: ReturnType<typeof setInterval> | null = null
@@ -21,7 +23,6 @@ let timerId: ReturnType<typeof setInterval> | null = null
 const completedBlockIds = computed(() => routineStore.completedBlockIds)
 const skippedBlockIds = computed(() => routineStore.skippedBlockIds)
 const isRoutineModalOpen = ref(false)
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
 // Format today's date in Portuguese (e.g., Sexta-feira, 30 de Outubro de 2026)
 const currentDateFormatted = computed(() => {
@@ -82,21 +83,12 @@ const combinedProgressPercentage = computed(() => {
   return Math.round((routinePercentage.value + habitPercentage.value) / 2)
 })
 
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
-
 async function handleCompleteBlock(blockId: string, status: BlockStatusType) {
   try {
     await routineStore.completeBlock(blockId, status)
     showToast(`Bloco atualizado como ${status === 'completed' ? 'concluído' : 'pulado'}`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao registrar progresso do bloco', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -118,7 +110,7 @@ async function handleCreateRoutine(payload: {
     isRoutineModalOpen.value = false
     showToast('Rotina e cronograma de blocos salvos com sucesso!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criar rotina', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -158,7 +150,7 @@ async function handleHabitCheckin(habitId: string, value: number, isIncrement: b
     habitItem.today_value = prevValue
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
-    showToast(err.message || 'Falha ao registrar check-in', 'error')
+    showToast(err, 'error')
   }
 }
 

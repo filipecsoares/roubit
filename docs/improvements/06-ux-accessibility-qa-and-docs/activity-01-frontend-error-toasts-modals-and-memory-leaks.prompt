@@ -38,8 +38,8 @@ Improve frontend UX, error reporting, and resource hygiene: surface localized RF
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] Error toasts display the backend's RFC 7807 `detail` message.
-- [ ] `HabitManageModal.vue` and `OkrManageModal.vue` do not wipe user input if an API error occurs.
-- [ ] `focus.ts` does not leak `AudioContext` instances and `FocusModeModal.vue` only listens to `keydown`/`resize` while open.
-- [ ] All frontend tests (`npm run test`) and build (`npm run build`) pass.
+- [x] Error toasts display the backend's RFC 7807 `detail` message.
+- [x] `HabitManageModal.vue` and `OkrManageModal.vue` do not wipe user input if an API error occurs.
+- [x] `focus.ts` does not leak `AudioContext` instances and `FocusModeModal.vue` only listens to `keydown`/`resize` while open.
+- [x] All frontend tests (`npm run test`) and build (`npm run build`) pass.
 

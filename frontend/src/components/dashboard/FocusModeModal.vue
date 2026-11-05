@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import {
   Play,
   Pause,
@@ -21,6 +21,7 @@ import {
   POMODORO_LONG_BREAK_SECONDS,
 } from '@/stores/focus'
 import { useRoutineStore } from '@/stores/routine'
+import { useModal } from '@/composables/useModal'
 
 const props = withDefaults(
   defineProps<{
@@ -103,14 +104,29 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('resize', updateWidth)
-  window.addEventListener('keydown', handleKeydown)
-})
+useModal(() => focusStore.isModalOpen, focusStore.closeFocusModal)
+
+watch(
+  () => focusStore.isModalOpen,
+  (isOpen) => {
+    if (typeof window === 'undefined') return
+    if (isOpen) {
+      updateWidth()
+      window.addEventListener('resize', updateWidth)
+      window.addEventListener('keydown', handleKeydown)
+    } else {
+      window.removeEventListener('resize', updateWidth)
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  },
+  { immediate: true, flush: 'sync' }
+)
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateWidth)
-  window.removeEventListener('keydown', handleKeydown)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateWidth)
+    window.removeEventListener('keydown', handleKeydown)
+  }
 })
 </script>
 

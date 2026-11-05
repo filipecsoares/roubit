@@ -55,6 +55,15 @@ function resetForm() {
   colorHex.value = '#6366f1'
 }
 
+watch(
+  () => props.isOpen,
+  (open, wasOpen) => {
+    if (!open && wasOpen) {
+      resetForm()
+    }
+  }
+)
+
 function handleSave() {
   if (!name.value.trim()) return
   emit('save', {
@@ -66,7 +75,6 @@ function handleSave() {
     frequency_days: 127, // All days of the week by default (binary 1111111)
     color_hex: colorHex.value,
   })
-  resetForm()
 }
 </script>
 

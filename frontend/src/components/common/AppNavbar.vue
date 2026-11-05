@@ -294,8 +294,8 @@ onUnmounted(() => {
 
           <!-- User / Status Badge (desktop) -->
           <div class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/80 text-zinc-300 text-xs">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Online</span>
+            <span class="w-1.5 h-1.5 rounded-full" :class="isOnline ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+            <span>{{ isOnline ? 'Online' : 'Offline' }}</span>
           </div>
 
           <!-- Logout Button -->

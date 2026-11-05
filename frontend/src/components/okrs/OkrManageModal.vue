@@ -129,9 +129,16 @@ function handleSave() {
     end_date: endDate.value || undefined,
     key_results: validKrs,
   })
-
-  resetForm()
 }
+
+watch(
+  () => props.isOpen,
+  (open, wasOpen) => {
+    if (!open && wasOpen) {
+      resetForm()
+    }
+  }
+)
 </script>
 
 <template>

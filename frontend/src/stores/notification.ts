@@ -59,7 +59,7 @@ export const useNotificationStore = defineStore('notification', () => {
       try {
         const osNotif = new Notification(notification.title, {
           body: notification.message,
-          icon: '/favicon.ico',
+          icon: '/favicon.svg',
           tag: notification.id,
         })
         osNotif.onclick = () => {

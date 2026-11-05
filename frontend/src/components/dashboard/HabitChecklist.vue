@@ -68,9 +68,20 @@ const filteredHabits = computed(() => {
       </button>
     </div>
 
+    <!-- Loading skeleton -->
+    <div
+      v-if="loading && habits.length === 0"
+      class="text-center py-12 px-4 rounded-xl border border-dashed border-surface-border/40 animate-pulse"
+    >
+      <div class="inline-flex p-3 rounded-2xl bg-surface-border/30 text-slate-500 mb-3">
+        <Sparkles class="w-6 h-6 animate-spin" />
+      </div>
+      <p class="text-xs text-slate-500">Carregando hábitos diários...</p>
+    </div>
+
     <!-- Empty state: No habits at all -->
     <div
-      v-if="habits.length === 0"
+      v-else-if="habits.length === 0"
       class="text-center py-12 px-4 rounded-xl border border-dashed border-surface-border"
     >
       <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400 mb-3">

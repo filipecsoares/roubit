@@ -17,9 +17,11 @@ import LockStatusBadge from '@/components/journal/LockStatusBadge.vue'
 import VaultUnlockModal from '@/components/journal/VaultUnlockModal.vue'
 import JournalEditor from '@/components/journal/JournalEditor.vue'
 import { formatLocalDate, addDaysLocal, parseLocalDate } from '@/utils/date'
+import { useToast, extractErrorMessage } from '@/composables/useToast'
 
 const vaultStore = useVaultStore()
 const journalStore = useJournalStore()
+const { toastMessage, showToast } = useToast()
 
 const todayStr = formatLocalDate()
 const entryDate = ref(todayStr)
@@ -30,7 +32,6 @@ const tags = ref<string[]>([])
 const isUnlockModalOpen = ref(false)
 const unlockError = ref<string | null>(null)
 const isSaving = ref(false)
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
 // Scrub plaintext and metadata state whenever vault locks (manual or inactivity timeout)
 watch(
@@ -44,15 +45,6 @@ watch(
     }
   }
 )
-
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
 
 const formattedDateDisplay = computed(() => {
   const dateObj = parseLocalDate(entryDate.value)
@@ -159,7 +151,7 @@ async function handleUnlock(passphrase: string) {
     await journalStore.fetchMetadata()
     await loadEntryForDate()
   } catch (err: any) {
-    unlockError.value = err.message || 'Senha mestre incorreta ou erro de derivação'
+    unlockError.value = extractErrorMessage(err, 'Senha mestre incorreta ou erro de derivação')
   }
 }
 
@@ -203,7 +195,7 @@ async function handleSave() {
 
     showToast('Reflexão cifrada e salva com sucesso no cofre!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criptografar ou salvar reflexão', 'error')
+    showToast(err, 'error')
   } finally {
     isSaving.value = false
   }
