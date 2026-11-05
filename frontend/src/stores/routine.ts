@@ -7,6 +7,8 @@ export const useRoutineStore = defineStore('routine', () => {
   const routine = ref<Routine | null>(null)
   const blocks = ref<TimeBlock[]>([])
   const progress = ref<CurrentRoutineProgress | null>(null)
+  const completedBlockIds = ref<string[]>([])
+  const skippedBlockIds = ref<string[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -18,6 +20,8 @@ export const useRoutineStore = defineStore('routine', () => {
       routine.value = data.routine
       blocks.value = data.blocks
       progress.value = data.progress
+      completedBlockIds.value = data.completed_block_ids || []
+      skippedBlockIds.value = data.skipped_block_ids || []
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Erro ao carregar rotina diária'
       throw err
@@ -60,6 +64,23 @@ export const useRoutineStore = defineStore('routine', () => {
   async function completeBlock(blockId: string, status: BlockStatusType = 'completed', notes?: string): Promise<void> {
     loading.value = true
     error.value = null
+
+    // Optimistic update
+    if (status === 'completed') {
+      if (!completedBlockIds.value.includes(blockId)) {
+        completedBlockIds.value.push(blockId)
+      }
+      skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
+    } else if (status === 'skipped') {
+      if (!skippedBlockIds.value.includes(blockId)) {
+        skippedBlockIds.value.push(blockId)
+      }
+      completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
+    } else {
+      completedBlockIds.value = completedBlockIds.value.filter((id) => id !== blockId)
+      skippedBlockIds.value = skippedBlockIds.value.filter((id) => id !== blockId)
+    }
+
     try {
       await apiClient.post(`/routines/blocks/${blockId}/complete`, { status, notes })
       try {
@@ -68,7 +89,11 @@ export const useRoutineStore = defineStore('routine', () => {
         // Offline: update local block status optimistically
         const block = blocks.value.find((b) => b.id === blockId)
         if (block && progress.value) {
-          progress.value.completed_blocks += 1
+          if (status === 'completed') {
+            progress.value.completed_blocks += 1
+          } else if (status === 'skipped') {
+            progress.value.skipped_blocks += 1
+          }
           if (progress.value.pending_blocks > 0) {
             progress.value.pending_blocks -= 1
           }
@@ -86,6 +111,8 @@ export const useRoutineStore = defineStore('routine', () => {
     routine,
     blocks,
     progress,
+    completedBlockIds,
+    skippedBlockIds,
     loading,
     error,
     fetchActiveRoutine,

@@ -246,10 +246,7 @@ export function initOfflineSync(apiClientInstance: AxiosInstance): void {
   // Initial count update
   updatePendingCount()
 
-  window.addEventListener('online', () => {
-    syncOfflineQueue(apiClientInstance)
-  })
-
+  // Note: 'online' event is orchestrated by usePwa.ts which also handles Pinia stores refresh.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && window.navigator.onLine) {
       syncOfflineQueue(apiClientInstance)

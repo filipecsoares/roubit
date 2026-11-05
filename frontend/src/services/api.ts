@@ -1,6 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { enqueueMutation, initOfflineSync } from './offlineQueue'
+import { formatLocalDate } from '@/utils/date'
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -32,6 +33,12 @@ apiClient.interceptors.request.use(
       if (!config.headers.get('Idempotency-Key')) {
         config.headers.set('Idempotency-Key', crypto.randomUUID())
       }
+    }
+
+    // Inject client local date and timezone
+    config.headers.set('X-Local-Date', formatLocalDate())
+    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+      config.headers.set('X-Timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)
     }
 
     return config
@@ -96,7 +103,7 @@ apiClient.interceptors.response.use(
             log: {
               id: crypto.randomUUID(),
               habit_id: habitId,
-              log_date: payloadData?.date || new Date().toISOString().split('T')[0],
+              log_date: payloadData?.date || formatLocalDate(),
               actual_value: payloadData?.value || 1,
               is_completed: true,
               created_at: new Date().toISOString(),

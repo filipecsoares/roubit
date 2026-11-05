@@ -21,12 +21,25 @@ const recentlySynced = ref(false)
 
 function handleOnline() {
   isOnline.value = true
-  syncOfflineQueue(apiClient).then((res) => {
+  syncOfflineQueue(apiClient).then(async (res) => {
     if (res.synced > 0) {
       recentlySynced.value = true
       setTimeout(() => {
         recentlySynced.value = false
       }, 4000)
+
+      try {
+        const { useHabitStore } = await import('@/stores/habit')
+        const { useRoutineStore } = await import('@/stores/routine')
+        const { useOkrStore } = await import('@/stores/okr')
+        await Promise.allSettled([
+          useHabitStore().fetchHabits(),
+          useRoutineStore().fetchActiveRoutine(),
+          useOkrStore().fetchOkrs(),
+        ])
+      } catch (err) {
+        console.warn('Failed to refresh stores after offline sync', err)
+      }
     }
   })
 }

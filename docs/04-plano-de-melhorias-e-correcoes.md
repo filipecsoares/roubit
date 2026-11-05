@@ -93,24 +93,24 @@ flowchart TD
 
 ---
 
-### 🟡 Fase 04: Completude Funcional Full-Stack — API ↔ Frontend (`P2 — Integração de Domínio`)
+### 🟢 Fase 04: Completude Funcional Full-Stack — API ↔ Frontend (`P2 — Integração de Domínio`)
 *Objetivo: Substituir estados efêmeros/mockados no frontend por persistência real na API e corrigir bugs de fuso horário e PWA.*
 
-- [ ] **04.1 Persistência de Progresso Diário de Rotinas, Status `Skipped` & Editor de Rotina** ([activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt))
-  - [ ] Desativar rotinas anteriores ao criar nova rotina ativa e suportar `status: "completed" | "skipped"` em `POST /api/v1/routines/blocks/{id}/complete`.
-  - [ ] Retornar `completed_block_ids` e `skipped_block_ids` do dia em `GET /api/v1/routines` e hidratar `DashboardView.vue` (preservando o progresso ao atualizar a página).
-  - [ ] Conectar `@complete-block` do `<FocusModeModal />` em `App.vue` e carregar os blocos atuais ao abrir `RoutineManageModal.vue`.
-- [ ] **04.2 Endpoint de Analytics de Hábitos, Heatmap Real de 365 Dias & Check-in Numérico/Timer** ([activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt))
-  - [ ] Expor `GET /api/v1/habits/analytics` e `POST /api/v1/habits/{id}/archive` em `habit_controller.rs`.
-  - [ ] Alimentar `<HeatmapCalendar />` em `HabitsView.vue` com dados reais de 365 dias e otimizar a formatação de datas com `Intl.DateTimeFormat` único.
-  - [ ] Retornar `today_value` em `HabitSummaryDto` e corrigir exibição e check-in incremental de hábitos `numeric` e `timer` no Dashboard.
-- [ ] **04.3 Criação Atômica de OKRs & Endpoint de Vínculo Hábito-Key Result** ([activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt))
-  - [ ] Envolver criação de `Objective` + `KeyResults` em transação atômica, validar `start_date <= end_date`, sincronizar valor inicial de KRs vinculados a hábitos e retornar o `Objective` com `progress_percentage` atualizado.
-  - [ ] Expor `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` e persistir o vínculo de hábito no `LinkHabitModal` (`OkrsView.vue` e `useOkrStore`).
-- [ ] **04.4 Consciência de Fuso Horário (`X-Timezone`) & Sincronização Offline PWA** ([activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt))
-  - [ ] Substituir `new Date().toISOString().split('T')[0]` por utilitário de data local no frontend e enviar header `X-Timezone` nas requisições Axios.
-  - [ ] Respeitar `X-Timezone` nos controllers do servidor, incluir a data na chave de cache `roubit:cache:user:{user_id}:habits:summary:{date}` e limitar o cache L1 em memória.
-  - [ ] Corrigir `urlPattern` do Workbox em `frontend/vite.config.ts`, unificar o listener `online` entre `offlineQueue.ts` e `usePwa.ts` e recarregar as stores Pinia após sincronizar a fila offline.
+- [x] **04.1 Persistência de Progresso Diário de Rotinas, Status `Skipped` & Editor de Rotina** ([activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt))
+  - [x] Desativar rotinas anteriores ao criar nova rotina ativa e suportar `status: "completed" | "skipped"` em `POST /api/v1/routines/blocks/{id}/complete`.
+  - [x] Retornar `completed_block_ids` e `skipped_block_ids` do dia em `GET /api/v1/routines` e hidratar `DashboardView.vue` (preservando o progresso ao atualizar a página).
+  - [x] Conectar `@complete-block` do `<FocusModeModal />` em `App.vue` e carregar os blocos atuais ao abrir `RoutineManageModal.vue`.
+- [x] **04.2 Endpoint de Analytics de Hábitos, Heatmap Real de 365 Dias & Check-in Numérico/Timer** ([activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt))
+  - [x] Expor `GET /api/v1/habits/analytics` e `POST /api/v1/habits/{id}/archive` em `habit_controller.rs`.
+  - [x] Alimentar `<HeatmapCalendar />` em `HabitsView.vue` com dados reais de 365 dias e otimizar a formatação de datas com `Intl.DateTimeFormat` único.
+  - [x] Retornar `today_value` em `HabitSummaryDto` e corrigir exibição e check-in incremental de hábitos `numeric` e `timer` no Dashboard.
+- [x] **04.3 Criação Atômica de OKRs & Endpoint de Vínculo Hábito-Key Result** ([activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt))
+  - [x] Envolver criação de `Objective` + `KeyResults` em transação atômica, validar `start_date <= end_date`, sincronizar valor inicial de KRs vinculados a hábitos e retornar o `Objective` com `progress_percentage` atualizado.
+  - [x] Expor `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` e persistir o vínculo de hábito no `LinkHabitModal` (`OkrsView.vue` e `useOkrStore`).
+- [x] **04.4 Consciência de Fuso Horário (`X-Timezone`) & Sincronização Offline PWA** ([activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt))
+  - [x] Substituir `new Date().toISOString().split('T')[0]` por utilitário de data local no frontend e enviar header `X-Timezone` nas requisições Axios.
+  - [x] Respeitar `X-Timezone` nos controllers do servidor, incluir a data na chave de cache `roubit:cache:user:{user_id}:habits:summary:{date}` e limitar o cache L1 em memória.
+  - [x] Corrigir `urlPattern` do Workbox em `frontend/vite.config.ts`, unificar o listener `online` entre `offlineQueue.ts` e `usePwa.ts` e recarregar as stores Pinia após sincronizar a fila offline.
 
 ---
 

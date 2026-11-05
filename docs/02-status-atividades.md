@@ -205,11 +205,11 @@
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **Fase 02. Dual DB: SQLite (Dev) & PostgreSQL (Prod/Test)** | 🔴 P0/P1 | 4 | 4 | 0 | 0 | 🟢 Concluído |
-| **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 2 | 0 | 1 | 🟡 Em Progresso |
-| **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
+| **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 3 | 0 | 0 | 🟢 Concluído |
+| **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
 | **Fase 05. Conclusão do Modo Híbrido Remoto da CLI** | 🟡 P2 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
 | **Fase 06. UX, Acessibilidade, Testes de Views & Docs** | 🟢 P3 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL (MELHORIAS v3.0)** | — | **22** | **10** | **0** | **12** | **45.5%** |
+| **TOTAL (MELHORIAS v3.0)** | — | **22** | **14** | **0** | **8** | **63.6%** |
 
 ---
 
@@ -238,17 +238,17 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **IMP-03.1** | Hardening de Idempotência (Body Limit 2MB, Path Validation & Locks) | [activity-01-idempotency-middleware-security-hardening.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-01-idempotency-middleware-security-hardening.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-03.2** | Argon2id `spawn_blocking`, Timing Attack Defense & Redação de Logs | [activity-02-auth-argon2-blocking-and-timing-defense.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-02-auth-argon2-blocking-and-timing-defense.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
-| **IMP-03.3** | Rate Limiting, Cookies Seguros & Logout Completo (Backend + Frontend) | [activity-03-rate-limiting-secure-cookies-and-logout.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-03-rate-limiting-secure-cookies-and-logout.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-03.3** | Rate Limiting, Cookies Seguros & Logout Completo (Backend + Frontend) | [activity-03-rate-limiting-secure-cookies-and-logout.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/03-security-and-idempotency/activity-03-rate-limiting-secure-cookies-and-logout.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 
 ---
 
 ### Fase 04 (P2): Completude Funcional Full-Stack — API ↔ Frontend
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **IMP-04.1** | Hidratação do Progresso Diário de Rotinas, Status `Skipped` & Editor | [activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt) | ⚪ NÃO INICIADO | — |
-| **IMP-04.2** | Endpoint de Analytics de Hábitos, Heatmap Real de 365d & Numéricos | [activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt) | ⚪ NÃO INICIADO | — |
-| **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | ⚪ NÃO INICIADO | — |
-| **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-04.1** | Hidratação do Progresso Diário de Rotinas, Status `Skipped` & Editor | [activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.2** | Endpoint de Analytics de Hábitos, Heatmap Real de 365d & Numéricos | [activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
+| **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 
 ---
 

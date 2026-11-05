@@ -16,11 +16,12 @@ import { WebCryptoService } from '@/services/crypto'
 import LockStatusBadge from '@/components/journal/LockStatusBadge.vue'
 import VaultUnlockModal from '@/components/journal/VaultUnlockModal.vue'
 import JournalEditor from '@/components/journal/JournalEditor.vue'
+import { formatLocalDate, addDaysLocal, parseLocalDate } from '@/utils/date'
 
 const vaultStore = useVaultStore()
 const journalStore = useJournalStore()
 
-const todayStr = new Date().toISOString().split('T')[0]
+const todayStr = formatLocalDate()
 const entryDate = ref(todayStr)
 const plaintextReflection = ref('')
 const moodScore = ref(3)
@@ -54,8 +55,7 @@ function showToast(text: string, type: 'success' | 'error' = 'success') {
 }
 
 const formattedDateDisplay = computed(() => {
-  const parts = entryDate.value.split('-').map(Number)
-  const dateObj = new Date(parts[0], parts[1] - 1, parts[2])
+  const dateObj = parseLocalDate(entryDate.value)
   return dateObj.toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
@@ -65,10 +65,7 @@ const formattedDateDisplay = computed(() => {
 })
 
 function changeDate(daysOffset: number) {
-  const parts = entryDate.value.split('-').map(Number)
-  const d = new Date(parts[0], parts[1] - 1, parts[2])
-  d.setDate(d.getDate() + daysOffset)
-  entryDate.value = d.toISOString().split('T')[0]
+  entryDate.value = addDaysLocal(entryDate.value, daysOffset)
   vaultStore.resetInactivityTimer()
   loadEntryForDate()
 }

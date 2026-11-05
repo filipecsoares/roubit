@@ -32,8 +32,8 @@ Fix the OKR module's backend and frontend integration: make `Objective` + `KeyRe
 6. Update `docs/02-status-atividades.md` and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` persists `linked_habit_id` and `current_value` in the database and recalculates Objective progress.
-- [ ] Linking a habit via `LinkHabitModal.vue` in `OkrsView.vue` persists across page refreshes.
-- [ ] `POST /api/v1/okrs` validates `start_date <= end_date` and returns the Objective with accurate `progress_percentage`.
-- [ ] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
+- [x] `PATCH /api/v1/okrs/{id}/key-results/{kr_id}` persists `linked_habit_id` and `current_value` in the database and recalculates Objective progress.
+- [x] Linking a habit via `LinkHabitModal.vue` in `OkrsView.vue` persists across page refreshes.
+- [x] `POST /api/v1/okrs` validates `start_date <= end_date` and returns the Objective with accurate `progress_percentage`.
+- [x] All backend (`cargo test`) and frontend (`npm run test`) tests pass.
 

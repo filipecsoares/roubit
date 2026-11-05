@@ -647,3 +647,118 @@ async fn test_habit_summary_cache_and_offline_redis_graceful_degradation() {
     assert_eq!(habits2[0]["streak"]["current_streak"], 1);
     assert_eq!(habits2[0]["streak"]["is_active_today"], true);
 }
+
+#[tokio::test]
+async fn test_timezone_and_local_date_headers_behavior() {
+    let pool = create_sqlite_pool("sqlite::memory:")
+        .await
+        .expect("Failed to create in-memory database");
+    roubit_core::run_migrations(&pool)
+        .await
+        .expect("Failed to apply migrations");
+    let config = AppConfig {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 0,
+        jwt_secret: "super-secure-test-jwt-secret-with-minimum-32-bytes!!".to_string(),
+        ..Default::default()
+    };
+
+    let state = AppState::new(pool, config);
+    let app = build_router(state);
+
+    let token = register_and_get_token(&app, "tz_tester@roubit.app").await;
+
+    // 1. Create objective with X-Local-Date header (simulating client in 2026-07-15 = Q3)
+    let okr_payload = serde_json::json!({
+        "title": "Local Timezone Objective",
+        "description": "Aligning across timezones",
+        "key_results": []
+    });
+    let req_okr = Request::builder()
+        .uri("/api/v1/okrs")
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .header("x-local-date", "2026-07-15")
+        .body(Body::from(serde_json::to_vec(&okr_payload).unwrap()))
+        .unwrap();
+    let res_okr = app.clone().oneshot(req_okr).await.unwrap();
+    assert_eq!(res_okr.status(), StatusCode::CREATED);
+    let okr_bytes = to_bytes(res_okr.into_body(), usize::MAX).await.unwrap();
+    let created_okr: serde_json::Value = serde_json::from_slice(&okr_bytes).unwrap();
+    assert_eq!(created_okr["objective"]["quarter"], "2026-Q3");
+    assert_eq!(created_okr["objective"]["start_date"], "2026-07-15");
+
+    // 2. Create a habit
+    let habit_payload = serde_json::json!({
+        "name": "Evening Meditation",
+        "habit_type": "binary",
+        "target_value": 1.0,
+        "frequency_days": 127
+    });
+    let req_create_habit = Request::builder()
+        .uri("/api/v1/habits")
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&habit_payload).unwrap()))
+        .unwrap();
+    let res_create = app.clone().oneshot(req_create_habit).await.unwrap();
+    assert_eq!(res_create.status(), StatusCode::CREATED);
+    let habit_bytes = to_bytes(res_create.into_body(), usize::MAX).await.unwrap();
+    let habit: serde_json::Value = serde_json::from_slice(&habit_bytes).unwrap();
+    let habit_id = habit["id"].as_str().unwrap();
+
+    // 3. Record check-in for 2026-07-15 with X-Local-Date header
+    let checkin_payload = serde_json::json!({
+        "date": "2026-07-15",
+        "value": 1.0,
+        "is_increment": false
+    });
+    let req_checkin = Request::builder()
+        .uri(format!("/api/v1/habits/{habit_id}/checkin"))
+        .method("POST")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .header("x-local-date", "2026-07-15")
+        .body(Body::from(serde_json::to_vec(&checkin_payload).unwrap()))
+        .unwrap();
+    let res_checkin = app.clone().oneshot(req_checkin).await.unwrap();
+    assert_eq!(res_checkin.status(), StatusCode::OK);
+    let checkin_bytes = to_bytes(res_checkin.into_body(), usize::MAX).await.unwrap();
+    let checkin_res: serde_json::Value = serde_json::from_slice(&checkin_bytes).unwrap();
+    assert_eq!(checkin_res["streak"]["is_active_today"], true);
+
+    // 4. List habits sending X-Local-Date: 2026-07-15 -> is_active_today is true
+    let req_list_today = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-local-date", "2026-07-15")
+        .body(Body::empty())
+        .unwrap();
+    let res_list_today = app.clone().oneshot(req_list_today).await.unwrap();
+    assert_eq!(res_list_today.status(), StatusCode::OK);
+    let list_today_bytes = to_bytes(res_list_today.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let habits_today: Vec<serde_json::Value> = serde_json::from_slice(&list_today_bytes).unwrap();
+    assert_eq!(habits_today[0]["streak"]["is_active_today"], true);
+
+    // 5. List habits sending X-Local-Date: 2026-07-16 (tomorrow) -> is_active_today is false (not stale!)
+    let req_list_tomorrow = Request::builder()
+        .uri("/api/v1/habits")
+        .method("GET")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-local-date", "2026-07-16")
+        .body(Body::empty())
+        .unwrap();
+    let res_list_tomorrow = app.clone().oneshot(req_list_tomorrow).await.unwrap();
+    assert_eq!(res_list_tomorrow.status(), StatusCode::OK);
+    let list_tomorrow_bytes = to_bytes(res_list_tomorrow.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let habits_tomorrow: Vec<serde_json::Value> =
+        serde_json::from_slice(&list_tomorrow_bytes).unwrap();
+    assert_eq!(habits_tomorrow[0]["streak"]["is_active_today"], false);
+}

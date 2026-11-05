@@ -11,7 +11,7 @@ const okrStore = useOkrStore()
 const habitStore = useHabitStore()
 
 const quarters = ['2026-Q4', '2026-Q3', '2027-Q1', '2027-Q2']
-const selectedQuarter = ref('2026-Q4')
+const selectedQuarter = ref(okrStore.quarter)
 
 // Modals state
 const isLinkModalOpen = ref(false)
@@ -79,21 +79,34 @@ function openLinkModal(krId: string) {
   }
 }
 
-function handleLinkConfirm(habitId: string) {
+async function handleLinkConfirm(habitId: string) {
   if (!selectedKrId.value) return
 
-  // Update in local store
+  // Find parent objective ID
+  let parentObjectiveId: string | null = null
   for (const obj of okrStore.objectives) {
-    const kr = obj.key_results.find((k) => k.id === selectedKrId.value)
-    if (kr) {
-      kr.linked_habit_id = habitId
-      const habitName = habitsMap.value[habitId] || 'Hábito'
-      showToast(`Resultado-Chave vinculado ao hábito "${habitName}"!`)
+    if (obj.key_results.some((k) => k.id === selectedKrId.value)) {
+      parentObjectiveId = obj.objective.id
       break
     }
   }
-  isLinkModalOpen.value = false
-  selectedKrId.value = null
+
+  if (!parentObjectiveId) {
+    isLinkModalOpen.value = false
+    selectedKrId.value = null
+    return
+  }
+
+  try {
+    await okrStore.linkHabitToKeyResult(parentObjectiveId, selectedKrId.value, habitId)
+    const habitName = habitsMap.value[habitId] || 'Hábito'
+    showToast(`Resultado-Chave vinculado ao hábito "${habitName}"!`)
+  } catch (err: any) {
+    showToast(err.message || 'Erro ao vincular hábito ao Resultado-Chave', 'error')
+  } finally {
+    isLinkModalOpen.value = false
+    selectedKrId.value = null
+  }
 }
 
 async function handleQuarterChange(quarter: string) {

@@ -267,6 +267,7 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .expect("Parse routine with progress");
     assert_eq!(routine_prog.blocks.len(), 2);
     let block1_id = routine_prog.blocks[0].id;
+    let block2_id = routine_prog.blocks[1].id;
 
     // Complete time block
     let complete_url = format!("http://{local_addr}/api/v1/routines/blocks/{block1_id}/complete");
@@ -281,6 +282,99 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("Complete block failed");
     assert_eq!(complete_res.status(), reqwest::StatusCode::OK);
+
+    // Skip second time block
+    let skip_url = format!("http://{local_addr}/api/v1/routines/blocks/{block2_id}/complete");
+    let skip_res = client
+        .post(&skip_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "status": "skipped",
+            "notes": "Skipped due to urgent meeting"
+        }))
+        .send()
+        .await
+        .expect("Skip block failed");
+    assert_eq!(skip_res.status(), reqwest::StatusCode::OK);
+
+    // Verify progress hydration contains both completed and skipped block IDs
+    let get_hydrated_res = client
+        .get(&routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get routine failed");
+    assert_eq!(get_hydrated_res.status(), reqwest::StatusCode::OK);
+    let hydrated_prog: roubit_server::controllers::RoutineWithProgressResponse = get_hydrated_res
+        .json()
+        .await
+        .expect("Parse routine with progress");
+    assert!(hydrated_prog.completed_block_ids.contains(&block1_id));
+    assert!(hydrated_prog.skipped_block_ids.contains(&block2_id));
+
+    // Verify creating another active routine automatically deactivates the previous one
+    let create_second_routine_res = client
+        .post(&routines_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Evening Wind-Down",
+            "is_active": true,
+            "blocks": [
+                {
+                    "name": "Reading",
+                    "start_time": "21:00:00",
+                    "end_time": "22:00:00"
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Create second routine failed");
+    assert_eq!(
+        create_second_routine_res.status(),
+        reqwest::StatusCode::CREATED
+    );
+    let second_routine: roubit_core::Routine = create_second_routine_res
+        .json()
+        .await
+        .expect("Parse second routine");
+
+    // Fetch active routine now returns the second routine
+    let get_active2_res = client
+        .get(&routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get active routine 2 failed");
+    let active2_prog: roubit_server::controllers::RoutineWithProgressResponse = get_active2_res
+        .json()
+        .await
+        .expect("Parse active routine 2");
+    assert_eq!(
+        active2_prog.routine.expect("Active routine").id,
+        second_routine.id
+    );
+
+    // List all routines confirms previous routine is_active is false
+    let list_routines_url = format!("http://{local_addr}/api/v1/routines/all");
+    let list_res = client
+        .get(&list_routines_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List routines failed");
+    let all_routines: Vec<roubit_core::Routine> =
+        list_res.json().await.expect("Parse all routines");
+    let first_in_list = all_routines
+        .iter()
+        .find(|r| r.id == created_routine.id)
+        .expect("First routine exists");
+    let second_in_list = all_routines
+        .iter()
+        .find(|r| r.id == second_routine.id)
+        .expect("Second routine exists");
+    assert!(!first_in_list.is_active);
+    assert!(second_in_list.is_active);
 
     // 3. Habits CRUD & Idempotent check-in
     let habits_url = format!("http://{local_addr}/api/v1/habits");
@@ -346,7 +440,7 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         Some("HIT")
     );
 
-    // List habits
+    // List habits & verify today_value hydration
     let list_habits_res = client
         .get(&habits_url)
         .bearer_auth(&auth.token)
@@ -354,6 +448,121 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("List habits failed");
     assert_eq!(list_habits_res.status(), reqwest::StatusCode::OK);
+    let habits_list: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        list_habits_res.json().await.expect("Parse habits list");
+    assert_eq!(habits_list.len(), 1);
+    assert_eq!(habits_list[0].habit.id, habit.id);
+
+    // Incremental check-in for today (1.0L)
+    let today_str = chrono::Utc::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
+    let inc1_res = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "date": today_str,
+            "value": 1.0,
+            "is_increment": true
+        }))
+        .send()
+        .await
+        .expect("Increment 1 failed");
+    assert_eq!(inc1_res.status(), reqwest::StatusCode::OK);
+
+    // Second incremental check-in for today (1.5L -> total 2.5L, target reached)
+    let inc2_res = client
+        .post(&checkin_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "date": today_str,
+            "value": 1.5,
+            "is_increment": true
+        }))
+        .send()
+        .await
+        .expect("Increment 2 failed");
+    assert_eq!(inc2_res.status(), reqwest::StatusCode::OK);
+
+    // Fetch habits again and verify today_value reflects 2.5L and streak is active today
+    let fetch_updated_habits_res = client
+        .get(&habits_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List habits 2 failed");
+    let habits_list2: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        fetch_updated_habits_res
+            .json()
+            .await
+            .expect("Parse habits list 2");
+    assert!((habits_list2[0].today_value - 2.5).abs() < f64::EPSILON);
+    assert!(habits_list2[0].streak.is_active_today);
+
+    // Analytics endpoint (GET /api/v1/habits/analytics)
+    let analytics_url = format!("http://{local_addr}/api/v1/habits/analytics");
+    let analytics_res = client
+        .get(&analytics_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Get habit analytics failed");
+    assert_eq!(analytics_res.status(), reqwest::StatusCode::OK);
+    let analytics_data: roubit_server::controllers::HabitAnalyticsResponse =
+        analytics_res.json().await.expect("Parse habit analytics");
+    assert!(!analytics_data.habits_summary.is_empty());
+    assert_eq!(analytics_data.habits_summary[0].habit_id, habit.id);
+    assert_eq!(
+        analytics_data.habits_summary[0].summary.heatmap_cells.len(),
+        365
+    );
+
+    // Archive habit endpoint (POST /api/v1/habits/:id/archive)
+    let create_temp_habit_res = client
+        .post(&habits_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "name": "Temporary Habit",
+            "habit_type": "binary",
+            "target_value": 1.0
+        }))
+        .send()
+        .await
+        .expect("Create temp habit failed");
+    assert_eq!(create_temp_habit_res.status(), reqwest::StatusCode::CREATED);
+    let temp_habit: roubit_core::Habit = create_temp_habit_res
+        .json()
+        .await
+        .expect("Parse temp habit");
+
+    let archive_url = format!(
+        "http://{local_addr}/api/v1/habits/{}/archive",
+        temp_habit.id
+    );
+    let archive_res = client
+        .post(&archive_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("Archive habit failed");
+    assert_eq!(archive_res.status(), reqwest::StatusCode::OK);
+
+    // Verify temp_habit is no longer in active list
+    let list_after_archive = client
+        .get(&habits_url)
+        .bearer_auth(&auth.token)
+        .send()
+        .await
+        .expect("List after archive failed");
+    let habits_after_archive: Vec<roubit_server::controllers::HabitWithStreakResponse> =
+        list_after_archive
+            .json()
+            .await
+            .expect("Parse list after archive");
+    assert!(!habits_after_archive
+        .iter()
+        .any(|h| h.habit.id == temp_habit.id));
 
     // 4. OKRs CRUD
     let okrs_url = format!("http://{local_addr}/api/v1/okrs");
@@ -378,8 +587,44 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("Create OKR failed");
     assert_eq!(create_okr_res.status(), reqwest::StatusCode::CREATED);
+    let created_okr: roubit_core::ObjectiveWithKeyResults =
+        create_okr_res.json().await.expect("Parse created OKR");
+    assert_eq!(created_okr.key_results.len(), 1);
+    let obj_id = created_okr.objective.id;
+    let kr_id = created_okr.key_results[0].id;
 
-    // List OKRs
+    // Reject objective creation with invalid date range (start_date > end_date)
+    let bad_date_res = client
+        .post(&okrs_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "title": "Invalid Date OKR",
+            "start_date": "2026-12-31",
+            "end_date": "2026-01-01"
+        }))
+        .send()
+        .await
+        .expect("Send bad date request");
+    assert_eq!(bad_date_res.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    // PATCH /api/v1/okrs/{id}/key-results/{kr_id} - update current_value to 75.0
+    let patch_kr_url = format!("http://{local_addr}/api/v1/okrs/{obj_id}/key-results/{kr_id}");
+    let patch_res = client
+        .patch(&patch_kr_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "current_value": 75.0
+        }))
+        .send()
+        .await
+        .expect("Patch KR failed");
+    assert_eq!(patch_res.status(), reqwest::StatusCode::OK);
+    let patched_okr: roubit_core::ObjectiveWithKeyResults =
+        patch_res.json().await.expect("Parse patched OKR");
+    assert!((patched_okr.key_results[0].current_value - 75.0).abs() < f64::EPSILON);
+    assert!((patched_okr.objective.progress_percentage - 75.0).abs() < f32::EPSILON);
+
+    // List OKRs confirms persistence across requests
     let list_okrs_res = client
         .get(&okrs_url)
         .query(&[("quarter", "Q4-2026")])
@@ -392,6 +637,8 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         list_okrs_res.json().await.expect("Parse OKRs");
     assert_eq!(okrs.len(), 1);
     assert_eq!(okrs[0].key_results.len(), 1);
+    assert_eq!(okrs[0].key_results[0].linked_habit_id, Some(habit.id));
+    assert!((okrs[0].key_results[0].current_value - 75.0).abs() < f64::EPSILON);
 
     let _ = shutdown_tx.send(());
     tokio::time::timeout(Duration::from_secs(3), server_handle)

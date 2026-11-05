@@ -253,23 +253,30 @@ impl RedisService {
         Ok(deleted > 0)
     }
 
-    /// Key format for user habit dashboard summary cache.
+    /// Key format for user habit dashboard summary cache for a specific date.
     #[must_use]
-    pub fn habit_summary_cache_key(user_id: &str) -> String {
-        format!("roubit:cache:user:{user_id}:habits:summary")
+    pub fn habit_summary_cache_key(user_id: &str, date: chrono::NaiveDate) -> String {
+        format!("roubit:cache:user:{user_id}:habits:summary:{date}")
     }
 
-    /// Retrieves the cached habit dashboard summary JSON payload for a user.
-    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    /// Pattern for user habit summary cache keys across all dates.
+    #[must_use]
+    pub fn habit_summary_cache_pattern(user_id: &str) -> String {
+        format!("roubit:cache:user:{user_id}:habits:summary:*")
+    }
+
+    /// Retrieves the cached habit dashboard summary JSON payload for a user on a given date.
+    /// Key format: `roubit:cache:user:{user_id}:habits:summary:{date}`
     ///
     /// # Errors
     /// Returns `RedisError` if retrieving the connection or GET command fails.
     pub async fn get_cached_habit_summary(
         &self,
         user_id: &str,
+        date: chrono::NaiveDate,
     ) -> Result<Option<String>, RedisError> {
         let mut conn = self.get_connection().await?;
-        let key = Self::habit_summary_cache_key(user_id);
+        let key = Self::habit_summary_cache_key(user_id, date);
         let result: Option<String> = conn.get(&key).await?;
         Ok(result)
     }
@@ -278,38 +285,56 @@ impl RedisService {
     ///
     /// # Errors
     /// Returns `RedisError` if retrieving the connection or GET command fails.
-    pub async fn get_cached_summary(&self, user_id: &str) -> Result<Option<String>, RedisError> {
-        self.get_cached_habit_summary(user_id).await
+    pub async fn get_cached_summary(
+        &self,
+        user_id: &str,
+        date: chrono::NaiveDate,
+    ) -> Result<Option<String>, RedisError> {
+        self.get_cached_habit_summary(user_id, date).await
     }
 
     /// Stores the habit dashboard summary JSON payload in Redis with a TTL.
-    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    /// Key format: `roubit:cache:user:{user_id}:habits:summary:{date}`
     ///
     /// # Errors
     /// Returns `RedisError` if retrieving the connection or SETEX command fails.
     pub async fn set_cached_habit_summary(
         &self,
         user_id: &str,
+        date: chrono::NaiveDate,
         summary_json: &str,
         ttl_seconds: u64,
     ) -> Result<(), RedisError> {
         let mut conn = self.get_connection().await?;
-        let key = Self::habit_summary_cache_key(user_id);
+        let key = Self::habit_summary_cache_key(user_id, date);
         conn.set_ex::<_, _, ()>(&key, summary_json, ttl_seconds)
             .await?;
         Ok(())
     }
 
-    /// Invalidates (evicts) the cached habit dashboard summary for a user.
-    /// Key format: `roubit:cache:user:{user_id}:habits:summary`
+    /// Invalidates (evicts) the cached habit dashboard summary for a user across all dates.
+    /// Pattern: `roubit:cache:user:{user_id}:habits:summary:*`
     ///
     /// # Errors
     /// Returns `RedisError` if retrieving the connection or DEL command fails.
     pub async fn invalidate_user_habits_cache(&self, user_id: &str) -> Result<bool, RedisError> {
         let mut conn = self.get_connection().await?;
-        let key = Self::habit_summary_cache_key(user_id);
-        let deleted: i64 = redis::cmd("DEL").arg(&key).query_async(&mut conn).await?;
-        Ok(deleted > 0)
+        let pattern = Self::habit_summary_cache_pattern(user_id);
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg(&pattern)
+            .query_async(&mut conn)
+            .await
+            .unwrap_or_default();
+        if keys.is_empty() {
+            Ok(false)
+        } else {
+            let mut del_cmd = redis::cmd("DEL");
+            for k in &keys {
+                del_cmd.arg(k);
+            }
+            let deleted: i64 = del_cmd.query_async(&mut conn).await?;
+            Ok(deleted > 0)
+        }
     }
 
     /// Alias for `invalidate_user_habits_cache`.
@@ -413,10 +438,11 @@ mod tests {
     #[test]
     fn test_habit_summary_cache_key() {
         let user_id = "550e8400-e29b-41d4-a716-446655440000";
-        let key = RedisService::habit_summary_cache_key(user_id);
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 11, 4).unwrap();
+        let key = RedisService::habit_summary_cache_key(user_id, date);
         assert_eq!(
             key,
-            "roubit:cache:user:550e8400-e29b-41d4-a716-446655440000:habits:summary"
+            "roubit:cache:user:550e8400-e29b-41d4-a716-446655440000:habits:summary:2026-11-04"
         );
     }
 }
