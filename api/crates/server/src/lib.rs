@@ -17,7 +17,7 @@ pub use controllers::{
     CreateKeyResultRequest, CreateObjectiveRequest, CreateRoutineRequest, CreateTimeBlockRequest,
     EncryptedJournalResponse, HabitAnalyticsResponse, HabitCheckinRequest, HabitSummaryAnalyticsDto,
     HabitWithStreakResponse, JournalMetadataQuery, ListOkrsQuery, LogBlockStatusRequest,
-    RoutineWithProgressResponse, SaveEncryptedJournalRequest,
+    RoutineWithProgressResponse, SaveEncryptedJournalRequest, UpdateKeyResultRequest,
 };
 pub use errors::{ApiError, ProblemDetails};
 pub use middleware::{

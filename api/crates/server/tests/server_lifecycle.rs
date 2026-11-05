@@ -556,8 +556,44 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("Create OKR failed");
     assert_eq!(create_okr_res.status(), reqwest::StatusCode::CREATED);
+    let created_okr: roubit_core::ObjectiveWithKeyResults =
+        create_okr_res.json().await.expect("Parse created OKR");
+    assert_eq!(created_okr.key_results.len(), 1);
+    let obj_id = created_okr.objective.id;
+    let kr_id = created_okr.key_results[0].id;
 
-    // List OKRs
+    // Reject objective creation with invalid date range (start_date > end_date)
+    let bad_date_res = client
+        .post(&okrs_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "title": "Invalid Date OKR",
+            "start_date": "2026-12-31",
+            "end_date": "2026-01-01"
+        }))
+        .send()
+        .await
+        .expect("Send bad date request");
+    assert_eq!(bad_date_res.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    // PATCH /api/v1/okrs/{id}/key-results/{kr_id} - update current_value to 75.0
+    let patch_kr_url = format!("http://{local_addr}/api/v1/okrs/{obj_id}/key-results/{kr_id}");
+    let patch_res = client
+        .patch(&patch_kr_url)
+        .bearer_auth(&auth.token)
+        .json(&serde_json::json!({
+            "current_value": 75.0
+        }))
+        .send()
+        .await
+        .expect("Patch KR failed");
+    assert_eq!(patch_res.status(), reqwest::StatusCode::OK);
+    let patched_okr: roubit_core::ObjectiveWithKeyResults =
+        patch_res.json().await.expect("Parse patched OKR");
+    assert!((patched_okr.key_results[0].current_value - 75.0).abs() < f64::EPSILON);
+    assert!((patched_okr.objective.progress_percentage - 75.0).abs() < f32::EPSILON);
+
+    // List OKRs confirms persistence across requests
     let list_okrs_res = client
         .get(&okrs_url)
         .query(&[("quarter", "Q4-2026")])
@@ -570,6 +606,8 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         list_okrs_res.json().await.expect("Parse OKRs");
     assert_eq!(okrs.len(), 1);
     assert_eq!(okrs[0].key_results.len(), 1);
+    assert_eq!(okrs[0].key_results[0].linked_habit_id, Some(habit.id));
+    assert!((okrs[0].key_results[0].current_value - 75.0).abs() < f64::EPSILON);
 
     let _ = shutdown_tx.send(());
     tokio::time::timeout(Duration::from_secs(3), server_handle)

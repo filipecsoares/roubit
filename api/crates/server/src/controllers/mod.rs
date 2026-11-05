@@ -14,6 +14,7 @@ pub use journal_controller::{
 };
 pub use okr_controller::{
     okr_routes, CreateKeyResultRequest, CreateObjectiveRequest, ListOkrsQuery,
+    UpdateKeyResultRequest,
 };
 pub use routine_controller::{
     complete_block, create_routine, get_routine, routine_routes, CreateRoutineRequest,

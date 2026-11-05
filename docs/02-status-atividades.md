@@ -206,10 +206,10 @@
 | **Fase 01. Dados, Cofre, SSE & Build** | 🔴 P0 | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **Fase 02. Dual DB: SQLite (Dev) & PostgreSQL (Prod/Test)** | 🔴 P0/P1 | 4 | 4 | 0 | 0 | 🟢 Concluído |
 | **Fase 03. Blindagem de Segurança, Auth & Idempotência** | 🟠 P1 | 3 | 3 | 0 | 0 | 🟢 Concluído |
-| **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 2 | 0 | 2 | 🟡 Em Progresso |
+| **Fase 04. Integração Full-Stack (API ↔ Frontend & Timezone)** | 🟡 P2 | 4 | 3 | 0 | 1 | 🟡 Em Progresso |
 | **Fase 05. Conclusão do Modo Híbrido Remoto da CLI** | 🟡 P2 | 3 | 0 | 0 | 3 | ⚪ Não Iniciado |
 | **Fase 06. UX, Acessibilidade, Testes de Views & Docs** | 🟢 P3 | 4 | 0 | 0 | 4 | ⚪ Não Iniciado |
-| **TOTAL (MELHORIAS v3.0)** | — | **22** | **13** | **0** | **9** | **59.1%** |
+| **TOTAL (MELHORIAS v3.0)** | — | **22** | **14** | **0** | **8** | **63.6%** |
 
 ---
 
@@ -247,7 +247,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **IMP-04.1** | Hidratação do Progresso Diário de Rotinas, Status `Skipped` & Editor | [activity-01-routine-persistence-skip-status-and-editor.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-01-routine-persistence-skip-status-and-editor.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-04.2** | Endpoint de Analytics de Hábitos, Heatmap Real de 365d & Numéricos | [activity-02-habit-analytics-endpoint-and-real-heatmap.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-02-habit-analytics-endpoint-and-real-heatmap.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
-| **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-04.3** | Criação Atômica de OKRs & Persistência de Vínculo Hábito-KR | [activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-03-okr-atomic-creation-and-habit-link-endpoint.prompt) | 🟢 CONCLUÍDO | 2026-11-04 |
 | **IMP-04.4** | Suporte a Fuso Horário Local (`X-Timezone`) & Sync Offline PWA | [activity-04-timezone-awareness-and-pwa-offline-sync.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/04-fullstack-domain-integration/activity-04-timezone-awareness-and-pwa-offline-sync.prompt) | ⚪ NÃO INICIADO | — |
 
 ---

@@ -92,6 +92,15 @@ pub trait OkrRepository: Send + Sync {
         new_value: f64,
     ) -> Result<KeyResult, OkrRepositoryError>;
 
+    /// Updates a Key Result's linked habit and/or current value, updating progress for both KR and parent Objective.
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
+    ) -> Result<KeyResult, OkrRepositoryError>;
+
     /// Explicitly updates an objective's progress percentage.
     async fn update_objective_progress(
         &self,
@@ -395,6 +404,17 @@ impl OkrRepository for SqliteOkrRepository {
         kr_id: Uuid,
         new_value: f64,
     ) -> Result<KeyResult, OkrRepositoryError> {
+        self.update_key_result_link_or_value(user_id, kr_id, None, Some(new_value))
+            .await
+    }
+
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
+    ) -> Result<KeyResult, OkrRepositoryError> {
         let mut tx = self.pool.begin().await?;
 
         // 1. Fetch KeyResult and verify ownership via parent Objective
@@ -413,16 +433,24 @@ impl OkrRepository for SqliteOkrRepository {
 
         let mut kr = kr_opt.ok_or(OkrRepositoryError::KeyResultNotFound(kr_id))?;
 
-        // 2. Update KR value and progress
-        kr.update_current_value(new_value);
+        if let Some(link_opt) = linked_habit_id {
+            kr.linked_habit_id = link_opt;
+        }
+
+        if let Some(val) = new_value {
+            kr.update_current_value(val);
+        } else {
+            kr.updated_at = Utc::now();
+        }
 
         sqlx::query(
             r"
             UPDATE key_results
-            SET current_value = ?, progress_percentage = ?, updated_at = ?
+            SET linked_habit_id = ?, current_value = ?, progress_percentage = ?, updated_at = ?
             WHERE id = ?
             ",
         )
+        .bind(kr.linked_habit_id)
         .bind(kr.current_value)
         .bind(kr.progress_percentage)
         .bind(kr.updated_at)
@@ -964,6 +992,17 @@ impl OkrRepository for PgOkrRepository {
         kr_id: Uuid,
         new_value: f64,
     ) -> Result<KeyResult, OkrRepositoryError> {
+        self.update_key_result_link_or_value(user_id, kr_id, None, Some(new_value))
+            .await
+    }
+
+    async fn update_key_result_link_or_value(
+        &self,
+        user_id: Uuid,
+        kr_id: Uuid,
+        linked_habit_id: Option<Option<Uuid>>,
+        new_value: Option<f64>,
+    ) -> Result<KeyResult, OkrRepositoryError> {
         let mut tx = self.pool.begin().await?;
 
         let kr_row_opt = sqlx::query(
@@ -982,15 +1021,26 @@ impl OkrRepository for PgOkrRepository {
         let kr_row = kr_row_opt.ok_or(OkrRepositoryError::KeyResultNotFound(kr_id))?;
         let mut kr = Self::map_kr_row(&kr_row)?;
 
-        kr.update_current_value(new_value);
+        if let Some(link_opt) = linked_habit_id {
+            kr.linked_habit_id = link_opt;
+        }
+
+        if let Some(val) = new_value {
+            kr.update_current_value(val);
+        } else {
+            kr.updated_at = Utc::now();
+        }
+
+        let habit_id_str = kr.linked_habit_id.map(|id| id.to_string());
 
         sqlx::query(
             r"
             UPDATE key_results
-            SET current_value = $1, progress_percentage = $2, updated_at = $3
-            WHERE id = $4
+            SET linked_habit_id = $1, current_value = $2, progress_percentage = $3, updated_at = $4
+            WHERE id = $5
             ",
         )
+        .bind(habit_id_str)
         .bind(kr.current_value)
         .bind(f64::from(kr.progress_percentage))
         .bind(kr.updated_at)
