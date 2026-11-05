@@ -255,7 +255,7 @@
 ### Fase 05 (P2): Conclusão do Modo Híbrido Remoto da CLI
 | ID | Atividade | Arquivo | Estado | Commit / Data |
 | :---: | :--- | :--- | :---: | :---: |
-| **IMP-05.1** | Alinhamento de Contratos REST e DTOs no `HttpClient` da CLI | [activity-01-cli-remote-dto-and-endpoint-alignment.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-01-cli-remote-dto-and-endpoint-alignment.prompt) | ⚪ NÃO INICIADO | — |
+| **IMP-05.1** | Alinhamento de Contratos REST e DTOs no `HttpClient` da CLI | [activity-01-cli-remote-dto-and-endpoint-alignment.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-01-cli-remote-dto-and-endpoint-alignment.prompt) | 🟢 CONCLUÍDO | 2026-11-05 |
 | **IMP-05.2** | Habilitação Remota de `routine`, `okr`, `journal` & `config set` | [activity-02-cli-remote-routine-okr-journal-commands.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-02-cli-remote-routine-okr-journal-commands.prompt) | ⚪ NÃO INICIADO | — |
 | **IMP-05.3** | Suíte Completa de Testes E2E da CLI em Modo Remoto | [activity-03-cli-remote-full-e2e-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-03-cli-remote-full-e2e-test-suite.prompt) | ⚪ NÃO INICIADO | — |
 

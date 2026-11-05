@@ -17,8 +17,9 @@ pub use okr_controller::{
     UpdateKeyResultRequest,
 };
 pub use routine_controller::{
-    complete_block, create_routine, get_routine, routine_routes, CreateRoutineRequest,
-    CreateTimeBlockRequest, LogBlockStatusRequest, RoutineWithProgressResponse,
+    complete_block, create_routine, get_routine, list_routine_blocks, routine_routes,
+    CreateRoutineRequest, CreateTimeBlockRequest, LogBlockStatusRequest,
+    RoutineWithProgressResponse,
 };
 
 use axum::http::HeaderMap;

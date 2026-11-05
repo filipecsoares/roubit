@@ -193,6 +193,21 @@ async fn test_cli_remote_end_to_end_workflow() {
         .success()
         .stdout(predicates::str::contains("Check-in recorded for habit"));
 
+    // Scenario 4.1: Archive habit via remote CLI
+    let mut archive_cmd = Command::cargo_bin("roubit").expect("Binary 'roubit' must exist");
+    archive_cmd
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "habit",
+            "archive",
+            &habit_uuid.to_string(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("archived"));
+
     // Scenario 5: Idempotency-Key retry verification
     // Read the stored JWT token to perform duplicate network call with identical idempotency key
     let creds_bytes = fs::read(&creds_path).expect("Read credentials");

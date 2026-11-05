@@ -355,11 +355,30 @@ pub async fn delete_routine(
     }
 }
 
+/// Handler for `GET /api/v1/routines/:id/blocks`
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] if database queries fail.
+pub async fn list_routine_blocks(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(routine_id): Path<Uuid>,
+) -> Result<Json<Vec<TimeBlock>>, ApiError> {
+    let blocks = state
+        .routine_repo
+        .list_blocks_for_routine(routine_id, user.id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(blocks))
+}
+
 /// Constructs router for routine endpoints
 pub fn routine_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_routine).post(create_routine))
         .route("/all", get(list_routines))
         .route("/{id}", axum::routing::delete(delete_routine))
+        .route("/{id}/blocks", get(list_routine_blocks))
         .route("/blocks/{id}/complete", post(complete_block))
 }

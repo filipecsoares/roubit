@@ -131,10 +131,81 @@ impl HttpClient {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-struct HabitWithStreakDto {
-    habit: Habit,
+#[serde(untagged)]
+enum HabitResponseItem {
+    Nested {
+        habit: Habit,
+        #[allow(dead_code)]
+        streak: roubit_core::StreakMetrics,
+        #[allow(dead_code)]
+        #[serde(default)]
+        today_value: Option<f64>,
+    },
+    Flat {
+        id: Uuid,
+        user_id: Option<Uuid>,
+        name: String,
+        description: Option<String>,
+        habit_type: roubit_core::HabitType,
+        target_value: f64,
+        unit: Option<String>,
+        frequency_days: Option<u8>,
+        color_hex: Option<String>,
+        is_archived: Option<bool>,
+        current_streak: Option<i32>,
+        longest_streak: Option<i32>,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
+        updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    },
+}
+
+impl HabitResponseItem {
+    fn into_habit(self) -> Habit {
+        match self {
+            Self::Nested { habit, .. } => habit,
+            Self::Flat {
+                id,
+                user_id,
+                name,
+                description,
+                habit_type,
+                target_value,
+                unit,
+                frequency_days,
+                color_hex,
+                is_archived,
+                current_streak,
+                longest_streak,
+                created_at,
+                updated_at,
+            } => Habit {
+                id,
+                user_id,
+                name,
+                description,
+                habit_type,
+                target_value,
+                unit,
+                frequency_days: frequency_days.unwrap_or(127),
+                color_hex: color_hex.unwrap_or_else(|| "#4F46E5".to_string()),
+                is_archived: is_archived.unwrap_or(false),
+                current_streak: current_streak.unwrap_or(0),
+                longest_streak: longest_streak.unwrap_or(0),
+                created_at: created_at.unwrap_or_else(chrono::Utc::now),
+                updated_at: updated_at.unwrap_or_else(chrono::Utc::now),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct RoutineWithProgressDto {
+    routine: Option<Routine>,
+    #[serde(default)]
+    blocks: Vec<TimeBlock>,
     #[allow(dead_code)]
-    streak: roubit_core::StreakMetrics,
+    #[serde(default)]
+    progress: Option<roubit_core::CurrentRoutineProgress>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -154,20 +225,27 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
-        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
-        Ok(items.into_iter().map(|item| item.habit).collect())
+        let items: Vec<HabitResponseItem> = Self::handle_response(resp).await?;
+        Ok(items
+            .into_iter()
+            .map(HabitResponseItem::into_habit)
+            .collect())
     }
 
     async fn list_active_habits(&self) -> Result<Vec<Habit>, ClientError> {
-        let url = format!("{}/api/v1/habits?active=true", self.base_url);
+        let url = format!("{}/api/v1/habits", self.base_url);
         let resp = self
             .client
             .get(&url)
             .headers(self.build_headers(None))
             .send()
             .await?;
-        let items: Vec<HabitWithStreakDto> = Self::handle_response(resp).await?;
-        Ok(items.into_iter().map(|item| item.habit).collect())
+        let items: Vec<HabitResponseItem> = Self::handle_response(resp).await?;
+        Ok(items
+            .into_iter()
+            .map(HabitResponseItem::into_habit)
+            .filter(|h| !h.is_archived)
+            .collect())
     }
 
     async fn habit_checkin(
@@ -253,7 +331,7 @@ impl RoubitClient for HttpClient {
     }
 
     async fn get_active_routine(&self) -> Result<Option<Routine>, ClientError> {
-        let url = format!("{}/api/v1/routines/active", self.base_url);
+        let url = format!("{}/api/v1/routines", self.base_url);
         let resp = self
             .client
             .get(&url)
@@ -265,7 +343,8 @@ impl RoubitClient for HttpClient {
             return Ok(None);
         }
 
-        Self::handle_response(resp).await
+        let res: RoutineWithProgressDto = Self::handle_response(resp).await?;
+        Ok(res.routine)
     }
 
     async fn list_routine_blocks(&self, routine_id: Uuid) -> Result<Vec<TimeBlock>, ClientError> {
@@ -276,6 +355,23 @@ impl RoubitClient for HttpClient {
             .headers(self.build_headers(None))
             .send()
             .await?;
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            let active_url = format!("{}/api/v1/routines", self.base_url);
+            let active_resp = self
+                .client
+                .get(&active_url)
+                .headers(self.build_headers(None))
+                .send()
+                .await?;
+            if let Ok(res) = Self::handle_response::<RoutineWithProgressDto>(active_resp).await {
+                if res.routine.as_ref().map(|r| r.id) == Some(routine_id) {
+                    return Ok(res.blocks);
+                }
+            }
+            return Ok(Vec::new());
+        }
+
         Self::handle_response(resp).await
     }
 
@@ -285,7 +381,10 @@ impl RoubitClient for HttpClient {
         date: NaiveDate,
         status: BlockStatus,
     ) -> Result<(), ClientError> {
-        let url = format!("{}/api/v1/routines/blocks/{block_id}/log", self.base_url);
+        let url = format!(
+            "{}/api/v1/routines/blocks/{block_id}/complete",
+            self.base_url
+        );
         let idempotency_key = Uuid::new_v4();
 
         let payload = serde_json::json!({
@@ -334,7 +433,10 @@ impl RoubitClient for HttpClient {
         from: NaiveDate,
         to: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, ClientError> {
-        let url = format!("{}/api/v1/journal?from={from}&to={to}", self.base_url);
+        let url = format!(
+            "{}/api/v1/journal/metadata?start_date={from}&end_date={to}",
+            self.base_url
+        );
         let resp = self
             .client
             .get(&url)
@@ -361,7 +463,7 @@ impl RoubitClient for HttpClient {
             "ciphertext_base64": ciphertext_base64,
             "salt_base64": salt_base64,
             "nonce_base64": nonce_base64,
-            "mood": mood,
+            "mood_score": mood.and_then(|m| u8::try_from(m).ok()),
             "tags": tags,
         });
 
@@ -378,7 +480,7 @@ impl RoubitClient for HttpClient {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -432,5 +534,96 @@ mod tests {
             HttpClient::extract_error_detail(plain_txt),
             "Internal Server Error"
         );
+    }
+
+    #[test]
+    fn test_habit_response_item_deserializes_both_nested_and_flat_formats() {
+        // 1. Nested format from roubit-server list_habits
+        let nested_json = serde_json::json!([{
+            "habit": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Morning Run",
+                "description": "5km daily",
+                "habit_type": "numeric",
+                "target_value": 5.0,
+                "unit": "km",
+                "frequency_days": 127,
+                "color_hex": "#4F46E5",
+                "is_archived": false,
+                "current_streak": 3,
+                "longest_streak": 5,
+                "created_at": "2026-11-05T00:00:00Z",
+                "updated_at": "2026-11-05T00:00:00Z"
+            },
+            "streak": {
+                "current_streak": 3,
+                "longest_streak": 5,
+                "is_active_today": true
+            },
+            "today_value": 5.0
+        }]);
+
+        let nested_items: Vec<HabitResponseItem> =
+            serde_json::from_value(nested_json).expect("Nested habit deserialization");
+        assert_eq!(nested_items.len(), 1);
+        let habit1 = nested_items.into_iter().next().unwrap().into_habit();
+        assert_eq!(habit1.name, "Morning Run");
+        assert_eq!(habit1.target_value, 5.0);
+
+        // 2. Flat format
+        let flat_json = serde_json::json!([{
+            "id": "550e8400-e29b-41d4-a716-446655440001",
+            "name": "Read Book",
+            "description": "20 pages",
+            "habit_type": "binary",
+            "target_value": 1.0,
+            "unit": "pages",
+            "frequency_days": 127,
+            "color_hex": "#10B981",
+            "current_streak": 2,
+            "longest_streak": 10,
+            "is_active_today": false
+        }]);
+
+        let flat_items: Vec<HabitResponseItem> =
+            serde_json::from_value(flat_json).expect("Flat habit deserialization");
+        assert_eq!(flat_items.len(), 1);
+        let habit2 = flat_items.into_iter().next().unwrap().into_habit();
+        assert_eq!(habit2.name, "Read Book");
+        assert_eq!(habit2.target_value, 1.0);
+    }
+
+    #[test]
+    fn test_routine_with_progress_dto_deserialization() {
+        let routine_json = serde_json::json!({
+            "routine": {
+                "id": "550e8400-e29b-41d4-a716-446655440002",
+                "name": "Daily Routine",
+                "description": "Standard flow",
+                "is_active": true,
+                "created_at": "2026-11-05T00:00:00Z",
+                "updated_at": "2026-11-05T00:00:00Z"
+            },
+            "blocks": [{
+                "id": "550e8400-e29b-41d4-a716-446655440003",
+                "routine_id": "550e8400-e29b-41d4-a716-446655440002",
+                "name": "Deep Work",
+                "start_time": "09:00:00",
+                "end_time": "11:00:00",
+                "category": "Focus",
+                "color_hex": "#3B82F6",
+                "order_index": 0,
+                "created_at": "2026-11-05T00:00:00Z"
+            }],
+            "progress": null,
+            "completed_block_ids": [],
+            "skipped_block_ids": []
+        });
+
+        let res: RoutineWithProgressDto =
+            serde_json::from_value(routine_json).expect("Routine with progress deserialization");
+        assert!(res.routine.is_some());
+        assert_eq!(res.blocks.len(), 1);
+        assert_eq!(res.blocks[0].name, "Deep Work");
     }
 }
