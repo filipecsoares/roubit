@@ -320,16 +320,20 @@ impl RedisService {
     pub async fn invalidate_user_habits_cache(&self, user_id: &str) -> Result<bool, RedisError> {
         let mut conn = self.get_connection().await?;
         let pattern = Self::habit_summary_cache_pattern(user_id);
-        let keys: Vec<String> = redis::cmd("KEYS").arg(&pattern).query_async(&mut conn).await.unwrap_or_default();
-        if !keys.is_empty() {
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg(&pattern)
+            .query_async(&mut conn)
+            .await
+            .unwrap_or_default();
+        if keys.is_empty() {
+            Ok(false)
+        } else {
             let mut del_cmd = redis::cmd("DEL");
             for k in &keys {
                 del_cmd.arg(k);
             }
             let deleted: i64 = del_cmd.query_async(&mut conn).await?;
             Ok(deleted > 0)
-        } else {
-            Ok(false)
         }
     }
 

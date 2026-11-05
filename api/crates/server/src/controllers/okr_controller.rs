@@ -88,6 +88,7 @@ pub async fn list_okrs(
 ///
 /// # Errors
 /// Returns [`ApiError::BadRequest`] on validation errors or [`ApiError::Internal`] on db error.
+#[allow(clippy::too_many_lines)]
 pub async fn create_objective(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -180,14 +181,18 @@ pub async fn create_objective(
                             SqliteOkrRepository::new(pool.clone()),
                             SqliteHabitRepository::new(pool.clone()),
                         );
-                        sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
                     }
                     DatabasePool::Postgres(pool) => {
                         let sync_svc = OkrSyncService::new(
                             PgOkrRepository::new(pool.clone()),
                             PgHabitRepository::new(pool.clone()),
                         );
-                        sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
                     }
                 };
                 if let Err(e) = sync_res {
@@ -255,14 +260,18 @@ pub async fn create_kr(
                             SqliteOkrRepository::new(pool.clone()),
                             SqliteHabitRepository::new(pool.clone()),
                         );
-                        sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
                     }
                     DatabasePool::Postgres(pool) => {
                         let sync_svc = OkrSyncService::new(
                             PgOkrRepository::new(pool.clone()),
                             PgHabitRepository::new(pool.clone()),
                         );
-                        sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                        sync_svc
+                            .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                            .await
                     }
                 };
                 if let Err(e) = sync_res {
@@ -333,14 +342,18 @@ pub async fn update_key_result(
                     SqliteOkrRepository::new(pool.clone()),
                     SqliteHabitRepository::new(pool.clone()),
                 );
-                sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                sync_svc
+                    .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                    .await
             }
             DatabasePool::Postgres(pool) => {
                 let sync_svc = OkrSyncService::new(
                     PgOkrRepository::new(pool.clone()),
                     PgHabitRepository::new(pool.clone()),
                 );
-                sync_svc.sync_linked_krs_for_habit(user.id, linked_habit_id).await
+                sync_svc
+                    .sync_linked_krs_for_habit(user.id, linked_habit_id)
+                    .await
             }
         };
         if let Err(e) = sync_res {

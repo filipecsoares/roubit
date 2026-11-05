@@ -739,7 +739,9 @@ async fn test_timezone_and_local_date_headers_behavior() {
         .unwrap();
     let res_list_today = app.clone().oneshot(req_list_today).await.unwrap();
     assert_eq!(res_list_today.status(), StatusCode::OK);
-    let list_today_bytes = to_bytes(res_list_today.into_body(), usize::MAX).await.unwrap();
+    let list_today_bytes = to_bytes(res_list_today.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let habits_today: Vec<serde_json::Value> = serde_json::from_slice(&list_today_bytes).unwrap();
     assert_eq!(habits_today[0]["streak"]["is_active_today"], true);
 
@@ -753,7 +755,10 @@ async fn test_timezone_and_local_date_headers_behavior() {
         .unwrap();
     let res_list_tomorrow = app.clone().oneshot(req_list_tomorrow).await.unwrap();
     assert_eq!(res_list_tomorrow.status(), StatusCode::OK);
-    let list_tomorrow_bytes = to_bytes(res_list_tomorrow.into_body(), usize::MAX).await.unwrap();
-    let habits_tomorrow: Vec<serde_json::Value> = serde_json::from_slice(&list_tomorrow_bytes).unwrap();
+    let list_tomorrow_bytes = to_bytes(res_list_tomorrow.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let habits_tomorrow: Vec<serde_json::Value> =
+        serde_json::from_slice(&list_tomorrow_bytes).unwrap();
     assert_eq!(habits_tomorrow[0]["streak"]["is_active_today"], false);
 }

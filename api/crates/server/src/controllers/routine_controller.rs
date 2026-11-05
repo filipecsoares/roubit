@@ -136,8 +136,7 @@ pub async fn get_routine(
         .collect();
 
     let now_time = extract_local_time(&headers);
-    let progress =
-        RoutineProgressTracker::compute_progress(&blocks, &block_statuses, now_time);
+    let progress = RoutineProgressTracker::compute_progress(&blocks, &block_statuses, now_time);
 
     Ok(Json(RoutineWithProgressResponse {
         routine: Some(routine),
@@ -274,11 +273,14 @@ pub async fn complete_block(
     headers: HeaderMap,
     payload: Option<Json<LogBlockStatusRequest>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let req = payload.map(|Json(p)| p).unwrap_or(LogBlockStatusRequest {
-        date: None,
-        status: None,
-        notes: None,
-    });
+    let req = payload.map_or(
+        LogBlockStatusRequest {
+            date: None,
+            status: None,
+            notes: None,
+        },
+        |Json(p)| p,
+    );
 
     let target_date = req.date.unwrap_or_else(|| extract_local_date(&headers));
     let status = match req.status.as_deref().unwrap_or("completed") {

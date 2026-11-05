@@ -93,6 +93,8 @@ pub trait OkrRepository: Send + Sync {
     ) -> Result<KeyResult, OkrRepositoryError>;
 
     /// Updates a Key Result's linked habit and/or current value, updating progress for both KR and parent Objective.
+    #[allow(clippy::option_option)]
+    #[allow(clippy::option_option)]
     async fn update_key_result_link_or_value(
         &self,
         user_id: Uuid,
@@ -408,6 +410,7 @@ impl OkrRepository for SqliteOkrRepository {
             .await
     }
 
+    #[allow(clippy::option_option)]
     async fn update_key_result_link_or_value(
         &self,
         user_id: Uuid,
@@ -996,6 +999,7 @@ impl OkrRepository for PgOkrRepository {
             .await
     }
 
+    #[allow(clippy::option_option)]
     async fn update_key_result_link_or_value(
         &self,
         user_id: Uuid,

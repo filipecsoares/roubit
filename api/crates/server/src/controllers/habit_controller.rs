@@ -120,7 +120,11 @@ async fn set_l1_cache(state: &AppState, user_id: Uuid, today: NaiveDate, json_st
 }
 
 /// Retrieves cached habit summary from L1 or L2 cache if available for a given date.
-async fn get_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveDate) -> Option<String> {
+async fn get_cached_habit_summary(
+    state: &AppState,
+    user_id: Uuid,
+    today: NaiveDate,
+) -> Option<String> {
     // 1. Check L1 in-memory summary cache first
     {
         let cache_read = state.summary_cache.read().await;
@@ -133,7 +137,10 @@ async fn get_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveD
 
     // 2. Check L2 Redis cache if available
     if let Some(redis) = &state.redis {
-        match redis.get_cached_habit_summary(&user_id.to_string(), today).await {
+        match redis
+            .get_cached_habit_summary(&user_id.to_string(), today)
+            .await
+        {
             Ok(Some(cached_json)) => {
                 // Populate L1 cache from Redis hit
                 set_l1_cache(state, user_id, today, cached_json.clone()).await;
@@ -150,7 +157,12 @@ async fn get_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveD
 }
 
 /// Populates L1 and L2 caches with newly queried habit summary JSON.
-async fn set_cached_habit_summary(state: &AppState, user_id: Uuid, today: NaiveDate, json_str: &str) {
+async fn set_cached_habit_summary(
+    state: &AppState,
+    user_id: Uuid,
+    today: NaiveDate,
+    json_str: &str,
+) {
     set_l1_cache(state, user_id, today, json_str.to_string()).await;
 
     if let Some(redis) = &state.redis {
@@ -425,7 +437,10 @@ pub async fn archive_habit(
                     .cancel_reminder(&user.id.to_string(), "habit", &habit_id.to_string())
                     .await;
             }
-            Ok((StatusCode::OK, Json(serde_json::json!({ "archived": true }))))
+            Ok((
+                StatusCode::OK,
+                Json(serde_json::json!({ "archived": true })),
+            ))
         }
         Err(HabitRepositoryError::NotFound(_)) => {
             Err(ApiError::NotFound(format!("Habit {habit_id} not found")))

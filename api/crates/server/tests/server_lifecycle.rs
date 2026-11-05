@@ -330,9 +330,14 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .send()
         .await
         .expect("Create second routine failed");
-    assert_eq!(create_second_routine_res.status(), reqwest::StatusCode::CREATED);
-    let second_routine: roubit_core::Routine =
-        create_second_routine_res.json().await.expect("Parse second routine");
+    assert_eq!(
+        create_second_routine_res.status(),
+        reqwest::StatusCode::CREATED
+    );
+    let second_routine: roubit_core::Routine = create_second_routine_res
+        .json()
+        .await
+        .expect("Parse second routine");
 
     // Fetch active routine now returns the second routine
     let get_active2_res = client
@@ -345,7 +350,10 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .json()
         .await
         .expect("Parse active routine 2");
-    assert_eq!(active2_prog.routine.expect("Active routine").id, second_routine.id);
+    assert_eq!(
+        active2_prog.routine.expect("Active routine").id,
+        second_routine.id
+    );
 
     // List all routines confirms previous routine is_active is false
     let list_routines_url = format!("http://{local_addr}/api/v1/routines/all");
@@ -355,9 +363,16 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .send()
         .await
         .expect("List routines failed");
-    let all_routines: Vec<roubit_core::Routine> = list_res.json().await.expect("Parse all routines");
-    let first_in_list = all_routines.iter().find(|r| r.id == created_routine.id).expect("First routine exists");
-    let second_in_list = all_routines.iter().find(|r| r.id == second_routine.id).expect("Second routine exists");
+    let all_routines: Vec<roubit_core::Routine> =
+        list_res.json().await.expect("Parse all routines");
+    let first_in_list = all_routines
+        .iter()
+        .find(|r| r.id == created_routine.id)
+        .expect("First routine exists");
+    let second_in_list = all_routines
+        .iter()
+        .find(|r| r.id == second_routine.id)
+        .expect("Second routine exists");
     assert!(!first_in_list.is_active);
     assert!(second_in_list.is_active);
 
@@ -439,7 +454,10 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
     assert_eq!(habits_list[0].habit.id, habit.id);
 
     // Incremental check-in for today (1.0L)
-    let today_str = chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string();
+    let today_str = chrono::Utc::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
     let inc1_res = client
         .post(&checkin_url)
         .bearer_auth(&auth.token)
@@ -468,14 +486,17 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
     assert_eq!(inc2_res.status(), reqwest::StatusCode::OK);
 
     // Fetch habits again and verify today_value reflects 2.5L and streak is active today
-    let list2_res = client
+    let fetch_updated_habits_res = client
         .get(&habits_url)
         .bearer_auth(&auth.token)
         .send()
         .await
         .expect("List habits 2 failed");
     let habits_list2: Vec<roubit_server::controllers::HabitWithStreakResponse> =
-        list2_res.json().await.expect("Parse habits list 2");
+        fetch_updated_habits_res
+            .json()
+            .await
+            .expect("Parse habits list 2");
     assert!((habits_list2[0].today_value - 2.5).abs() < f64::EPSILON);
     assert!(habits_list2[0].streak.is_active_today);
 
@@ -510,10 +531,15 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("Create temp habit failed");
     assert_eq!(create_temp_habit_res.status(), reqwest::StatusCode::CREATED);
-    let temp_habit: roubit_core::Habit =
-        create_temp_habit_res.json().await.expect("Parse temp habit");
+    let temp_habit: roubit_core::Habit = create_temp_habit_res
+        .json()
+        .await
+        .expect("Parse temp habit");
 
-    let archive_url = format!("http://{local_addr}/api/v1/habits/{}/archive", temp_habit.id);
+    let archive_url = format!(
+        "http://{local_addr}/api/v1/habits/{}/archive",
+        temp_habit.id
+    );
     let archive_res = client
         .post(&archive_url)
         .bearer_auth(&auth.token)
@@ -530,8 +556,13 @@ async fn test_tcp_domain_controllers_routines_habits_and_okrs() {
         .await
         .expect("List after archive failed");
     let habits_after_archive: Vec<roubit_server::controllers::HabitWithStreakResponse> =
-        list_after_archive.json().await.expect("Parse list after archive");
-    assert!(!habits_after_archive.iter().any(|h| h.habit.id == temp_habit.id));
+        list_after_archive
+            .json()
+            .await
+            .expect("Parse list after archive");
+    assert!(!habits_after_archive
+        .iter()
+        .any(|h| h.habit.id == temp_habit.id));
 
     // 4. OKRs CRUD
     let okrs_url = format!("http://{local_addr}/api/v1/okrs");
