@@ -23,46 +23,46 @@
 | ⏱️ **Daily Focus & Routine Timeline** | ⚡ **Smart Habits, Streaks & 52-Week Heatmap** |
 | :---: | :---: |
 | ![Daily Focus Dashboard](docs/images/01_dashboard.png) | ![Habits & Consistency Heatmap](docs/images/02_habitos.png) |
-| *Time-blocking cronológico com cálculo de progresso em tempo real* | *Streaks atômicos em O(1), contadores diários e mapa de calor anual* |
+| *Chronological time-blocking with real-time progress roll-up* | *Atomic O(1) streaks, daily counters, and 52-week momentum heatmap* |
 
 | 🎯 **OKRs & Goal Alignment Engine** | ⏱️ **Pomodoro Focus Mode** |
 | :---: | :---: |
 | ![OKRs & Strategic Alignment](docs/images/04_okrs.png) | ![Pomodoro Focus Mode](docs/images/05_modo_foco.png) |
-| *Metas trimestrais conectadas diretamente a hábitos com progresso automático* | *Imersão sem distrações, feedback harmônico Web Audio e atalhos de teclado* |
+| *Quarterly goals linked directly to habits with automated progress roll-up* | *Distraction-free immersion, Web Audio harmonic feedback, and keyboard shortcuts* |
 
 | 🔒 **Zero-Knowledge Encrypted Journal** | 📱 **PWA Authentication & Offline Engine** |
 | :---: | :---: |
 | ![Encrypted Journal Vault](docs/images/03_diario_vault.png) | ![PWA Login & Install](docs/images/00_login.png) |
-| *Cifragem no cliente com AES-256-GCM + Argon2id e limpeza da RAM* | *PWA instalável, sincronização offline idempotente e auth segura* |
+| *Client-side AES-256-GCM + Argon2id encryption with volatile memory scrubbing* | *Installable PWA, idempotent offline background sync, and secure auth* |
 
 </div>
 
 ---
 
-## 🎓 Sobre Este Projeto de Estudo
+## 🎓 About This Engineering Study Project
 
-O **Roubit** foi concebido e implementado como um **laboratório de engenharia de software de ponta a ponta**. O objetivo é demonstrar, em código de produção, soluções para desafios reais de arquitetura de sistemas contemporâneos:
+**Roubit** was conceived and built as an **end-to-end software engineering study laboratory**. Its goal is to demonstrate, in production-grade code, practical solutions to real-world contemporary systems architecture challenges:
 
-1. **Backend de Baixíssima Latência em Rust:** Uso de Axum 0.8, Tokio e SQLx com tempo de resposta de cauda (P99) inferior a 5ms, throughput superior a 10.000 req/s e consumo de memória inferior a 15MB RSS.
-2. **Criptografia Zero-Knowledge no Cliente:** Garantia matemática de privacidade onde anotações reflexivas são cifradas diretamente no navegador/CLI (AES-256-GCM + Argon2id). O servidor armazena apenas envelopes cifrados; nem mesmo administradores ou vazamentos de banco podem ler as reflexões.
-3. **Estratégia de Banco de Dados Dual:** Desenvolvimento local com **SQLite WAL** (zero configuração externa) e homologação/produção distribuída com **PostgreSQL 16** e **Redis 7** (cache L2, locks distribuídos e mensageria SSE via TTL keyspace).
-4. **PWA Offline-First & Sincronização Idempotente:** Fila monotônica de mutações em IndexedDB gerenciada pelo Service Worker (Workbox). Permite registrar hábitos, completar blocos e planejar tarefas sem conexão à internet, com drenagem automática e idempotente (UUIDv4) ao restabelecer o sinal.
-5. **Arquitetura Limpa & Paridade de Interfaces:** Separação estrita entre Domínio (`roubit-core`), Servidor REST (`roubit-server`) e Terminal CLI (`roubit`). A CLI opera em modo local (chamadas diretas ao banco) ou em modo remoto autenticado contra a API HTTP.
-6. **Cultura de Qualidade & CI/CD Estrito:** Suíte com mais de 200 testes no backend (unitários, integração, vetores criptográficos NIST/RFC e estresse de concorrência), 112 testes no frontend (Vitest e ESLint), e pipeline de pre-commit automatizado.
+1. **Ultra-Low Latency Rust Backend:** Built with Axum 0.8, Tokio, and SQLx delivering sub-5ms tail latency (P99), throughput exceeding 10,000 req/s, and a compact memory footprint under 15MB RSS.
+2. **Client-Side Zero-Knowledge Encryption:** Mathematical privacy guarantees where reflective journal entries are encrypted directly in the client browser or CLI (AES-256-GCM + Argon2id). The server stores only opaque ciphertext envelopes; reflections cannot be read even in the event of database exfiltration or privileged server access.
+3. **Dual-Database Architecture:** Lightweight local development powered by **SQLite WAL** (zero external dependencies) paired with distributed staging and production powered by **PostgreSQL 16** and **Redis 7** (L2 caching, distributed mutual exclusion locks, and SSE keyspace TTL events).
+4. **Offline-First PWA & Idempotent Synchronization:** Monotonic IndexedDB mutation queue managed by Service Worker (Workbox). Enables habit tracking, routine completion, and task planning without an active internet connection, with automatic idempotent synchronization (UUIDv4) upon network reconnection.
+5. **Clean Architecture & Interface Parity:** Strict decoupling across Domain Core (`roubit-core`), REST API Server (`roubit-server`), and Terminal CLI (`roubit`). The CLI seamlessly toggles between embedded local mode (direct database operations) and authenticated remote API transport.
+6. **Rigorous Quality Culture & Automated CI/CD:** Robust test suite with 200+ backend tests (unit, integration, NIST/RFC cryptographic vectors, and concurrent stress benchmarks), 112 frontend Vitest and ESLint checks, and strict pre-commit automated gates.
 
 ---
 
-## 🎯 Por que o Roubit?
+## 🎯 Why Roubit?
 
-Muitos setups de produtividade são fragmentados: listas de tarefas em um app, hábitos em outro, metas trimestrais em planilhas e pensamentos pessoais em notas soltas. Isso gera atrito cognitivo e perda de contexto.
+Many productivity workflows suffer from fragmentation: tasks in one app, daily habits in another, quarterly goals in spreadsheets, and private thoughts scattered across text notes. This creates cognitive friction and context loss.
 
-O **Roubit** une esses pilares em um ecossistema integrado:
+**Roubit** brings these pillars together into a cohesive, high-performance ecosystem:
 
-- **Foco Diário Estruturado:** Seu dia dividido em blocos de tempo cronológicos e executado com timer Pomodoro integrado.
-- **Hábitos com Propósito Estratégico:** Hábitos diários vinculados a Resultados-Chave (KRs) dos seus OKRs trimestrais — cada check-in avança suas metas macro.
-- **Privacidade Inegociável:** Suas reflexões mais íntimas nunca chegam em texto aberto ao servidor.
-- **Resiliência Offline:** Funcione normalmente no avião ou sem sinal; tudo sincroniza sem duplicação ao reconectar.
-- **Velocidade Extrema:** Sem telas de espera, construído para responder instantaneamente.
+- **Structured Daily Focus:** Plan your day into chronological focus blocks and execute with an integrated Pomodoro timer.
+- **Habits with Strategic Purpose:** Link daily habits to Key Results (KRs) within your quarterly OKRs — every check-in moves your macro goals forward.
+- **Non-Negotiable Privacy:** Sensitive reflections never touch the server or transit the network in plaintext.
+- **Offline Resilience:** Work smoothly on an airplane or during network drops; everything syncs idempotently when reconnected.
+- **Instantaneous Performance:** Sub-millisecond local responses, no loading spinners, built for zero latency.
 
 ---
 
@@ -157,102 +157,102 @@ flowchart TD
 
 ---
 
-## 🚀 Quick Start & Como Rodar o Projeto Sem Erros
+## 🚀 Quick Start & Zero-Error Execution Guide
 
-O **Roubit** foi desenhado para iniciar de forma simples e previsível. Você pode rodar o ecossistema completo em **1 comando via Docker Compose** ou rodar **nativamente** em modo de desenvolvimento leve.
+**Roubit** is designed for predictable, hassle-free startup. You can run the entire distributed ecosystem with **a single Docker Compose command**, or run it **natively** in lightweight development mode.
 
-### 📋 Pré-requisitos
-- **Para execução com Docker (Recomendado):** Docker 24.0+ e Docker Compose v2.20+.
-- **Para execução nativa:** 
+### 📋 Prerequisites
+- **For Docker execution (Recommended):** Docker 24.0+ and Docker Compose v2.20+.
+- **For native execution:** 
   - [Rust 1.85.0+](https://rustup.rs/) (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-  - [Node.js 20+](https://nodejs.org/) e npm 10+ (`node -v` && `npm -v`)
+  - [Node.js 20+](https://nodejs.org/) and npm 10+ (`node -v` && `npm -v`)
 
 ---
 
-### Opção 1: Execução Completa via Docker Compose (PostgreSQL 16 + Redis 7 + Nginx)
+### Option 1: Full Stack via Docker Compose (PostgreSQL 16 + Redis 7 + Nginx)
 
-Esta é a opção mais rápida para testar a aplicação completa sem precisar configurar banco ou ambiente de compilação:
+This is the fastest path to test the full production-grade stack without manual database configuration:
 
 ```bash
-# 1. Clone o repositório
+# 1. Clone the repository
 git clone https://github.com/filipecsoares/roubit.git
 cd roubit
 
-# 2. Suba todos os serviços em segundo plano (Postgres 16, Redis 7, Backend Axum e Frontend PWA)
+# 2. Spin up all services in the background (Postgres 16, Redis 7, Axum Backend, and PWA Frontend)
 docker compose up -d --build
 
-# 3. Verifique se os 4 containers estão saudáveis
+# 3. Verify that all 4 containers are healthy
 docker compose ps
 ```
 
-#### 🌐 Pontos de Acesso:
-- **Aplicação Web & PWA:** [http://localhost](http://localhost) (Porta 80 — servida via Nginx com compressão gzip e cache PWA)
-- **API REST Backend:** [http://localhost:8080](http://localhost:8080)
-- **Liveness Probe:** `curl http://localhost:8080/health` (retorna `{"status":"ok"}`)
-- **Readiness Probe:** `curl http://localhost:8080/ready` (valida conexão ativa com Postgres e Redis)
+#### 🌐 Service Endpoints:
+- **Web App & PWA:** [http://localhost](http://localhost) (Port 80 — served via Nginx with gzip compression and PWA caching)
+- **REST API Backend:** [http://localhost:8080](http://localhost:8080)
+- **Liveness Probe:** `curl http://localhost:8080/health` (returns `{"status":"ok"}`)
+- **Readiness Probe:** `curl http://localhost:8080/ready` (verifies live connection to Postgres and Redis)
 
-Para parar a aplicação e manter os dados dos volumes:
+To stop all containers while preserving data volumes:
 ```bash
 docker compose down
 ```
 
 ---
 
-### Opção 2: Desenvolvimento Nativo (SQLite WAL — Zero Dependências Externas)
+### Option 2: Native Development (SQLite WAL — Zero External Dependencies)
 
-No modo de desenvolvimento nativo, o backend utiliza **SQLite em WAL mode** com migrações automáticas. Você não precisa instalar PostgreSQL nem Redis:
+In native development mode, the backend uses **SQLite in WAL mode** with auto-applied migrations. No PostgreSQL or Redis setup is required:
 
-#### Passo 1: Iniciar o Servidor Backend (Terminal 1)
+#### Step 1: Start Backend Server (Terminal 1)
 ```bash
-# O servidor inicializa automaticamente o arquivo SQLite 'roubit.db' com todas as tabelas
+# The server automatically creates SQLite file 'roubit.db' and applies all schema migrations
 cargo run --bin roubit-server --manifest-path api/Cargo.toml
 ```
-*O servidor estará escutando em `http://127.0.0.1:8080` com migrações aplicadas automaticamente.*
+*The server listens on `http://127.0.0.1:8080` with migrations applied automatically.*
 
-#### Passo 2: Iniciar a Aplicação Frontend (Terminal 2)
+#### Step 2: Start Frontend Application (Terminal 2)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*Abra [http://localhost:5173](http://localhost:5173) no seu navegador. As chamadas à API e streams SSE são roteados automaticamente para o backend.*
+*Open [http://localhost:5173](http://localhost:5173) in your browser. API requests and SSE notification streams are automatically routed to the backend.*
 
 ---
 
-### 🔑 Primeiro Acesso & Credenciais de Demonstração
+### 🔑 First Login & Demo Walkthrough
 
-1. Acesse `http://localhost:5173` (ou `http://localhost` no Docker).
-2. Na tela de login, clique em **"Não tem conta? Cadastre-se"**.
-3. Crie qualquer conta informando um e-mail e senha (ex.: `dev@roubit.app` / `SenhaForte123!`). O hash Argon2id é derivado de forma isolada na threadpool.
-4. **Para o Diário Criptografado:** Clique na aba **"Diário"** e em **"Desbloquear Diário"**. Digite uma senha mestre (ex.: `senha-cofre-2026`). A chave AES-256-GCM é derivada em memória via Argon2id WASM no seu browser e nunca é enviada ao servidor.
-
----
-
-### 💡 Roteiro Rápido para Testar as Principais Funcionalidades
-
-- **Cronograma de Rotina & Time-blocking:** No Dashboard, clique em **"Configurar Rotina"** para criar blocos diários de foco. Use o botão **"Modo Foco"** para iniciar o timer Pomodoro com atalhos de teclado (`Espaço` para pausar, `Esc` para minimizar).
-- **Rastreamento de Hábitos & Streaks:** Na aba **"Hábitos"**, crie hábitos binários, numéricos ou por timer. Ao clicar em **"Check-in"**, o streak é recalculado atomicamente em $O(1)$ e o mapa de calor anual é atualizado.
-- **Conexão Estratégica Hábito $\to$ OKR:** Na aba **"OKRs"**, crie um Objetivo trimestral e vincule um Resultado-Chave a um dos seus hábitos. Ao realizar check-ins diários do hábito, veja a barra de progresso do objetivo avançar automaticamente!
-- **Segurança Zero-Knowledge:** Escreva uma reflexão no Diário, salve e inspecione as requisições HTTP na aba Network do DevTools: você verá apenas campos de metadados (`entry_date`, `mood_score`, `tags`) e o envelope cifrado (`ciphertext_base64`, `nonce_base64`, `salt_base64`). Zero texto puro no tráfego ou no banco.
-- **PWA & Modo Offline:** No Chrome/Edge, abra o DevTools $\to$ aba **Network** $\to$ marque **"Offline"**. Realize check-ins de hábitos ou complete blocos de rotina. Você verá o badge de rede alertar sobre mutações offline enfileiradas no IndexedDB. Desmarque o modo offline e veja a sincronização automática acontecer em segundo plano com idempotência!
+1. Navigate to `http://localhost:5173` (or `http://localhost` if running via Docker).
+2. On the login view, click **"Don't have an account? Sign up"**.
+3. Create an account with any email and password (e.g., `dev@roubit.app` / `StrongPassword123!`). The Argon2id password hash is safely derived on a dedicated threadpool.
+4. **For the Encrypted Journal:** Navigate to the **"Journal"** tab and click **"Unlock Journal"**. Enter a master passphrase (e.g., `vault-passphrase-2026`). The AES-256-GCM key is derived locally in memory via Argon2id WASM in your browser and is never transmitted to the server.
 
 ---
 
-### 🛠️ Solução de Problemas Comuns (Troubleshooting)
+### 💡 Quick Testing Tour
 
-- **Porta 8080 ou 5173 já em uso:**
-  - Caso tenha outro processo utilizando a porta 8080, inicie o backend definindo outra porta: `PORT=8090 cargo run --bin roubit-server --manifest-path api/Cargo.toml`.
-  - No frontend, o Vite selecionará automaticamente a próxima porta disponível (ex.: 5174).
-- **Erro de conexão com Docker:**
-  - Certifique-se de que o daemon do Docker está rodando (`sudo systemctl status docker` no Linux ou Docker Desktop no Mac/Windows).
-- **Conflito de pacotes no Frontend:**
-  - Execute `npm ci` dentro da pasta `frontend/` para garantir as versões exatas do `package-lock.json`.
-- **Como executar toda a bateria de validação do projeto:**
-  - Basta rodar `./scripts/pre-commit.sh`. Ele executa `cargo fmt`, `cargo clippy`, todos os testes Rust do workspace, ESLint no frontend, testes Vitest das Views e build do PWA.
+- **Routine Timeline & Time-Blocking:** On the Dashboard, click **"Configure Routine"** to set up daily focus blocks. Click the **"Focus Mode"** button to open the full-screen Pomodoro timer with keyboard shortcuts (`Space` to pause/resume, `Esc` to minimize).
+- **Habits Tracking & Streaks:** On the **"Habits"** tab, create binary, numeric, or timer habits. Click **"Check-in"** to see your streak atomically recalculated in $O(1)$ and your 52-week contribution heatmap updated.
+- **Habit-to-OKR Strategic Roll-Up:** On the **"OKRs"** tab, create a quarterly Objective and link a Key Result to one of your habits. Whenever you check in to that habit, notice the OKR progress bar advance automatically!
+- **Zero-Knowledge Security Inspection:** Write a reflection in the Journal, save it, and inspect network requests in the DevTools Network tab: you will only see plain metadata (`entry_date`, `mood_score`, `tags`) and encrypted envelopes (`ciphertext_base64`, `nonce_base64`, `salt_base64`). Zero plaintext in transit or at rest.
+- **PWA & Offline Simulation:** In Chrome/Edge DevTools $\to$ **Network** tab $\to$ check **"Offline"**. Record habit check-ins or complete routine blocks. Notice the offline status badge alerting that mutations are safely queued in IndexedDB. Uncheck offline mode and watch background synchronization automatically drain the queue idempotently!
 
 ---
 
-### Option C: Terminal CLI Standalone & Remote Modes
+### 🛠️ Troubleshooting & FAQ
+
+- **Port 8080 or 5173 already in use:**
+  - Override the backend port: `PORT=8090 cargo run --bin roubit-server --manifest-path api/Cargo.toml`.
+  - In the frontend, Vite will automatically select the next available port (e.g., 5174).
+- **Docker connection errors:**
+  - Ensure the Docker daemon is running (`sudo systemctl status docker` on Linux or Docker Desktop on macOS/Windows).
+- **Frontend package issues:**
+  - Run `npm ci` inside `frontend/` to install exact dependency versions from `package-lock.json`.
+- **How to run the complete project quality suite:**
+  - Run `./scripts/pre-commit.sh`. It executes `cargo fmt`, `cargo clippy`, all Rust workspace tests, frontend ESLint, Vitest suites, and production PWA compilation.
+
+---
+
+### Option 3: Terminal CLI Standalone & Remote Modes
 
 The command-line interface (`roubit`) can run directly against your local SQLite database or connect remotely to an authenticated server:
 
