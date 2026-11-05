@@ -31,8 +31,8 @@ Remove the `"currently supported in local mode only"` restriction on `roubit rou
 4. Update `README.md`, `docs/02-status-atividades.md`, `docs/03-plano-de-desenvolvimento-v2.md`, and `docs/04-plano-de-melhorias-e-correcoes.md`.
 
 ## 4. Definition of Done (DoD)
-- [ ] `roubit routine`, `roubit habit`, `roubit okr`, and `roubit journal` all work in both local mode and `--remote` mode.
-- [ ] `roubit config set` persists settings to `~/.roubit/config.json` and `roubit config show` displays the persisted values.
-- [ ] `README.md` accurately documents all CLI commands and environment variables.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
+- [x] `roubit routine`, `roubit habit`, `roubit okr`, and `roubit journal` all work in both local mode and `--remote` mode.
+- [x] `roubit config set` persists settings to `~/.roubit/config.json` and `roubit config show` displays the persisted values.
+- [x] `README.md` accurately documents all CLI commands and environment variables.
+- [x] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass.
 

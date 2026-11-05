@@ -266,3 +266,352 @@ async fn test_cli_remote_end_to_end_workflow() {
         "Credentials file must be deleted upon logout"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_cli_remote_routine_okr_journal_and_config() {
+    let server = start_test_server().await;
+    let client = reqwest::Client::new();
+
+    // Register user
+    let register_url = format!("{}/api/v1/auth/register", server.base_url);
+    client
+        .post(&register_url)
+        .json(&serde_json::json!({
+            "email": "routine_okr_user@example.com",
+            "password": "Password123!"
+        }))
+        .send()
+        .await
+        .expect("Register request failed");
+
+    let temp_dir = tempfile::tempdir().expect("Failed to create tempdir");
+    let creds_path = temp_dir.path().join("credentials.json");
+    let config_path = temp_dir.path().join("config.json");
+    let creds_path_str = creds_path.to_str().expect("Valid UTF-8 path");
+    let config_path_str = config_path.to_str().expect("Valid UTF-8 path");
+
+    // Login
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "auth",
+            "login",
+            "--url",
+            &server.base_url,
+            "--email",
+            "routine_okr_user@example.com",
+            "--password",
+            "Password123!",
+        ])
+        .assert()
+        .success();
+
+    // 1. Config set and show
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CONFIG_PATH", config_path_str)
+        .args([
+            "config",
+            "set",
+            "--db",
+            "/tmp/custom_test.db",
+            "--api-url",
+            &server.base_url,
+            "--output-format",
+            "json",
+        ])
+        .assert()
+        .success();
+
+    assert!(config_path.exists(), "config.json must exist");
+    #[cfg(unix)]
+    {
+        let meta = fs::metadata(&config_path).expect("Read config metadata");
+        let mode = meta.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "Config file must have 0600 permissions");
+    }
+
+    let show_out = Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CONFIG_PATH", config_path_str)
+        .args(["config", "show", "--json"])
+        .assert()
+        .success();
+    let show_str = String::from_utf8(show_out.get_output().stdout.clone()).expect("UTF-8 stdout");
+    assert!(show_str.contains("/tmp/custom_test.db"));
+
+    // 2. Routine remote operations
+    let routine_create = Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "routine",
+            "create",
+            "--name",
+            "Morning Flow",
+            "--blocks",
+            "08:00-10:00:Deep Focus,10:00-10:30:Rest",
+            "--active",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let routine_create_str =
+        String::from_utf8(routine_create.get_output().stdout.clone()).expect("UTF-8 stdout");
+    assert!(routine_create_str.contains("Morning Flow"));
+    let routine_json: serde_json::Value =
+        serde_json::from_str(&routine_create_str).expect("Valid JSON Routine");
+    let routine_id = routine_json["routine"]["id"].as_str().expect("Routine ID");
+
+    // Fetch blocks to test status transitions
+    let blocks_url = format!("{}/api/v1/routines/{routine_id}/blocks", server.base_url);
+    let creds_bytes = fs::read(&creds_path).expect("Read credentials");
+    let creds_json: serde_json::Value =
+        serde_json::from_slice(&creds_bytes).expect("Valid JSON credentials");
+    let token = creds_json["token"].as_str().expect("JWT token");
+
+    let blocks_resp = client
+        .get(&blocks_url)
+        .header("authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("Fetch blocks request");
+    assert!(
+        blocks_resp.status().is_success(),
+        "blocks status: {}",
+        blocks_resp.status()
+    );
+    let blocks_arr: serde_json::Value = blocks_resp.json().await.expect("JSON blocks array");
+    let block_id = blocks_arr[0]["id"].as_str().expect("Block ID");
+
+    // Routine start remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "routine",
+            "start",
+            block_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"new_status\":\"in_progress\""));
+
+    // Routine complete remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "routine",
+            "complete",
+            block_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"new_status\":\"completed\""));
+
+    // Routine activate remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "routine",
+            "activate",
+            routine_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"activated\":true"));
+
+    // Routine list remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args(["--remote", &server.base_url, "routine", "list"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Morning Flow"));
+
+    // 3. OKR remote operations
+    let okr_create = Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "okr",
+            "create",
+            "--title",
+            "Ship Q4 Deliverables",
+            "--quarter",
+            "2026-Q4",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let okr_str = String::from_utf8(okr_create.get_output().stdout.clone()).expect("UTF-8 stdout");
+    let okr_json: serde_json::Value = serde_json::from_str(&okr_str).expect("Valid JSON OKR");
+    let obj_id = okr_json["id"].as_str().expect("Objective ID");
+
+    // Add Key Result
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "okr",
+            "add-kr",
+            "--objective-id",
+            obj_id,
+            "--title",
+            "100 Unit Tests",
+            "--target",
+            "100",
+            "--unit",
+            "tests",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    // OKR list & summary
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args(["--remote", &server.base_url, "okr", "list"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Ship Q4 Deliverables"));
+
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args(["--remote", &server.base_url, "okr", "summary"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Ship Q4 Deliverables"));
+
+    // 4. Journal remote operations with ZK encryption
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .env("ROUBIT_PASSPHRASE", "my-secure-master-passphrase-2026")
+        .args([
+            "--remote",
+            &server.base_url,
+            "journal",
+            "write",
+            "--date",
+            "2026-11-05",
+            "--mood",
+            "5",
+            "--tags",
+            "remote,zk,test",
+            "--content",
+            "Top secret journal reflection content for 2026-11-05",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    // Journal read remote (decrypts locally using passphrase)
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .env("ROUBIT_PASSPHRASE", "my-secure-master-passphrase-2026")
+        .args([
+            "--remote",
+            &server.base_url,
+            "journal",
+            "read",
+            "--date",
+            "2026-11-05",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Top secret journal reflection content for 2026-11-05",
+        ));
+
+    // Journal list remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "journal",
+            "list",
+            "--from",
+            "2026-11-01",
+            "--to",
+            "2026-11-10",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("2026-11-05"));
+
+    // Journal delete remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "journal",
+            "delete",
+            "--date",
+            "2026-11-05",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"deleted\":true"));
+
+    // OKR delete remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "okr",
+            "delete",
+            obj_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"deleted\":true"));
+
+    // Routine delete remote
+    Command::cargo_bin("roubit")
+        .expect("Binary 'roubit' must exist")
+        .env("ROUBIT_CREDENTIALS_PATH", creds_path_str)
+        .args([
+            "--remote",
+            &server.base_url,
+            "routine",
+            "delete",
+            routine_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"deleted\":true"));
+}

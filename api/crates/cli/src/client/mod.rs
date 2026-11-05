@@ -1,10 +1,12 @@
 //! Hybrid mode client adapter for local SQLite and remote REST API.
 
+pub mod config;
 pub mod credentials;
 pub mod factory;
 pub mod local;
 pub mod remote;
 
+pub use config::{CliConfigFile, CliConfigManager};
 pub use credentials::{CredentialsManager, StoredCredentials};
 pub use factory::{ClientFactory, ClientMode};
 pub use local::LocalClient;
@@ -14,9 +16,10 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use roubit_core::domain::{
     habit::models::{Habit, HabitLog},
-    journal::models::JournalMetadata,
+    journal::models::{EncryptedJournalEntry, JournalMetadata},
     routine::models::{Routine, TimeBlock},
-    BlockStatus, ObjectiveWithKeyResults,
+    routine::CurrentRoutineProgress,
+    BlockStatus, KeyResult, Objective, ObjectiveWithKeyResults,
 };
 use uuid::Uuid;
 
@@ -88,6 +91,33 @@ pub trait RoubitClient: Send + Sync {
         status: BlockStatus,
     ) -> Result<(), ClientError>;
 
+    /// Fetches active routine, scheduled blocks with statuses, and computed progress for a target date.
+    async fn get_active_routine_progress(
+        &self,
+        date: NaiveDate,
+    ) -> Result<
+        Option<(
+            Routine,
+            Vec<(TimeBlock, BlockStatus)>,
+            CurrentRoutineProgress,
+        )>,
+        ClientError,
+    >;
+
+    /// Creates a new routine template with optional time blocks.
+    async fn create_routine(
+        &self,
+        name: &str,
+        blocks: &[TimeBlock],
+        is_active: bool,
+    ) -> Result<Routine, ClientError>;
+
+    /// Sets a routine as the active daily template.
+    async fn activate_routine(&self, routine_id: Uuid) -> Result<(), ClientError>;
+
+    /// Deletes a routine template and associated time blocks.
+    async fn delete_routine(&self, routine_id: Uuid) -> Result<(), ClientError>;
+
     /// Lists all objectives and associated key results.
     async fn list_all_objectives(&self) -> Result<Vec<ObjectiveWithKeyResults>, ClientError>;
 
@@ -97,12 +127,48 @@ pub trait RoubitClient: Send + Sync {
         quarter: &str,
     ) -> Result<Vec<ObjectiveWithKeyResults>, ClientError>;
 
+    /// Creates a new objective.
+    async fn create_objective(
+        &self,
+        title: &str,
+        quarter: &str,
+        description: Option<&str>,
+    ) -> Result<Objective, ClientError>;
+
+    /// Adds a key result to an objective.
+    async fn create_key_result(
+        &self,
+        objective_id: Uuid,
+        title: &str,
+        target_value: f64,
+        unit: Option<&str>,
+        linked_habit_id: Option<Uuid>,
+    ) -> Result<KeyResult, ClientError>;
+
+    /// Deletes an objective.
+    async fn delete_objective(&self, objective_id: Uuid) -> Result<(), ClientError>;
+
     /// Lists metadata entries of encrypted journal reflections in a date range.
     async fn list_journal_metadata(
         &self,
         from: NaiveDate,
         to: NaiveDate,
     ) -> Result<Vec<JournalMetadata>, ClientError>;
+
+    /// Fetches an encrypted journal entry by its unique ID.
+    async fn get_journal_entry(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError>;
+
+    /// Fetches an encrypted journal entry for a given calendar date.
+    async fn get_journal_entry_by_date(
+        &self,
+        date: NaiveDate,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError>;
+
+    /// Deletes an encrypted journal entry by calendar date. Returns true if deleted, false if not found.
+    async fn delete_journal_entry_by_date(&self, date: NaiveDate) -> Result<bool, ClientError>;
 
     /// Saves an encrypted journal reflection.
     async fn save_journal(

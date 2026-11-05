@@ -119,7 +119,7 @@ flowchart TD
 
 - [x] **05.1 Alinhamento de Contratos REST e DTOs no `HttpClient` da CLI** ([activity-01-cli-remote-dto-and-endpoint-alignment.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-01-cli-remote-dto-and-endpoint-alignment.prompt))
   - [x] Alinhar DTOs e URLs em `api/crates/cli/src/client/remote.rs` com `roubit-server` (`HabitSummaryDto`, `/api/v1/habits/{id}/archive`, `/api/v1/routines`, `/api/v1/routines/blocks/{id}/complete`, `/api/v1/journal/metadata` e `mood_score`).
-- [ ] **05.2 Habilitação Remota de `routine`, `okr`, `journal` & Persistência de `config set`** ([activity-02-cli-remote-routine-okr-journal-commands.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-02-cli-remote-routine-okr-journal-commands.prompt))
+- [x] **05.2 Habilitação Remota de `routine`, `okr`, `journal` & Persistência de `config set`** ([activity-02-cli-remote-routine-okr-journal-commands.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-02-cli-remote-routine-okr-journal-commands.prompt))
   - [ ] Adaptar `Commands::Routine`, `Commands::Okr` e `Commands::Journal` em `api/crates/cli/` para operarem via trait `RoubitClient`.
   - [ ] Persistir configurações em `~/.roubit/config.json` no comando `roubit config set`, padronizar `ROUBIT_API_URL` e atualizar a documentação da CLI no `README.md`.
 - [ ] **05.3 Suíte Completa de Testes E2E da CLI Remota** ([activity-03-cli-remote-full-e2e-test-suite.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/05-cli-hybrid-remote-completion/activity-03-cli-remote-full-e2e-test-suite.prompt))

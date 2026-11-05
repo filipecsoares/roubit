@@ -62,6 +62,8 @@ pub struct RoutineWithProgressResponse {
     pub completed_block_ids: Vec<Uuid>,
     #[serde(default)]
     pub skipped_block_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub block_statuses: HashMap<Uuid, BlockStatus>,
 }
 
 fn parse_time(time_str: &str) -> Result<NaiveTime, ApiError> {
@@ -96,6 +98,7 @@ pub async fn get_routine(
             progress: None,
             completed_block_ids: Vec::new(),
             skipped_block_ids: Vec::new(),
+            block_statuses: HashMap::new(),
         }));
     };
 
@@ -144,6 +147,7 @@ pub async fn get_routine(
         progress: Some(progress),
         completed_block_ids,
         skipped_block_ids,
+        block_statuses: log_status_map,
     }))
 }
 
@@ -373,12 +377,34 @@ pub async fn list_routine_blocks(
     Ok(Json(blocks))
 }
 
+/// Handler for `POST /api/v1/routines/:id/activate`
+///
+/// # Errors
+/// Returns [`ApiError::NotFound`] if routine not found or not owned by user, or [`ApiError::Internal`] on db error.
+pub async fn activate_routine(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    match state.routine_repo.set_active_routine(id, user.id).await {
+        Ok(()) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({ "activated": true, "routine_id": id })),
+        )),
+        Err(RoutineRepositoryError::NotFound(_)) => {
+            Err(ApiError::NotFound(format!("Routine {id} not found")))
+        }
+        Err(e) => Err(ApiError::Internal(e.into())),
+    }
+}
+
 /// Constructs router for routine endpoints
 pub fn routine_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_routine).post(create_routine))
         .route("/all", get(list_routines))
         .route("/{id}", axum::routing::delete(delete_routine))
+        .route("/{id}/activate", post(activate_routine))
         .route("/{id}/blocks", get(list_routine_blocks))
         .route("/blocks/{id}/complete", post(complete_block))
 }

@@ -9,13 +9,16 @@ use roubit_core::{
             models::{Habit, HabitLog},
             HabitRepository, SqliteHabitRepository,
         },
-        journal::{models::JournalMetadata, JournalRepository, SqliteJournalRepository},
+        journal::{
+            models::{EncryptedJournalEntry, JournalMetadata},
+            JournalRepository, SqliteJournalRepository,
+        },
         okr::{OkrRepository, SqliteOkrRepository},
         routine::{
             models::{Routine, TimeBlock},
-            RoutineRepository, SqliteRoutineRepository,
+            CurrentRoutineProgress, RoutineRepository, SqliteRoutineRepository,
         },
-        BlockStatus, ObjectiveWithKeyResults,
+        BlockStatus, KeyResult, Objective, ObjectiveWithKeyResults,
     },
     LOCAL_USER_ID,
 };
@@ -143,6 +146,102 @@ impl RoubitClient for LocalClient {
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
+    async fn get_active_routine_progress(
+        &self,
+        date: NaiveDate,
+    ) -> Result<
+        Option<(
+            Routine,
+            Vec<(TimeBlock, BlockStatus)>,
+            CurrentRoutineProgress,
+        )>,
+        ClientError,
+    > {
+        let repo = SqliteRoutineRepository::new(self.pool.clone());
+        let routine_opt = repo
+            .get_active_routine(LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        let Some(routine) = routine_opt else {
+            return Ok(None);
+        };
+
+        let blocks = repo
+            .list_blocks_for_routine(routine.id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        let mut block_statuses = Vec::with_capacity(blocks.len());
+        for block in &blocks {
+            let log_opt = repo
+                .get_daily_log(block.id, LOCAL_USER_ID, date)
+                .await
+                .map_err(|e| ClientError::Local(e.to_string()))?;
+            let status = log_opt.map_or(BlockStatus::Pending, |l| l.status);
+            block_statuses.push((block.clone(), status));
+        }
+
+        let now_time = chrono::Local::now().time();
+        let progress = roubit_core::RoutineProgressTracker::compute_progress(
+            &blocks,
+            &block_statuses,
+            now_time,
+        );
+
+        Ok(Some((routine, block_statuses, progress)))
+    }
+
+    async fn create_routine(
+        &self,
+        name: &str,
+        blocks: &[TimeBlock],
+        is_active: bool,
+    ) -> Result<Routine, ClientError> {
+        let repo = SqliteRoutineRepository::new(self.pool.clone());
+        let routine_id = Uuid::new_v4();
+        let routine = Routine {
+            id: routine_id,
+            user_id: Some(LOCAL_USER_ID),
+            name: name.to_string(),
+            description: None,
+            is_active,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let mut assigned_blocks = blocks.to_vec();
+        for b in &mut assigned_blocks {
+            b.routine_id = routine_id;
+        }
+
+        repo.create_routine_with_blocks(LOCAL_USER_ID, &routine, &assigned_blocks)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        if is_active {
+            repo.set_active_routine(routine_id, LOCAL_USER_ID)
+                .await
+                .map_err(|e| ClientError::Local(e.to_string()))?;
+        }
+
+        Ok(routine)
+    }
+
+    async fn activate_routine(&self, routine_id: Uuid) -> Result<(), ClientError> {
+        let repo = SqliteRoutineRepository::new(self.pool.clone());
+        repo.set_active_routine(routine_id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn delete_routine(&self, routine_id: Uuid) -> Result<(), ClientError> {
+        let repo = SqliteRoutineRepository::new(self.pool.clone());
+        repo.delete_routine(routine_id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
     async fn list_all_objectives(&self) -> Result<Vec<ObjectiveWithKeyResults>, ClientError> {
         let repo = SqliteOkrRepository::new(self.pool.clone());
         repo.list_all_objectives(LOCAL_USER_ID)
@@ -160,6 +259,75 @@ impl RoubitClient for LocalClient {
             .map_err(|e| ClientError::Local(e.to_string()))
     }
 
+    async fn create_objective(
+        &self,
+        title: &str,
+        quarter: &str,
+        description: Option<&str>,
+    ) -> Result<Objective, ClientError> {
+        let repo = SqliteOkrRepository::new(self.pool.clone());
+        let today = chrono::Local::now().date_naive();
+        let quarter_end = today + chrono::Duration::days(90);
+        let objective = Objective::new(
+            title.to_string(),
+            description.map(ToString::to_string),
+            quarter.to_string(),
+            today,
+            quarter_end,
+        )
+        .with_user_id(LOCAL_USER_ID);
+
+        repo.create_objective(LOCAL_USER_ID, &objective)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        Ok(objective)
+    }
+
+    async fn create_key_result(
+        &self,
+        objective_id: Uuid,
+        title: &str,
+        target_value: f64,
+        unit: Option<&str>,
+        linked_habit_id: Option<Uuid>,
+    ) -> Result<KeyResult, ClientError> {
+        let repo = SqliteOkrRepository::new(self.pool.clone());
+        let unit_str = unit.unwrap_or("%").to_string();
+        let kr = if let Some(h_id) = linked_habit_id {
+            KeyResult::new_habit_linked(
+                objective_id,
+                h_id,
+                title.to_string(),
+                target_value,
+                unit_str,
+                1.0,
+            )
+        } else {
+            KeyResult::new_numeric(
+                objective_id,
+                title.to_string(),
+                0.0,
+                target_value,
+                unit_str,
+                1.0,
+            )
+        };
+
+        repo.create_key_result(LOCAL_USER_ID, &kr)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?;
+
+        Ok(kr)
+    }
+
+    async fn delete_objective(&self, objective_id: Uuid) -> Result<(), ClientError> {
+        let repo = SqliteOkrRepository::new(self.pool.clone());
+        repo.delete_objective(objective_id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
     async fn list_journal_metadata(
         &self,
         from: NaiveDate,
@@ -169,6 +337,42 @@ impl RoubitClient for LocalClient {
         repo.list_metadata_in_range(LOCAL_USER_ID, from, to)
             .await
             .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn get_journal_entry(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError> {
+        let repo = SqliteJournalRepository::new(self.pool.clone());
+        repo.get_entry_by_id(id, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn get_journal_entry_by_date(
+        &self,
+        date: NaiveDate,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError> {
+        let repo = SqliteJournalRepository::new(self.pool.clone());
+        repo.get_entry_by_date(date, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+
+    async fn delete_journal_entry_by_date(&self, date: NaiveDate) -> Result<bool, ClientError> {
+        let repo = SqliteJournalRepository::new(self.pool.clone());
+        if let Some(entry) = repo
+            .get_entry_by_date(date, LOCAL_USER_ID)
+            .await
+            .map_err(|e| ClientError::Local(e.to_string()))?
+        {
+            repo.delete_entry(entry.metadata.id, LOCAL_USER_ID)
+                .await
+                .map_err(|e| ClientError::Local(e.to_string()))?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     async fn save_journal(

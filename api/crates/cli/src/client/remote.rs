@@ -1,14 +1,16 @@
 //! Remote REST API client adapter with Idempotency-Key headers and Bearer auth.
 
 use async_trait::async_trait;
+use base64::prelude::*;
 use chrono::NaiveDate;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
 use roubit_core::domain::{
     habit::models::{Habit, HabitLog},
-    journal::models::JournalMetadata,
+    journal::models::{EncryptedJournalEntry, JournalMetadata},
     routine::models::{Routine, TimeBlock},
-    BlockStatus, ObjectiveWithKeyResults,
+    routine::CurrentRoutineProgress,
+    BlockStatus, KeyResult, Objective, ObjectiveWithKeyResults,
 };
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
@@ -203,9 +205,68 @@ struct RoutineWithProgressDto {
     routine: Option<Routine>,
     #[serde(default)]
     blocks: Vec<TimeBlock>,
-    #[allow(dead_code)]
     #[serde(default)]
-    progress: Option<roubit_core::CurrentRoutineProgress>,
+    progress: Option<CurrentRoutineProgress>,
+    #[serde(default)]
+    block_statuses: std::collections::HashMap<Uuid, BlockStatus>,
+    #[serde(default)]
+    completed_block_ids: Vec<Uuid>,
+    #[serde(default)]
+    skipped_block_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct EncryptedJournalResponseDto {
+    id: Uuid,
+    entry_date: NaiveDate,
+    mood_score: Option<u8>,
+    #[serde(default)]
+    tags: Vec<String>,
+    salt_base64: String,
+    nonce_base64: String,
+    ciphertext_base64: String,
+}
+
+impl EncryptedJournalResponseDto {
+    fn try_into_encrypted_entry(self) -> Result<EncryptedJournalEntry, ClientError> {
+        let salt = BASE64_STANDARD
+            .decode(&self.salt_base64)
+            .map_err(|e| ClientError::Local(format!("invalid salt base64: {e}")))?;
+        let nonce = BASE64_STANDARD
+            .decode(&self.nonce_base64)
+            .map_err(|e| ClientError::Local(format!("invalid nonce base64: {e}")))?;
+        let ciphertext = BASE64_STANDARD
+            .decode(&self.ciphertext_base64)
+            .map_err(|e| ClientError::Local(format!("invalid ciphertext base64: {e}")))?;
+
+        let salt_arr: [u8; 16] = salt
+            .try_into()
+            .map_err(|_| ClientError::Local("salt must be 16 bytes".into()))?;
+        let nonce_arr: [u8; 12] = nonce
+            .try_into()
+            .map_err(|_| ClientError::Local("nonce must be 12 bytes".into()))?;
+
+        let metadata = roubit_core::domain::journal::models::JournalMetadata {
+            id: self.id,
+            user_id: None,
+            entry_date: self.entry_date,
+            mood_score: self.mood_score,
+            tags: self.tags,
+            ciphertext_bytes_len: ciphertext.len(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        EncryptedJournalEntry::new(metadata, salt_arr, nonce_arr, ciphertext)
+            .map_err(|e| ClientError::Local(e.to_string()))
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+enum ObjectiveResponseDto {
+    WithKrs(ObjectiveWithKeyResults),
+    Plain(Objective),
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -476,6 +537,259 @@ impl RoubitClient for HttpClient {
             .await?;
 
         Self::handle_empty_response(resp).await
+    }
+
+    async fn get_active_routine_progress(
+        &self,
+        date: NaiveDate,
+    ) -> Result<
+        Option<(
+            Routine,
+            Vec<(TimeBlock, BlockStatus)>,
+            CurrentRoutineProgress,
+        )>,
+        ClientError,
+    > {
+        let url = format!("{}/api/v1/routines", self.base_url);
+        let mut headers = self.build_headers(None);
+        if let Ok(val) = HeaderValue::from_str(&date.to_string()) {
+            headers.insert(HeaderName::from_static("x-local-date"), val);
+        }
+        let now_time = chrono::Local::now().time();
+        if let Ok(val) = HeaderValue::from_str(&now_time.format("%H:%M:%S").to_string()) {
+            headers.insert(HeaderName::from_static("x-local-time"), val);
+        }
+
+        let resp = self.client.get(&url).headers(headers).send().await?;
+
+        let dto: RoutineWithProgressDto = Self::handle_response(resp).await?;
+        let Some(routine) = dto.routine else {
+            return Ok(None);
+        };
+
+        let block_statuses: Vec<(TimeBlock, BlockStatus)> = dto
+            .blocks
+            .iter()
+            .map(|b| {
+                let status = dto.block_statuses.get(&b.id).copied().unwrap_or_else(|| {
+                    if dto.completed_block_ids.contains(&b.id) {
+                        BlockStatus::Completed
+                    } else if dto.skipped_block_ids.contains(&b.id) {
+                        BlockStatus::Skipped
+                    } else {
+                        BlockStatus::Pending
+                    }
+                });
+                (b.clone(), status)
+            })
+            .collect();
+
+        let progress = dto.progress.unwrap_or_else(|| {
+            roubit_core::RoutineProgressTracker::compute_progress(
+                &dto.blocks,
+                &block_statuses,
+                now_time,
+            )
+        });
+
+        Ok(Some((routine, block_statuses, progress)))
+    }
+
+    async fn create_routine(
+        &self,
+        name: &str,
+        blocks: &[TimeBlock],
+        is_active: bool,
+    ) -> Result<Routine, ClientError> {
+        let url = format!("{}/api/v1/routines", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let block_dtos: Vec<serde_json::Value> = blocks
+            .iter()
+            .enumerate()
+            .map(|(idx, b)| {
+                serde_json::json!({
+                    "name": b.name,
+                    "start_time": b.start_time.format("%H:%M").to_string(),
+                    "end_time": b.end_time.format("%H:%M").to_string(),
+                    "category": b.category,
+                    "color_hex": b.color_hex,
+                    "order_index": i32::try_from(idx).unwrap_or(0)
+                })
+            })
+            .collect();
+
+        let payload = serde_json::json!({
+            "name": name,
+            "description": null,
+            "is_active": is_active,
+            "blocks": block_dtos
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
+        Self::handle_response(resp).await
+    }
+
+    async fn activate_routine(&self, routine_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/routines/{routine_id}/activate", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .send()
+            .await?;
+
+        Self::handle_empty_response(resp).await
+    }
+
+    async fn delete_routine(&self, routine_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/routines/{routine_id}", self.base_url);
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(self.build_headers(None))
+            .send()
+            .await?;
+
+        Self::handle_empty_response(resp).await
+    }
+
+    async fn create_objective(
+        &self,
+        title: &str,
+        quarter: &str,
+        description: Option<&str>,
+    ) -> Result<Objective, ClientError> {
+        let url = format!("{}/api/v1/okrs", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "title": title,
+            "quarter": quarter,
+            "description": description
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
+        let res: ObjectiveResponseDto = Self::handle_response(resp).await?;
+        let objective = match res {
+            ObjectiveResponseDto::WithKrs(w) => w.objective,
+            ObjectiveResponseDto::Plain(o) => o,
+        };
+        Ok(objective)
+    }
+
+    async fn create_key_result(
+        &self,
+        objective_id: Uuid,
+        title: &str,
+        target_value: f64,
+        unit: Option<&str>,
+        linked_habit_id: Option<Uuid>,
+    ) -> Result<KeyResult, ClientError> {
+        let url = format!("{}/api/v1/okrs/{objective_id}/key-results", self.base_url);
+        let idempotency_key = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "title": title,
+            "target_value": target_value,
+            "unit": unit.unwrap_or("%"),
+            "linked_habit_id": linked_habit_id
+        });
+
+        let resp = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(Some(idempotency_key)))
+            .json(&payload)
+            .send()
+            .await?;
+
+        Self::handle_response(resp).await
+    }
+
+    async fn delete_objective(&self, objective_id: Uuid) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/okrs/{objective_id}", self.base_url);
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(self.build_headers(None))
+            .send()
+            .await?;
+
+        Self::handle_empty_response(resp).await
+    }
+
+    async fn get_journal_entry(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError> {
+        let url = format!("{}/api/v1/journal/{id}", self.base_url);
+        let resp = self
+            .client
+            .get(&url)
+            .headers(self.build_headers(None))
+            .send()
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        let dto: EncryptedJournalResponseDto = Self::handle_response(resp).await?;
+        dto.try_into_encrypted_entry().map(Some)
+    }
+
+    async fn get_journal_entry_by_date(
+        &self,
+        date: NaiveDate,
+    ) -> Result<Option<EncryptedJournalEntry>, ClientError> {
+        let url = format!("{}/api/v1/journal/by-date/{date}", self.base_url);
+        let resp = self
+            .client
+            .get(&url)
+            .headers(self.build_headers(None))
+            .send()
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        let dto: EncryptedJournalResponseDto = Self::handle_response(resp).await?;
+        dto.try_into_encrypted_entry().map(Some)
+    }
+
+    async fn delete_journal_entry_by_date(&self, date: NaiveDate) -> Result<bool, ClientError> {
+        let url = format!("{}/api/v1/journal/by-date/{date}", self.base_url);
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(self.build_headers(None))
+            .send()
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            Ok(false)
+        } else {
+            Self::handle_empty_response(resp).await?;
+            Ok(true)
+        }
     }
 }
 
