@@ -31,7 +31,8 @@ const emit = defineEmits<{
   }): void
 }>()
 
-useModal(() => props.isOpen, () => emit('close'))
+const modalContainer = ref<HTMLElement | null>(null)
+useModal(() => props.isOpen, () => emit('close'), modalContainer)
 
 const routineStore = useRoutineStore()
 
@@ -189,6 +190,10 @@ function handleSave() {
       @click="emit('close')"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="routine-modal-title"
         class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
@@ -199,13 +204,14 @@ function handleSave() {
               <Clock class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Criar / Configurar Rotina</h3>
+              <h2 id="routine-modal-title" class="text-base sm:text-lg font-bold text-white font-outfit">Criar / Configurar Rotina</h2>
               <p class="text-xs text-zinc-400">Estruture seus blocos de tempo diários e rotina ativa</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
+            aria-label="Fechar modal"
             class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
@@ -225,10 +231,11 @@ function handleSave() {
           <!-- Routine Info -->
           <div class="space-y-3">
             <div>
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              <label for="routine-name" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Nome da Rotina *
               </label>
               <input
+                id="routine-name"
                 v-model="routineName"
                 type="text"
                 required
@@ -238,10 +245,11 @@ function handleSave() {
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              <label for="routine-description" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
                 Descrição (opcional)
               </label>
               <input
+                id="routine-description"
                 v-model="routineDescription"
                 type="text"
                 placeholder="Ex: Cronograma otimizado para dias úteis"

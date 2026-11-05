@@ -11,7 +11,7 @@
 [![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?logo=docker)](docker-compose.yml)
 [![P99 Latency](https://img.shields.io/badge/P99%20Latency-4.875ms-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
 [![Memory RSS](https://img.shields.io/badge/Memory%20RSS-13.11MB-success)](docs/benchmarks/01-load-test-p99-memory-report.md)
-[![Tests](https://img.shields.io/badge/Tests-200%2B%20Rust%20%7C%2080%20Vitest-success)](docs/02-status-atividades.md)
+[![Tests](https://img.shields.io/badge/Tests-200%2B%20Rust%20%7C%20112%20Vitest-success)](docs/02-status-atividades.md)
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 ---
@@ -329,7 +329,10 @@ cargo test --test crypto_vectors --manifest-path api/Cargo.toml
 # Run in-process P99 load benchmark
 cargo test --test load_p99_benchmark --manifest-path api/Cargo.toml --release -- --nocapture
 
-# Run frontend Vitest suite (80 unit and integration tests)
+# Run frontend ESLint check
+npm run lint --prefix frontend
+
+# Run frontend Vitest suite (112 unit and integration tests)
 npm test --prefix frontend
 
 # Type-check TypeScript and build production PWA bundle
@@ -354,11 +357,15 @@ roubit/
 │   ├── 00-especificacao-tecnica.md
 │   ├── 01-plano-de-desenvolvimento.md
 │   ├── 02-status-atividades.md
+│   ├── 04-plano-de-melhorias-e-correcoes.md
 │   ├── features/            # Feature prompts & engineering activities (16 features)
+│   ├── improvements/        # Cycle improvements & QA prompts (6 phases)
 │   └── benchmarks/          # P99 latency and RSS load reports
 ├── scripts/                 # Quality assurance scripts (pre-commit.sh)
 ├── tests/load/              # K6 distributed load testing scenarios
-└── docker-compose.yml       # Production stack orchestration (PostgreSQL + Redis + API + SPA)
+├── docker-compose.yml       # Production stack orchestration (PostgreSQL + Redis + API + SPA)
+├── LICENSE-MIT              # MIT License
+└── LICENSE-APACHE           # Apache 2.0 License
 ```
 
 ---

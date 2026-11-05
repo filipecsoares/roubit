@@ -72,9 +72,9 @@ export default function (data) {
       'Idempotency-Key': idempotencyKey,
     });
     const payload = JSON.stringify({
-      log_date: '2026-10-30',
-      actual_value: 1.0,
-      is_completed: true,
+      date: '2026-10-30',
+      value: 1.0,
+      is_increment: false,
     });
 
     const res = http.post(

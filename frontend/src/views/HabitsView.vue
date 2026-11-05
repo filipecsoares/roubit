@@ -7,20 +7,12 @@ import HeatmapCalendar from '@/components/habits/HeatmapCalendar.vue'
 import HabitManageModal from '@/components/habits/HabitManageModal.vue'
 import type { HabitKind } from '@/types'
 import { formatLocalDate, addDaysLocal } from '@/utils/date'
+import { useToast } from '@/composables/useToast'
 
 const habitStore = useHabitStore()
+const { toastMessage, showToast } = useToast()
 
 const isModalOpen = ref(false)
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
-
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
 
 // Stats metrics
 const totalActiveHabits = computed(() => habitStore.habits.length)
@@ -69,7 +61,7 @@ async function handleCreateHabit(payload: {
     await habitStore.fetchAnalytics().catch(() => {})
     showToast('Hábito criado com sucesso!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criar hábito', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -96,7 +88,7 @@ async function handleCheckin(habitId: string, isCompletedCurrently: boolean) {
     habitItem.today_value = prevValue
     habitItem.streak.is_active_today = prevActive
     habitItem.streak.current_streak = prevStreak
-    showToast(err.message || 'Erro ao registrar check-in', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -107,7 +99,7 @@ async function handleArchiveHabit(habitId: string, habitName: string) {
     await habitStore.fetchAnalytics().catch(() => {})
     showToast(`Hábito "${habitName}" arquivado com sucesso.`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao arquivar hábito', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -118,7 +110,7 @@ async function handleDeleteHabit(habitId: string, habitName: string) {
     await habitStore.fetchAnalytics().catch(() => {})
     showToast(`Hábito "${habitName}" excluído com sucesso.`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao excluir hábito', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -133,6 +125,8 @@ onMounted(() => {
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
+      role="status"
+      aria-live="polite"
       class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'
@@ -211,8 +205,17 @@ onMounted(() => {
         <span class="text-xs text-slate-400 font-mono">{{ habitStore.habits.length }} cadastrados</span>
       </div>
 
+      <!-- Loading state -->
       <div
-        v-if="habitStore.habits.length === 0"
+        v-if="habitStore.loading && habitStore.habits.length === 0"
+        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border/40 animate-pulse space-y-2"
+      >
+        <Sparkles class="w-8 h-8 text-slate-500 mx-auto mb-2 animate-spin" />
+        <h3 class="text-sm font-semibold text-slate-300">Carregando hábitos...</h3>
+      </div>
+
+      <div
+        v-else-if="habitStore.habits.length === 0"
         class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border"
       >
         <Sparkles class="w-8 h-8 text-slate-500 mx-auto mb-2" />

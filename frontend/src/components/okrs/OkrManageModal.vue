@@ -35,7 +35,8 @@ const emit = defineEmits<{
   }): void
 }>()
 
-useModal(() => props.isOpen, () => emit('close'))
+const modalContainer = ref<HTMLElement | null>(null)
+useModal(() => props.isOpen, () => emit('close'), modalContainer)
 
 const title = ref('')
 const description = ref('')
@@ -129,9 +130,16 @@ function handleSave() {
     end_date: endDate.value || undefined,
     key_results: validKrs,
   })
-
-  resetForm()
 }
+
+watch(
+  () => props.isOpen,
+  (open, wasOpen) => {
+    if (!open && wasOpen) {
+      resetForm()
+    }
+  }
+)
 </script>
 
 <template>
@@ -142,6 +150,10 @@ function handleSave() {
       @click="emit('close')"
     >
       <div
+        ref="modalContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="okr-modal-title"
         class="w-full max-w-2xl bg-surface-card border border-surface-border rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto"
         @click.stop
       >
@@ -152,13 +164,14 @@ function handleSave() {
               <Target class="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 class="text-base sm:text-lg font-bold text-white font-outfit">Novo Objetivo Estratégico (OKR)</h3>
+              <h2 id="okr-modal-title" class="text-base sm:text-lg font-bold text-white font-outfit">Novo Objetivo Estratégico (OKR)</h2>
               <p class="text-xs text-zinc-400">Defina o objetivo e seus Resultados-Chave mensuráveis</p>
             </div>
           </div>
           <button
             type="button"
             @click="emit('close')"
+            aria-label="Fechar modal"
             class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-surface-border/60 transition-colors touch-target sm:min-h-0 sm:min-w-0"
           >
             <X class="w-5 h-5" />
@@ -170,10 +183,11 @@ function handleSave() {
           <!-- Title & Quarter -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div class="sm:col-span-2 space-y-1.5">
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <label for="okr-title" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                 Título do Objetivo *
               </label>
               <input
+                id="okr-title"
                 v-model="title"
                 type="text"
                 required
@@ -183,10 +197,11 @@ function handleSave() {
             </div>
 
             <div class="space-y-1.5">
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <label for="okr-quarter" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                 Trimestre *
               </label>
               <input
+                id="okr-quarter"
                 v-model="quarter"
                 type="text"
                 required
@@ -198,10 +213,11 @@ function handleSave() {
 
           <!-- Description -->
           <div class="space-y-1.5">
-            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+            <label for="okr-description" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
               Descrição do Objetivo (opcional)
             </label>
             <textarea
+              id="okr-description"
               v-model="description"
               rows="2"
               placeholder="Explique o propósito e o impacto esperado deste objetivo..."

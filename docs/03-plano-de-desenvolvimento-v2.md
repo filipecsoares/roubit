@@ -92,36 +92,36 @@ flowchart TD
 ### Fase 9: Modo Híbrido na CLI Rust (`roubit --remote` / `ROUBIT_API_URL`)
 *Objetivo: Permitir que desenvolvedores utilizem a CLI localmente ou apontando para uma API REST remota com segurança e controle de sessão.*
 
-- [ ] **9.1 Abstração de Transporte e Cliente HTTP na CLI (`RoubitClient`)**
-  - [ ] Definir a trait assíncrona `RoubitClient` desacoplando a interface Clap da camada de persistência.
-  - [ ] Implementar `LocalClient` (chamadas diretas ao SQLite via `roubit-core`) e `HttpClient` (chamadas REST assíncronas com `reqwest`).
-  - [ ] Suporte à flag global `--remote <URL>` e à variável de ambiente `ROUBIT_API_URL`.
-- [ ] **9.2 Gerenciamento Seguro de Credenciais da CLI (`~/.roubit/`)**
-  - [ ] Implementar subcomando `roubit auth login` (solicitação de e-mail e senha com máscara de terminal).
-  - [ ] Armazenar o token JWT de acesso em `~/.roubit/credentials.json` com permissões restritas de arquivo Unix (`0600`).
-  - [ ] Subcomando `roubit auth logout` e `roubit auth status`.
-- [ ] **9.3 Injeção Automática de Headers de Idempotência e Autorização**
-  - [ ] Injetar cabeçalho `Authorization: Bearer <token>` em todas as requisições autenticadas da CLI.
-  - [ ] Gerar e transmitir cabeçalho `Idempotency-Key` com UUIDv4 em todos os comandos de mutação (`habit checkin`, `routine complete`, `journal write`).
-- [ ] **9.4 Testes de Integração e E2E da CLI Remota**
-  - [ ] Testes automatizados executando binário `roubit-cli` contra um servidor Axum in-process testando login, check-in e saída formatada no terminal.
+- [x] **9.1 Abstração de Transporte e Cliente HTTP na CLI (`RoubitClient`)**
+  - [x] Definir a trait assíncrona `RoubitClient` desacoplando a interface Clap da camada de persistência.
+  - [x] Implementar `LocalClient` (chamadas diretas ao SQLite via `roubit-core`) e `HttpClient` (chamadas REST assíncronas com `reqwest`).
+  - [x] Suporte à flag global `--remote <URL>` e à variável de ambiente `ROUBIT_API_URL`.
+- [x] **9.2 Gerenciamento Seguro de Credenciais da CLI (`~/.roubit/`)**
+  - [x] Implementar subcomando `roubit auth login` (solicitação de e-mail e senha com máscara de terminal).
+  - [x] Armazenar o token JWT de acesso em `~/.roubit/credentials.json` com permissões restritas de arquivo Unix (`0600`).
+  - [x] Subcomando `roubit auth logout` e `roubit auth status`.
+- [x] **9.3 Injeção Automática de Headers de Idempotência e Autorização**
+  - [x] Injetar cabeçalho `Authorization: Bearer <token>` em todas as requisições autenticadas da CLI.
+  - [x] Gerar e transmitir cabeçalho `Idempotency-Key` com UUIDv4 em todos os comandos de mutação (`habit checkin`, `routine complete`, `journal write`).
+- [x] **9.4 Testes de Integração e E2E da CLI Remota**
+  - [x] Testes automatizados executando binário `roubit-cli` contra um servidor Axum in-process testando login, check-in e saída formatada no terminal.
 
 ---
 
 ### Fase 10: Homologação, Hardening de Segurança & Release v2.0
 *Objetivo: Assegurar estabilidade total, auditoria de segurança estrita e publicação da versão 2.0.*
 
-- [ ] **10.1 Auditoria de Segurança Multi-tenant & OWASP**
-  - [ ] Varredura estrita contra vazamento de memória com `zeroize` em novos fluxos de autenticação na CLI.
-  - [ ] Auditoria de endpoints para garantir ausência total de vulnerabilidades IDOR.
-- [ ] **10.2 Bateria Completa de Testes Automatizados**
-  - [ ] Backend: `cargo fmt --check`, `cargo clippy --all-targets` (0 warnings), `cargo test` (unitários + integração).
-  - [ ] Frontend: `npm test` (Vitest com 100% de aprovação), `npm run build` (`vue-tsc -b && vite build`).
-- [ ] **10.3 Atualização Documental e Guias de Operação**
-  - [ ] Atualização do [README.md](file:///home/filipe/Documents/projects/roubit/README.md) com novos comandos da CLI remota e variáveis de ambiente.
-  - [ ] Atualização do [02-status-atividades.md](file:///home/filipe/Documents/projects/roubit/docs/02-status-atividades.md) e [features/README.md](file:///home/filipe/Documents/projects/roubit/docs/features/README.md).
-- [ ] **10.4 Publicação da Release v2.0**
-  - [ ] Geração de tag Git `v2.0.0` e compilação de binários de release.
+- [x] **10.1 Auditoria de Segurança Multi-tenant & OWASP**
+  - [x] Varredura estrita contra vazamento de memória com `zeroize` em novos fluxos de autenticação na CLI.
+  - [x] Auditoria de endpoints para garantir ausência total de vulnerabilidades IDOR.
+- [x] **10.2 Bateria Completa de Testes Automatizados**
+  - [x] Backend: `cargo fmt --check`, `cargo clippy --all-targets` (0 warnings), `cargo test` (unitários + integração).
+  - [x] Frontend: `npm test` (Vitest com 100% de aprovação), `npm run build` (`vue-tsc -b && vite build`).
+- [x] **10.3 Atualização Documental e Guias de Operação**
+  - [x] Atualização do [README.md](file:///home/filipe/Documents/projects/roubit/README.md) com novos comandos da CLI remota e variáveis de ambiente.
+  - [x] Atualização do [02-status-atividades.md](file:///home/filipe/Documents/projects/roubit/docs/02-status-atividades.md) e [features/README.md](file:///home/filipe/Documents/projects/roubit/docs/features/README.md).
+- [x] **10.4 Publicação da Release v2.0**
+  - [x] Geração de tag Git `v2.0.0` e compilação de binários de release.
 
 ---
 

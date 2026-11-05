@@ -42,6 +42,8 @@ const moods = [
             : 'border-surface-border bg-surface-dark/50 text-slate-400 hover:border-slate-700 hover:text-slate-200'
         "
         :title="m.label"
+        :aria-label="m.label"
+        :aria-pressed="modelValue === m.score"
       >
         <span class="text-xl leading-none">{{ m.emoji }}</span>
         <span class="text-[10px] font-medium truncate hidden sm:block">{{ m.label }}</span>

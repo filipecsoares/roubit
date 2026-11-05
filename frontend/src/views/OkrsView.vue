@@ -6,9 +6,11 @@ import { useHabitStore } from '@/stores/habit'
 import ObjectiveCard from '@/components/okrs/ObjectiveCard.vue'
 import LinkHabitModal from '@/components/okrs/LinkHabitModal.vue'
 import OkrManageModal from '@/components/okrs/OkrManageModal.vue'
+import { useToast } from '@/composables/useToast'
 
 const okrStore = useOkrStore()
 const habitStore = useHabitStore()
+const { toastMessage, showToast } = useToast()
 
 const quarters = ['2026-Q4', '2026-Q3', '2027-Q1', '2027-Q2']
 const selectedQuarter = ref(okrStore.quarter)
@@ -19,18 +21,6 @@ const selectedKrId = ref<string | null>(null)
 const selectedKrTitle = ref('')
 
 const isCreateModalOpen = ref(false)
-
-// Toast notifications
-const toastMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
-
-function showToast(text: string, type: 'success' | 'error' = 'success') {
-  toastMessage.value = { text, type }
-  setTimeout(() => {
-    if (toastMessage.value?.text === text) {
-      toastMessage.value = null
-    }
-  }, 4000)
-}
 
 // Habits map: habitId -> habitName
 const habitsMap = computed<Record<string, string>>(() => {
@@ -102,7 +92,7 @@ async function handleLinkConfirm(habitId: string) {
     const habitName = habitsMap.value[habitId] || 'Hábito'
     showToast(`Resultado-Chave vinculado ao hábito "${habitName}"!`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao vincular hábito ao Resultado-Chave', 'error')
+    showToast(err, 'error')
   } finally {
     isLinkModalOpen.value = false
     selectedKrId.value = null
@@ -114,7 +104,7 @@ async function handleQuarterChange(quarter: string) {
   try {
     await okrStore.fetchOkrs(quarter)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao carregar OKRs do trimestre', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -138,7 +128,7 @@ async function handleCreateObjective(payload: {
     isCreateModalOpen.value = false
     showToast('Objetivo e Resultados-Chave cadastrados com sucesso!')
   } catch (err: any) {
-    showToast(err.message || 'Erro ao criar objetivo', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -150,7 +140,7 @@ async function handleDeleteObjective(objectiveId: string) {
     await okrStore.deleteObjective(objectiveId)
     showToast(`Objetivo "${title}" excluído com sucesso.`)
   } catch (err: any) {
-    showToast(err.message || 'Erro ao excluir objetivo', 'error')
+    showToast(err, 'error')
   }
 }
 
@@ -169,6 +159,8 @@ onMounted(async () => {
     <!-- Toast Notification -->
     <div
       v-if="toastMessage"
+      role="status"
+      aria-live="polite"
       class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-sm transition-all"
       :class="
         toastMessage.type === 'success'
@@ -258,9 +250,18 @@ onMounted(async () => {
         <span class="text-xs text-slate-400 font-mono">{{ okrStore.objectives.length }} no trimestre</span>
       </div>
 
+      <!-- Loading state -->
+      <div
+        v-if="okrStore.loading && okrStore.objectives.length === 0"
+        class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border/40 animate-pulse space-y-2"
+      >
+        <Target class="w-8 h-8 text-slate-500 mx-auto mb-2 animate-spin" />
+        <h3 class="text-sm font-semibold text-slate-300">Carregando objetivos e OKRs...</h3>
+      </div>
+
       <!-- Empty state with CTA button -->
       <div
-        v-if="okrStore.objectives.length === 0"
+        v-else-if="okrStore.objectives.length === 0"
         class="text-center py-16 px-4 rounded-2xl border border-dashed border-surface-border space-y-4"
       >
         <div class="inline-flex p-3 rounded-2xl bg-surface-border/40 text-slate-400">

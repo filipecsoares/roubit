@@ -7,6 +7,18 @@ export const POMODORO_LONG_FOCUS_SECONDS = 50 * 60 // 50 minutes (deep work)
 export const POMODORO_SHORT_BREAK_SECONDS = 5 * 60  // 5 minutes
 export const POMODORO_LONG_BREAK_SECONDS = 15 * 60  // 15 minutes
 
+let sharedAudioContext: AudioContext | null = null
+
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+  if (!AudioCtx) return null
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioCtx()
+  }
+  return sharedAudioContext
+}
+
 export const useFocusStore = defineStore('focus', () => {
   const mode = ref<FocusModeType>('pomodoro')
   const durationSeconds = ref(POMODORO_FOCUS_SECONDS)
@@ -51,12 +63,11 @@ export const useFocusStore = defineStore('focus', () => {
    */
   function playChime() {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      if (!AudioCtx) return
+      const ctx = getSharedAudioContext()
+      if (!ctx) return
 
-      const ctx = new AudioCtx()
       if (ctx.state === 'suspended') {
-        ctx.resume()
+        ctx.resume().catch(() => {})
       }
 
       const now = ctx.currentTime

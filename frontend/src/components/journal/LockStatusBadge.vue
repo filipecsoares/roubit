@@ -3,7 +3,7 @@ import { Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-vue-next'
 
 const props = withDefaults(
   defineProps<{
-    isUnlocked: boolean
+    isUnlocked?: boolean
     loading?: boolean
   }>(),
   {

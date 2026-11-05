@@ -37,7 +37,7 @@ flowchart TD
   - [x] Definir padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
 - [x] **0.3 Configuração Inicial de CI no GitHub Actions**
   - [x] Criar workflow `.github/workflows/rust-ci.yml` (`cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo audit`).
-  - [ ] Criar workflow base `.github/workflows/vue-ci.yml` (lint e type check para o frontend).
+  - [x] Criar workflow base `.github/workflows/vue-ci.yml` (lint e type check para o frontend).
 
 ---
 
@@ -96,8 +96,8 @@ flowchart TD
   - [x] **Hábitos:** `GET /api/v1/habits`, `POST /api/v1/habits`, `POST /api/v1/habits/:id/checkin` (com suporte a Idempotency-Key).
   - [x] **OKRs:** `GET /api/v1/okrs`, `POST /api/v1/okrs`.
   - [x] **Journaling:** `GET /api/v1/journal`, `POST /api/v1/journal` (recebimento exclusivo de payload cifrado e metadados abertos).
-- [ ] **2.5 Adaptação da CLI para Modo Híbrido**
-  - [ ] Permitir que a CLI opere conectando-se à API HTTP REST via flag/configuração (`--remote` / `ROUBIT_API_URL`), além do modo local SQLite.
+- [x] **2.5 Adaptação da CLI para Modo Híbrido**
+  - [x] Permitir que a CLI opere conectando-se à API HTTP REST via flag/configuração (`--remote` / `ROUBIT_API_URL`), além do modo local SQLite.
 - [x] **2.6 Validação de Segurança & CI da Fase 2**
   - [x] Testes E2E dos endpoints HTTP REST.
   - [x] Testes de concorrência e teste de validação do header de idempotência.
