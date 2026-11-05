@@ -140,7 +140,7 @@ flowchart TD
 - [x] **06.3 Testes Vitest para as 5 Views Principais & ESLint no Pipeline CI** ([activity-03-frontend-views-vitest-and-eslint-ci.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-03-frontend-views-vitest-and-eslint-ci.prompt))
   - [x] Criar suíte de testes de integração Vitest para `LoginView.vue`, `DashboardView.vue`, `HabitsView.vue`, `OkrsView.vue` e `JournalView.vue`.
   - [x] Configurar ESLint no frontend (`package.json`), adicioná-lo ao `.github/workflows/vue-ci.yml` e atualizar `scripts/pre-commit.sh`.
-- [ ] **06.4 Correção de Benchmarks (k6 / P99), Limpeza do Repositório & Consolidação Documental** ([activity-04-benchmarks-cleanup-and-docs-consolidation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-04-benchmarks-cleanup-and-docs-consolidation.prompt))
-  - [ ] Corrigir payload de check-in em `tests/load/k6_benchmark.js` (`date`, `value`, `is_increment`) e alinhar `load_p99_benchmark.rs` sem sujar a árvore Git durante `cargo test`.
-  - [ ] Remover arquivos residuais (`roubit.db*`, `frontend/dev-dist/`, especificação duplicada em `docs/`, assets não utilizados), adicionar `LICENSE-MIT` e `LICENSE-APACHE`, e consolidar toda a documentação (`README.md`, `01`, `02`, `03`, `04`).
+- [x] **06.4 Correção de Benchmarks (k6 / P99), Limpeza do Repositório & Consolidação Documental** ([activity-04-benchmarks-cleanup-and-docs-consolidation.prompt](file:///home/filipe/Documents/projects/roubit/docs/improvements/06-ux-accessibility-qa-and-docs/activity-04-benchmarks-cleanup-and-docs-consolidation.prompt))
+  - [x] Corrigir payload de check-in em `tests/load/k6_benchmark.js` (`date`, `value`, `is_increment`) e alinhar `load_p99_benchmark.rs` sem sujar a árvore Git durante `cargo test`.
+  - [x] Remover arquivos residuais (`roubit.db*`, `frontend/dev-dist/`, especificação duplicada em `docs/`, assets não utilizados), adicionar `LICENSE-MIT` e `LICENSE-APACHE`, e consolidar toda a documentação (`README.md`, `01`, `02`, `03`, `04`).
 

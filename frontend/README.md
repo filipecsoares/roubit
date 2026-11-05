@@ -7,7 +7,8 @@
 [![Vite](https://img.shields.io/badge/Vite-8.3%2B-646CFF?logo=vite)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4%2B-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![PWA Ready](https://img.shields.io/badge/PWA-Workbox%20%26%20IndexedDB-5A0FC8?logo=pwa)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
-[![Tests](https://img.shields.io/badge/Vitest-80%2F80%20Passing-success)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-112%2F112%20Passing-success)](https://vitest.dev/)
+[![ESLint](https://img.shields.io/badge/ESLint-Passing-4B32C3?logo=eslint)](package.json)
 
 ---
 
@@ -48,8 +49,11 @@ npm install
 # Start development server with proxy to backend (http://127.0.0.1:8080)
 npm run dev
 
-# Run Vitest test suites (80 unit and integration tests)
+# Run Vitest test suites (112 unit and integration tests across stores, services, components and views)
 npm test
+
+# Run ESLint check
+npm run lint
 
 # Type-check TypeScript code and build production PWA bundle
 npm run build
@@ -72,9 +76,10 @@ frontend/src/
 │   ├── journal/     # Zero-knowledge vault unlock, editor & timeline
 │   ├── okrs/        # Objectives list, Key Results & progress bars
 │   └── pwa/         # PWA install and service worker update prompts
-├── composables/     # Vue composables (usePwa, useModal, useNotification)
+├── composables/     # Vue composables (usePwa, useModal, useToast, useNotification)
 ├── services/        # WebCrypto (AES-256-GCM/Argon2id), Axios API, Offline Queue (IndexedDB)
 ├── stores/          # Pinia stores (auth, routine, habit, okr, journal, focus, notification)
 ├── router/          # Vue Router navigation & auth guards
 └── views/           # Top-level route views (Dashboard, Habits, OKRs, Journal, Login)
+    └── __tests__/   # Integration tests for all 5 top-level views
 ```
